@@ -1,6 +1,6 @@
 _addon.name = 'Vanguard'
 _addon.author = 'Daviant'
-_addon.version = '0.12.0'
+_addon.version = '0.13.0'
 _addon.commands = {'vanguard', 'vg'}
 
 --[[
@@ -1473,6 +1473,7 @@ local help = [[Vanguard commands (//vg ...):
   pianissimo <song> > <name>|clear  Bard single-target songs
   chain <skillchain>|off            Scholar Immanence skillchains (liquefaction, fusion, ...)
   update [install|on|off]           check for / install a newer Vanguard from its GitHub page
+  reload                            reload Vanguard (the panel does this after updating it)
   all <command>                     run a vg command on every character
   to <name> <command>               run a vg command on one character]]
 
@@ -1528,6 +1529,9 @@ windower.register_event('addon command', function(cmd, ...)
         safety.gs(windower.ffxi.get_player(), rest)
     elseif cmd == 'update' then
         update.command(args)
+    elseif cmd == 'reload' then
+        log('Reloading Vanguard...')
+        windower.send_command('lua reload vanguard')
     elseif cmd == 'rolls' then
         support.rolls(windower.ffxi.get_player(), rest, apply_rolls)
     elseif cmd == 'pianissimo' then

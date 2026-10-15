@@ -1,40 +1,38 @@
 # Vanguard
 
 A multibox party assistant for Final Fantasy XI (Windower 4): your other characters follow, assist, heal, buff,
-sing, roll, bubble and enfeeble on their own, with a desktop control panel. Commands: `//vg help`.
+sing, roll, bubble and enfeeble on their own, and you run them all from one desktop app, **Vanguard Control**.
 
 > Automation tools break Square Enix's terms of service and can get accounts banned. Supervise your characters;
 > don't leave them running unattended.
 
-## Install
+## Install (the app does it)
 
-1. Download this page (green **Code** button > **Download ZIP**). Copy the **Vanguard** folder into
-   `Windower\addons\` (so you have `Windower\addons\Vanguard\Vanguard.lua`).
-2. In game, on every character: `//lua load vanguard`. To load it at every start, add `lua load vanguard` to
-   `Windower\scripts\init.txt`.
-3. Optional: the **VanguardControl** folder holds the desktop panel. Put it anywhere and run `Vanguard Control.exe`
-   (Windows may warn about an unknown app the first time: More info > Run anyway). Everything the panel does can
-   also be typed as `//vg` commands.
+1. Download this page (green **Code** button > **Download ZIP**) and unzip it. Open the **VanguardControl** folder and
+   run `Vanguard Control.exe` (Windows may warn about an unknown app the first time: More info > Run anyway).
+2. The app finds your Windower folder (or asks you to pick it), installs the Vanguard addon into
+   `Windower\addons\Vanguard` and sets it to load when the game starts.
+3. Start the game (or, if it's already running, type `//lua load vanguard` once in each game window). Your characters
+   appear in the app: click the one you play, **Set up party**, **Start all**.
 
-## Updates
+## Updates (automatic)
 
-Vanguard checks this page when it loads and tells you when there's a newer version.
-`//vg update install` downloads it (only Vanguard's own files; your settings are never touched), then
-`//lua r vanguard` on each character. `//vg update off` stops the check.
-Vanguard Control updates itself: when it starts (and every 6 hours) it checks this page and, if there's a newer
-panel, downloads it and restarts. To turn that off, put an empty file named `noupdate.txt` next to the exe.
+The app checks this page when it starts and every 6 hours. A newer version downloads by itself, restarts the app,
+updates the addon and reloads it on your characters. Your settings are never touched. To turn it off, put an empty
+file named `noupdate.txt` next to the exe (you can still use **Check for updates** in the app).
+Without the app: copy the **Vanguard** folder into `Windower\addons\`; `//vg update install` updates it.
 
 ## What it sends to the game
 
 Only normal commands, the same ones you could type: `/ma`, `/ja`, `/ws`, `/ra`, `/attack`, `/pcmd`, `/mount`,
 `/heal` and so on, plus walking (Windower's run, like the follow addons). No packets are injected. The characters
-talk to each other and to the panel only on your own PC (Windower's IPC and a local UDP port, 127.0.0.1:47000).
+talk to each other and to the app only on your own PC (Windower's IPC and a local UDP port, 127.0.0.1:47000).
 
 ---
 
 ## Setup (once)
 
-Load Vanguard on every character (see Install above) and start **Vanguard Control**.
+Run **Vanguard Control**; it installs the addon (see Install above).
 
 ## Every session: 3 clicks
 
@@ -219,6 +217,20 @@ Settings are now saved safely with several characters running (one character's s
   add more lines (e.g. `Sentinel's Scherzo > CharA`). `//vg pianissimo` shows them, `//vg pianissimo clear` empties.
   Got a Terpander / Daurdabla? Just put 3 or 4 songs in the song list.
 - **Horde Lullaby.** With `//vg sleep on`, two or more extra mobs get Horde Lullaby (or Sleepga) at once.
+
+## The app does the work (new in 0.13.0 / Vanguard Control 1.2.0)
+
+- **Installs Vanguard for you.** Vanguard Control finds the Windower folder (or asks you to pick it), installs the
+  addon that's built into the app into `Windower\addons\Vanguard`, and adds `lua load vanguard` to `scripts\init.txt`.
+  Settings are never touched.
+- **Keeps it up to date.** A newer app carries a newer addon: it installs it and reloads Vanguard on characters still
+  running the old one. A yellow bar at the top says if anything needs you (pick a folder, start the game, ...).
+- **Team tab.** Everything for the whole party in one place: set up / invite, hold / come / camp / retreat,
+  formation, GearSwap defense, fighting rules, bar spells, Corsair rolls, sleeping extra mobs, XP party, team setups,
+  and the helpers (alerts, mount, food / Reraise, sneak, rest, overview box, away pause).
+- **Job extras** on the Job tab: Scholar skillchains, Corsair roll set / risk / reach, Bard NiTro and Pianissimo
+  songs, Geomancer hate list / Entrust / Radial Arcana, Red Mage Saboteur / Stymie, -na for the party.
+- **App & updates tab:** versions, Windower folder, check for updates, reinstall, reload everyone.
 
 ## Updates and sharing (new in 0.12.0)
 

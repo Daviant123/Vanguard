@@ -85,6 +85,15 @@ label.field select { min-width: 190px; color: var(--text); font-size: 13px; }
 .empty { color: var(--muted); padding: 10px 2px; }
 .steps { color: var(--muted); margin: 6px 0 0; padding-left: 18px; }
 .steps b { color: var(--text); }
+#addonbar { display: none; padding: 8px 14px; border-bottom: 1px solid var(--line); background: #2b2618; gap: 8px; align-items: center; flex-wrap: wrap; }
+#addonbar.show { display: flex; }
+#addonbar.ok { background: rgba(76,175,122,.08); }
+#addonbar b { color: var(--accent); }
+.pill.warn { background: rgba(224,96,90,.18); color: var(--bad); }
+.btns { display: flex; flex-wrap: wrap; gap: 6px; }
+.btns button.on { border-color: var(--good); color: var(--good); }
+.kv { display: grid; grid-template-columns: 150px 1fr; gap: 4px 10px; font-size: 12px; }
+.kv span:nth-child(odd) { color: var(--muted); }
 </style>
 </head>
 <body>
@@ -96,10 +105,12 @@ label.field select { min-width: 190px; color: var(--text); font-size: 13px; }
   <div class="status" id="status">Waiting for characters…</div>
   <button onclick="quitApp()" title="Close Vanguard Control">Quit</button>
 </header>
+<div id="addonbar"></div>
 <div class="layout">
   <aside id="chars">
     <div class="empty">No characters yet.
       <ol class="steps">
+        <li>Follow the bar above if it asks for anything (the app installs Vanguard for you).</li>
         <li>Log in your characters with Windower.</li>
         <li>Click the one you play, then <b>Set up party</b>.</li>
         <li>Tick what each one should do, then <b>Start all</b>.</li>
@@ -115,8 +126,8 @@ label.field select { min-width: 190px; color: var(--text); font-size: 13px; }
 <script>
 const MODULES = ["follow","assist","heal","raise","cleanse","buffs","mana","rest","actions","ws","sc","burst","songs","geo","debuff","dispel","triggers","trusts","farm"];
 const GROUPS = ["Buffs","Offense","Defense","Healing","Support","Debuffs","Pet","Recovery"];
-let chars = {}, selected = null, since = 0, tab = "job", bodyKey = "", headKey = "", listKey = "";
-try { tab = localStorage.getItem("vg.tab") || "job"; } catch (e) {}
+let chars = {}, selected = null, since = 0, tab = "team", bodyKey = "", headKey = "", listKey = "", addon = {}, addonKey = "";
+try { tab = localStorage.getItem("vg.tab") || "team"; } catch (e) {}
 
 const $ = id => document.getElementById(id);
 const arr = x => Array.isArray(x) ? x : [];
@@ -130,7 +141,13 @@ function post(target, command) {
     .then(() => setTimeout(() => fetch("/api/send", {method: "POST", headers: {"Content-Type": "application/json"},
       body: JSON.stringify({target, command: "profile"})}), 350));
 }
-function send(cmd) { if (selected) post(selected, cmd); }
+function send(cmd) {
+  if (cmd.startsWith("__all ")) return post("*", cmd.slice(6));
+  if (cmd.startsWith("__lead ")) { const c = cmd.slice(7); if (c.trim() === "rolls" || c.trim() === "rolls ") return; return lead(c); }
+  if (cmd.startsWith("__app ")) { const [, k, v] = cmd.split(" "); return addonDo(k, "&on=" + v); }
+  if (cmd.trim() === "rolls") return;      // "— pick a set —"
+  if (selected) post(selected, cmd);
+}
 function setupParty() {
   if (!selected) { alert("Click the character you play first. It becomes the leader."); return; }
   fetch("/api/setup?leader=" + encodeURIComponent(selected));
@@ -155,13 +172,14 @@ const slider = (label, setting, val, min, max, step = 1, unit = "%") =>
 // ---------- tabs ----------
 function tabsFor(p) {
   const m = p.menu || {}, cfg = p.config || {};
-  const t = [{id: "job", label: "Job & abilities"}];
+  const t = [{id: "team", label: "Team"}, {id: "job", label: "Job & abilities"}];
   if (m.can_cure || m.can_raise || arr(m.cleanse).length) t.push({id: "heal", label: "Healing"});
   if (arr(m.party_buffs).length || arr(m.self_buffs).length) t.push({id: "buffs", label: "Buffs", n: arr(cfg.buffs).length});
   if (arr(m.debuffs).length || m.can_dispel) t.push({id: "debuffs", label: "Enfeebles", n: arr(cfg.debuffs).length});
   if (arr(m.songs).length) t.push({id: "songs", label: "Songs", n: arr(cfg.songs).length});
   if (arr(m.indi).length || arr(m.geo).length) t.push({id: "geo", label: "Geomancy"});
   t.push({id: "adv", label: "Advanced"});
+  t.push({id: "app", label: "App & updates"});
   return t;
 }
 
@@ -179,8 +197,165 @@ function jobTab(c, p) {
     <div class="cols">${GROUPS.filter(g => by[g]).map(g => `<div class="box"><h3>${g}</h3>` +
       by[g].map(a => chk(a.label, a.on, `action ${a.id} on`, `action ${a.id} off`)).join("") + `</div>`).join("")
       || `<div class="empty">Waiting for ${esc(selected)}'s job info…</div>`}</div>
+    ${jobExtras(p)}
     <div class="hint">Only abilities ${esc(selected)} can use right now are listed (sub-job included). Changing the role re-ticks the recommended set.</div>
   </div>`;
+}
+
+// Job know-how from the community guides (rounds 9-10): only the boxes for this character's job.
+function jobExtras(p) {
+  const x = (p.config || {}).extra || {}, job = p.job || "", out = [];
+  const set = (k, v) => `set ${k} ${v}`;
+  if (job === "WHM" || job === "SCH") out.push(`<div class="box"><h3>Status removal</h3>
+    ${chk("One -na for the whole party when 2+ have the same ailment (Divine Seal / Accession)", x.aoe_na, set("mages.aoe_na", "true"), set("mages.aoe_na", "false"))}</div>`);
+  if (job === "RDM") out.push(`<div class="box"><h3>Red Mage</h3>
+    ${chk("Saboteur right before Dia / Distract / Frazzle on a new mob", x.saboteur, set("mages.saboteur", "true"), set("mages.saboteur", "false"))}
+    ${chk("Stymie when Frazzle or Distract is resisted", x.stymie, set("mages.stymie", "true"), set("mages.stymie", "false"))}</div>`);
+  if (job === "SCH") out.push(`<div class="box"><h3>Scholar</h3><div class="row" style="align-items:flex-end">
+    <label class="field">Self-skillchain with Immanence (nuker) ${sel("chain ", [{v: "off", l: "Off"}, {v: "liquefaction", l: "Liquefaction (Stone > Fire II)"},
+      {v: "fusion", l: "Fusion (Fire > Thunder II)"}, {v: "scission", l: "Scission (Fire > Stone II)"}, {v: "reverberation", l: "Reverberation (Stone > Water II)"},
+      {v: "detonation", l: "Detonation (Stone > Aero II)"}], x.immanence === false || !x.chain ? "off" : x.chain)}</label></div>
+    <div class="hint">As healer it uses Accession + Regen for the party, Perpetuance + Regen V on the leader and Aurorastorm II by itself.</div></div>`);
+  if (job === "COR") out.push(`<div class="box"><h3>Corsair</h3><div class="row" style="align-items:flex-end">
+    <label class="field">Rolls ${sel("rolls ", [{v: "", l: "— pick a set —"}, {v: "melee", l: "Melee: Samurai + Chaos"}, {v: "magic", l: "Magic: Wizard's + Warlock's"},
+      {v: "accuracy", l: "Accuracy: Hunter's + Chaos"}, {v: "tank", l: "Tank: Fighter's + Samurai"}, {v: "crit", l: "Crit: Rogue's + Chaos"},
+      {v: "refresh", l: "Refresh: Evoker's + Wizard's"}, {v: "exp", l: "EXP: Corsair's + Chaos"}, {v: "fastcast", l: "Fast Cast: Caster's + Wizard's"}], "")}</label>
+    <label class="field">Double-Up risk ${sel("set cor.risk ", [{v: "0", l: "Never bust (up to 5)"}, {v: "17", l: "Low (also on 6)"}, {v: "33", l: "Medium (also on 7)"}, {v: "50", l: "High (also on 8)"}], String(x.cor_risk ?? 0))}</label>
+    <label class="field">Roll reach ${sel("set cor.range ", [{v: "8", l: "8 yalms"}, {v: "16", l: "16 yalms (Luzaf's Ring)"}], String(x.cor_range ?? 8))}</label></div>
+    <div class="hint">Stops on the lucky number or 11, Snake Eye at 10 / one short of lucky / unlucky, Fold on a bust. Walks into range to roll.</div></div>`);
+  if (job === "GEO") out.push(`<div class="box"><h3>Geomancer</h3>
+    ${chk("Dia first, so Geo debuffs work (get on the hate list)", x.hate_first, set("geo.hate_first", "true"), set("geo.hate_first", "false"))}
+    ${chk("Entrust Indi-Haste / Indi-Fury to the leader automatically", lc((p.config || {}).entrust) === "auto", set("geo.entrust", "auto"), "menu entrust none")}
+    <div class="sliders">${slider("Radial Arcana when 2+ members are under", "geo.party_mp", x.party_mp ?? 40, 0, 80, 5)}</div></div>`);
+  if (job === "BRD") out.push(`<div class="box"><h3>Bard</h3>
+    ${chk("NiTro in fights: Nightingale + Troubadour + Marcato, then all songs", x.nitro, set("songs.nitro", "true"), set("songs.nitro", "false"))}
+    <div class="row" style="margin-top:6px"><input type="text" id="pian" placeholder="Pianissimo: Mage's Ballad III > Name|Name">
+      <button onclick="const v=$('pian').value.trim(); if(v){ send('pianissimo ' + v); $('pian').value=''; }">Add</button>
+      <button onclick="send('pianissimo clear')">Clear</button></div>
+    <div class="hint">Single-target songs now: ${esc(x.pianissimo || "none")}</div></div>`);
+  if (["RDM", "BLM", "BRD", "SCH", "GEO", "WHM"].includes(job)) out.push(`<div class="box"><h3>Crowd control</h3>
+    ${chk("Sleep extra mobs that attack the party (not the leader's target)", x.sleep, "sleep on", "sleep off")}</div>`);
+  return out.length ? `<div class="cols">${out.join("")}</div>` : "";
+}
+
+// ---------- Team tab: whole-party orders, sent to the leader (rounds 1-8) ----------
+function leaderName() {
+  const names = Object.keys(chars);
+  const counts = {};
+  names.forEach(n => { const l = (chars[n].snapshot || {}).leader; if (l) counts[l] = (counts[l] || 0) + 1; });
+  const best = Object.keys(counts).sort((a, b) => counts[b] - counts[a])[0];
+  return best && chars[best] ? best : selected;
+}
+function lead(cmd) { const l = leaderName(); if (l) post(l, cmd); }
+function teamTab(c, p) {
+  const L = leaderName(), ls = (chars[L] || {}).snapshot || {}, x = (p.config || {}).extra || {}, alts = x.alts || {};
+  const anyHold = Object.values(chars).some(ch => (ch.snapshot || {}).hold);
+  const anyCamp = Object.values(chars).some(ch => (ch.snapshot || {}).camp);
+  const anyRetreat = Object.values(chars).some(ch => (ch.snapshot || {}).retreat);
+  const def = Object.values(chars).map(ch => (ch.snapshot || {}).defense).find(d => d && d !== "off") || "off";
+  const altChk = (label, key) => chk(label, alts[key], `__all ${key === "mount" ? "mountsync" : key} on`, `__all ${key === "mount" ? "mountsync" : key} off`);
+  const setups = arr(x.setups);
+  return `<div class="stack">
+    <div class="hint">Orders go to the leader (<b>${esc(L || "nobody yet")}</b>), who passes them to everyone. Switches marked "everyone" are set on every character.</div>
+    <div class="cols">
+      <div class="box"><h3>Party</h3><div class="btns">
+        <button class="primary" onclick="setupParty()">Set up party (${esc(selected || "")} leads)</button>
+        <button onclick="lead('party')" title="Invites every character running Vanguard">Invite everyone</button></div>
+        ${chk("Accept party invites by themselves (everyone)", x.accept, "__all party accept on", "__all party accept off")}
+      </div>
+      <div class="box"><h3>Movement</h3><div class="btns">
+        <button class="${anyHold ? "on" : ""}" onclick="lead('${anyHold ? "come" : "hold"}')">${anyHold ? "Come (stop holding)" : "Hold here"}</button>
+        <button class="${anyCamp ? "on" : ""}" onclick="lead('camp ${anyCamp ? "off" : ""}')">${anyCamp ? "Camp off" : "Camp here"}</button>
+        <button class="stop ${anyRetreat ? "on" : ""}" onclick="lead('retreat')">Retreat</button></div>
+        <div class="row" style="margin-top:6px"><label class="field">Formation (everyone) ${sel("__all formation ", [{v: "spread", l: "Spread behind the leader"}, {v: "line", l: "Single file"}, {v: "off", l: "Plain follow"}], x.formation || "spread")}</label></div>
+      </div>
+      <div class="box"><h3>Gear (GearSwap)</h3><div class="btns">
+        ${["off", "physical", "magical"].map(m => `<button class="${def === m ? "on" : ""}" onclick="lead('defense ${m}')">${cap(m === "off" ? "normal" : m)}</button>`).join("")}</div>
+        ${chk("Defense set by itself under 40% HP (everyone)", x.gear_auto, "__all set gear.auto true", "__all set gear.auto false")}
+      </div>
+      <div class="box"><h3>Fighting</h3>
+        ${chk("Stop when the leader stops (everyone)", x.disengage, "__all set assist.disengage true", "__all set assist.disengage false")}
+        ${chk("Fight back when attacked (everyone)", x.defend, "__all set assist.defend true", "__all set assist.defend false")}
+        ${chk("Pick the next mob that attacks (everyone)", x.autotarget, "__all set assist.autotarget true", "__all set assist.autotarget false")}
+        <div class="row" style="margin-top:6px"><label class="field">Bar spells (WHM / RDM / SCH) ${sel("__lead bar ", [{v: "off", l: "Off"}, {v: "fire", l: "Fire + amnesia"}, {v: "ice", l: "Ice + paralyze"},
+          {v: "wind", l: "Wind + silence"}, {v: "earth", l: "Earth + petrify"}, {v: "thunder", l: "Thunder"}, {v: "water", l: "Water + poison"}], x.bar || "off")}</label>
+        <label class="field">Corsair rolls ${sel("__lead rolls ", [{v: "", l: "— pick —"}, {v: "melee", l: "Melee"}, {v: "magic", l: "Magic"}, {v: "accuracy", l: "Accuracy"}, {v: "tank", l: "Tank"}, {v: "crit", l: "Crit"}, {v: "refresh", l: "Refresh"}, {v: "exp", l: "EXP"}], "")}</label></div>
+        ${chk("Sleep extra mobs (everyone who can)", x.sleep, "__all sleep on", "__all sleep off")}
+      </div>
+      <div class="box"><h3>XP / CP / EP party</h3><div class="row">
+        <input type="text" id="expmobs" placeholder="Mob names (optional), comma separated">
+        <button class="go" onclick="send('exp ' + $('expmobs').value.trim())">Start: ${esc(selected || "")} pulls</button>
+        <button onclick="send('exp off')">Stop</button></div>
+        <div class="hint">The selected character pulls to a camp at its spot; the others fight at camp.</div>
+      </div>
+      <div class="box"><h3>Team setups</h3><div class="row">
+        <input type="text" id="setupname" placeholder="Name, e.g. Odyssey">
+        <button onclick="const v=$('setupname').value.trim(); if(v) lead('setup save ' + v)">Save</button></div>
+        ${setups.length ? `<div class="btns" style="margin-top:6px">${setups.map(n => `<button onclick="lead('setup load ${esc(n)}')" title="Load on everyone">${esc(n)}</button>`).join("")}</div>` : `<div class="hint">No saved setups yet.</div>`}
+      </div>
+      <div class="box"><h3>Helpers (everyone)</h3>
+        ${altChk("Alerts on the leader's screen", "alerts")}${altChk("Mount / dismount with the leader", "mount")}
+        ${altChk("Keep food and Reraise up", "upkeep")}${altChk("Sneak / Invisible with the leader", "stealth")}
+        ${altChk("Rest when the leader rests", "restsync")}${altChk("Overview box in game", "hud")}
+        <div class="row" style="margin-top:6px"><label class="field">Pause when I'm away for ${sel("__all set away.minutes ", [{v: "0", l: "Never"}, {v: "10", l: "10 minutes"}, {v: "20", l: "20 minutes"}, {v: "30", l: "30 minutes"}, {v: "60", l: "1 hour"}], String(x.away ?? 20))}</label></div>
+      </div>
+    </div>
+  </div>`;
+}
+
+// ---------- App & updates tab ----------
+function appTab() {
+  const a = addon || {};
+  return `<div class="stack"><div class="box"><h3>Vanguard Control</h3><div class="kv">
+      <span>App version</span><span>${esc(a.panel || "?")}</span>
+      <span>Addon in this app</span><span>${esc(a.bundled || "?")}</span>
+      <span>Windower folder</span><span>${a.found ? esc(a.windower) : "not found"}</span>
+      <span>Addon installed</span><span>${esc(a.installed || "no")}</span>
+      <span>Loads at game start</span><span>${a.autoload ? "yes" : "no"}</span>
+      <span>Characters</span><span>${Object.keys(chars).map(n => `${esc(n)} ${esc((chars[n].snapshot || {}).version || "?")}`).join(", ") || "none yet"}</span>
+    </div>
+    <div class="btns" style="margin-top:10px">
+      <button onclick="addonDo('check')">Check for updates</button>
+      <button onclick="addonDo('install')">Reinstall the addon</button>
+      <button onclick="addonDo('reload')">Reload Vanguard on all characters</button>
+      <button onclick="addonDo('pick')">Choose Windower folder…</button>
+      ${a.found && !a.autoload ? `<button onclick="addonDo('autoload')">Load at game start</button>` : ""}
+      <button onclick="fetch('/api/open-settings')">Open settings folder</button>
+    </div>
+    ${chk("Install, update and reload the addon by itself", a.auto, "__app auto 1", "__app auto 0")}
+    <div class="hint">The app checks GitHub when it starts and every 6 hours; a newer version installs itself and restarts the app. Your settings are never touched.</div>
+  </div></div>`;
+}
+async function addonDo(what, extra = "") {
+  try { addon = await (await fetch(`/api/addon?do=${what}${extra}`)).json(); } catch (e) {}
+  bodyKey = addonKey = ""; render(); renderAddonBar();
+}
+async function pollAddon() {
+  try { addon = await (await fetch("/api/addon")).json(); } catch (e) {}
+  renderAddonBar();
+  setTimeout(pollAddon, 4000);
+}
+function renderAddonBar() {
+  const a = addon || {}, bar = $("addonbar"), names = Object.keys(chars);
+  const online = names.filter(n => chars[n].online);
+  const old = online.filter(n => { const v = (chars[n].snapshot || {}).version; return a.installed && v && v !== a.installed; });
+  let html = "", cls = "show";
+  if (!a.bundled) html = "";
+  else if (!a.found) html = `<b>Where is Windower?</b> The app couldn't find your Windower folder.
+    <button class="primary" onclick="addonDo('pick')">Choose Windower folder…</button>`;
+  else if (!a.installed) html = `<b>Vanguard isn't installed</b> in ${esc(a.windower)}.
+    <button class="primary" onclick="addonDo('install')">Install Vanguard</button>`;
+  else if (!online.length) html = `Vanguard ${esc(a.installed)} is installed${a.autoload ? " and loads when the game starts" : ""}.
+    Start the game, or type <b>//lua load vanguard</b> once in each game window that's already open.
+    ${a.autoload ? "" : `<button onclick="addonDo('autoload')">Load it at game start</button>`}`;
+  else if (old.length) html = `${old.map(esc).join(", ")} still run${old.length === 1 ? "s" : ""} an older Vanguard.
+    <button class="primary" onclick="addonDo('reload')">Reload them</button>`;
+  else cls = "";
+  const key = cls + html;
+  if (key === addonKey) return;
+  addonKey = key;
+  bar.className = cls;
+  bar.innerHTML = html;
 }
 
 function healTab(p) {
@@ -338,7 +513,7 @@ document.addEventListener("click", e => { const card = e.target.closest(".card")
 function renderList() {
   const names = Object.keys(chars).sort();
   if (!names.length) return;
-  const key = JSON.stringify(names.map(n => [n, chars[n].online, chars[n].snapshot, (chars[n].profile || {}).role])) + selected;
+  const key = JSON.stringify(names.map(n => [n, chars[n].online, chars[n].snapshot, (chars[n].profile || {}).role])) + selected + (addon.installed || "");
   if (key === listKey) return;
   listKey = key;
   $("chars").innerHTML = names.map(n => {
@@ -347,6 +522,7 @@ function renderList() {
     const sub = [role ? role.label : "", c.online ? (s.status || "") : "offline", s.target ? `${s.target} ${s.target_hpp}%` : ""].filter(Boolean).join(" · ");
     return `<div class="card ${n === selected ? "sel" : ""} ${c.online ? "" : "offline"}" data-name="${esc(n)}">
       <div class="top"><span class="nm">${esc(n)}</span><span class="jb">${esc(s.job || p.job || "")}${p.sub ? "/" + esc(p.sub) : ""}</span>
+        ${addon.installed && s.version && s.version !== addon.installed && c.online ? `<span class="pill warn" title="Runs Vanguard ${esc(s.version)}; ${esc(addon.installed)} is installed">OLD</span>` : ""}
         <span class="pill ${s.enabled ? "on" : "off"}">${s.enabled ? "ON" : "OFF"}</span></div>
       <div class="sub">${esc(sub)}</div>
       <div class="bars">${bar(s.hpp, "var(--hp)", 100, "HP")}${bar(s.mpp, "var(--mp)", 100, "MP")}${bar(s.tp, "var(--tp)", 3000, "TP")}</div>
@@ -359,7 +535,7 @@ function renderPanel() {
   if (!c) { $("panel").innerHTML = ""; return; }
   const s = c.snapshot || {}, p = c.profile || {};
   const tabs = tabsFor(p);
-  if (!tabs.find(t => t.id === tab)) tab = "job";
+  if (!tabs.find(t => t.id === tab)) tab = "team";
 
   const hk = JSON.stringify([selected, s.enabled, p.job, p.sub, tab, tabs]);
   if (hk !== headKey || !$("tabbody")) {
@@ -375,11 +551,14 @@ function renderPanel() {
   // Don't redraw under the user's hand while a slider or text box is in use.
   const a = document.activeElement;
   if (a && $("tabbody").contains(a) && (a.type === "range" || a.type === "text")) return;
-  const bk = JSON.stringify([tab, p, s.leader, Object.keys(chars)]);
+  const team = tab === "team" ? Object.keys(chars).map(n => [n, (chars[n].snapshot || {}).hold, (chars[n].snapshot || {}).camp,
+    (chars[n].snapshot || {}).retreat, (chars[n].snapshot || {}).defense, (chars[n].snapshot || {}).leader]) : 0;
+  const bk = JSON.stringify([tab, p, s.leader, Object.keys(chars), team, tab === "app" ? addon : 0]);
   if (bk === bodyKey) return;
   bodyKey = bk;
   const fn = {job: () => jobTab(c, p), heal: () => healTab(p), buffs: () => buffsTab(p), debuffs: () => debuffsTab(p),
-              songs: () => songsTab(p), geo: () => geoTab(p), adv: () => advTab(p)}[tab];
+              songs: () => songsTab(p), geo: () => geoTab(p), adv: () => advTab(p), team: () => teamTab(c, p),
+              app: () => appTab()}[tab];
   $("tabbody").innerHTML = fn();
 }
 
@@ -411,6 +590,7 @@ async function poll() {
   setTimeout(poll, 600);
 }
 poll();
+pollAddon();
 </script>
 </body>
 </html>

@@ -20,7 +20,7 @@ import (
 	"time"
 )
 
-var panelVersion = "1.1.0" // set by -X for tests; the published version
+var panelVersion = "1.2.0" // set by -X for tests; the published version
 
 var updateBase = "https://raw.githubusercontent.com/Daviant123/Vanguard/main/VanguardControl/" // tests point it elsewhere
 
@@ -118,28 +118,40 @@ func updatesDisabled() bool {
 	return err == nil
 }
 
-// autoUpdate runs in the background for the life of the panel.
+// autoUpdate runs in the background for the life of the panel. "Check for updates" in the panel sends a
+// version on h.updateNow (that works even with noupdate.txt, since it's asked for).
 func (h *hub) autoUpdate(restart func(exe string)) {
-	if updatesDisabled() {
+	disabled := updatesDisabled()
+	if disabled {
 		h.addLog("Vanguard Control %s (automatic updates off: noupdate.txt)", panelVersion)
-		return
+	} else {
+		time.Sleep(5 * time.Second)
 	}
-	time.Sleep(5 * time.Second)
+	try := func(latest string) bool {
+		h.addLog("Vanguard Control %s is available (you have %s): downloading...", latest, panelVersion)
+		exe, err := installUpdate(latest)
+		if err != nil {
+			h.addLog("Update failed (%v); still on %s. It will try again later.", err, panelVersion)
+			return false
+		}
+		h.addLog("Updated to %s: restarting the panel...", latest)
+		time.Sleep(1 * time.Second)
+		restart(exe)
+		return true
+	}
 	for {
-		latest, err := checkUpdate()
-		if err == nil && latest != "" {
-			h.addLog("Vanguard Control %s is available (you have %s): downloading...", latest, panelVersion)
-			exe, err := installUpdate(latest)
-			if err != nil {
-				h.addLog("Update failed (%v); still on %s. It will try again later.", err, panelVersion)
-			} else {
-				h.addLog("Updated to %s: restarting the panel...", latest)
-				time.Sleep(1 * time.Second)
-				restart(exe)
+		if !disabled {
+			if latest, err := checkUpdate(); err == nil && latest != "" && try(latest) {
 				return
 			}
 		}
-		time.Sleep(6 * time.Hour)
+		select {
+		case latest := <-h.updateNow:
+			if try(latest) {
+				return
+			}
+		case <-time.After(6 * time.Hour):
+		}
 	}
 }
 

@@ -25,11 +25,19 @@ import (
 //go:embed web
 var webFS embed.FS
 
-const (
+var (
 	udpAddr  = "127.0.0.1:47000"
 	httpAddr = "127.0.0.1:47001"
 	uiURL    = "http://" + httpAddr + "/"
 )
+
+// VANGUARD_CONTROL_PORTS=48000,48001 runs a test copy beside the real one (the game only talks to 47000).
+func init() {
+	if p := strings.Split(os.Getenv("VANGUARD_CONTROL_PORTS"), ","); len(p) == 2 {
+		udpAddr, httpAddr = "127.0.0.1:"+p[0], "127.0.0.1:"+p[1]
+		uiURL = "http://" + httpAddr + "/"
+	}
+}
 
 type character struct {
 	Snapshot map[string]any `json:"snapshot"`
@@ -46,6 +54,7 @@ type logLine struct {
 }
 
 type hub struct {
+	updateNow chan string
 	mu     sync.Mutex
 	conn   *net.UDPConn
 	chars  map[string]*character
@@ -218,9 +227,12 @@ func (h *hub) handleSetup(w http.ResponseWriter, r *http.Request) {
 
 func handleOpenSettings(w http.ResponseWriter, r *http.Request) {
 	exe, _ := os.Executable()
-	dir := filepath.Join(filepath.Dir(exe), "..", "addons", "Vanguard", "data")
-	if _, err := os.Stat(dir); err != nil {
-		dir = filepath.Dir(exe)
+	dir := filepath.Dir(exe)
+	if st := currentAddonState(); st.Found {
+		dir = filepath.Join(st.Windower, "addons", "Vanguard")
+		if _, err := os.Stat(filepath.Join(dir, "data")); err == nil {
+			dir = filepath.Join(dir, "data")
+		}
 	}
 	exec.Command("explorer", filepath.Clean(dir)).Start()
 	w.WriteHeader(http.StatusNoContent)
@@ -259,9 +271,16 @@ func main() {
 		openWindow()
 		return
 	}
-	h := &hub{conn: conn, chars: map[string]*character{}}
+	h := &hub{conn: conn, chars: map[string]*character{}, updateNow: make(chan string, 1)}
 	h.addLog("Vanguard Control %s. Listening on %s. Load the addon in game with //lua load vanguard", panelVersion, udpAddr)
 	go h.listen()
+	// The addon: find Windower, install / update the one built into this exe, reload old copies.
+	go func() {
+		if msg := h.ensureAddon(false); msg != "" && msg != "ok" {
+			h.addLog("%s", msg)
+		}
+		h.reloadWatch()
+	}()
 
 	web, _ := fs.Sub(webFS, "web")
 	mux := http.NewServeMux()
@@ -271,6 +290,7 @@ func main() {
 	mux.HandleFunc("/api/leader", h.handleLeader)
 	mux.HandleFunc("/api/setup", h.handleSetup)
 	mux.HandleFunc("/api/open-settings", handleOpenSettings)
+	mux.HandleFunc("/api/addon", h.handleAddon)
 	mux.HandleFunc("/api/quit", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNoContent)
 		go func() { time.Sleep(200 * time.Millisecond); os.Exit(0) }()

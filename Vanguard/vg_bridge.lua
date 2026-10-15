@@ -42,7 +42,7 @@ function bridge.log(text)
     send({ type = 'log', name = p and p.name or '?', text = text })
 end
 
-local function snapshot(settings)
+local function snapshot(settings, state)
     local p = windower.ffxi.get_player()
     if not p then return nil end
     local info = windower.ffxi.get_info()
@@ -60,6 +60,12 @@ local function snapshot(settings)
         enabled = settings.enabled,
         leader = settings.leader,
         modules = settings.modules,
+        version = _addon.version,
+        hold = state and state.hold or false,
+        camp = state and state.camp ~= nil or false,
+        retreat = state and state.retreat or false,
+        away = state and state.away or false,
+        defense = state and state.defense or 'off',
     }
 end
 
@@ -75,7 +81,7 @@ function bridge.poll(settings, state)
     -- Outgoing status
     if now() - bridge.last_send >= settings.bridge.interval then
         bridge.last_send = now()
-        local snap = snapshot(settings)
+        local snap = snapshot(settings, state)
         if snap then send(snap) end
     end
 end

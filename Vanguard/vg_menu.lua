@@ -183,6 +183,29 @@ function menu.config(settings)
         songs_when = settings.songs.when,
         debuff_retries = settings.debuff.retries,
         modules = settings.modules,
+        extra = menu.extra(settings),
+    }
+end
+
+-- Everything the panel's Team tab and job extras show (rounds 1-10 settings).
+function menu.extra(settings)
+    local setups = {}
+    for name in pairs(settings.setups or {}) do setups[#setups + 1] = name end
+    table.sort(setups)
+    local m, c = settings.mages or {}, settings.cor or {}
+    return {
+        alts = settings.alts, formation = settings.follow.formation, trail = settings.follow.trail,
+        accept = settings.party and settings.party.accept, keys = settings.keys,
+        away = settings.away and settings.away.minutes, gear_auto = settings.gear and settings.gear.auto,
+        food = settings.upkeep and settings.upkeep.food, reraise = settings.upkeep and settings.upkeep.reraise,
+        mount = settings.mount and settings.mount.name,
+        bar = m.bar, bar_status = m.bar_status, sleep = m.sleep, chain = m.chain, immanence = m.immanence,
+        aoe_na = m.aoe_na, saboteur = m.saboteur, stymie = m.stymie,
+        cor_risk = c.risk, cor_range = c.range,
+        nitro = settings.songs.nitro, marcato = settings.songs.marcato, pianissimo = settings.songs.pianissimo,
+        hate_first = settings.geo.hate_first, party_mp = settings.geo.party_mp,
+        disengage = settings.assist.disengage, defend = settings.assist.defend, autotarget = settings.assist.autotarget,
+        setups = setups,
     }
 end
 
