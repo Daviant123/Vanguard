@@ -7,7 +7,9 @@
 package main
 
 import (
+	"bytes"
 	"embed"
+	"errors"
 	"encoding/json"
 	"fmt"
 	"io/fs"
@@ -76,13 +78,45 @@ func (h *hub) addLog(format string, args ...any) {
 
 func (h *hub) listen() {
 	buf := make([]byte, 65535)
+	parts := map[string][]string{} // big messages arrive in parts: "vgpart <id> <i>/<n> <text>"
 	for {
 		n, addr, err := h.conn.ReadFromUDP(buf)
 		if err != nil {
+			if errors.Is(err, net.ErrClosed) {
+				return
+			}
 			continue
 		}
+		data := buf[:n]
+		if bytes.HasPrefix(data, []byte("vgpart ")) {
+			var id, i, total int
+			var head string
+			if c, _ := fmt.Sscanf(string(data), "vgpart %d %d/%d", &id, &i, &total); c != 3 || i < 1 || total < 1 || i > total || total > 50 {
+				continue
+			}
+			head = fmt.Sprintf("vgpart %d %d/%d ", id, i, total)
+			key := fmt.Sprintf("%s#%d", addr.String(), id)
+			if parts[key] == nil {
+				parts[key] = make([]string, total)
+			}
+			parts[key][i-1] = string(data[len(head):])
+			done := true
+			for _, p := range parts[key] {
+				if p == "" {
+					done = false
+				}
+			}
+			if !done {
+				continue
+			}
+			data = []byte(strings.Join(parts[key], ""))
+			delete(parts, key)
+			if len(parts) > 100 { // stale halves from a crashed client
+				parts = map[string][]string{}
+			}
+		}
 		var msg map[string]any
-		if json.Unmarshal(buf[:n], &msg) != nil {
+		if json.Unmarshal(data, &msg) != nil {
 			continue
 		}
 		name, _ := msg["name"].(string)

@@ -30,9 +30,25 @@ function bridge.stop()
     if bridge.udp then bridge.udp:close() bridge.udp = nil end
 end
 
+-- Messages bigger than one UDP packet here (8 KB; a main Scholar's profile is ~14 KB) go in parts:
+-- "vgpart <id> <i>/<n> <text>", put back together by Vanguard Control.
+local PART = 8000                -- + a short header: stays under 8192
+function bridge.pack(text)
+    if #text <= PART then return { text } end
+    bridge.msgid = (bridge.msgid or 0) % 100000 + 1
+    local n = math.ceil(#text / PART)
+    local out = {}
+    for i = 1, n do
+        out[i] = ('vgpart %d %d/%d '):format(bridge.msgid, i, n) .. text:sub((i - 1) * PART + 1, i * PART)
+    end
+    return out
+end
+
 local function send(tbl)
     if not bridge.udp then return end
-    bridge.udp:sendto(util.json(tbl), bridge.host, bridge.port)
+    for _, msg in ipairs(bridge.pack(util.json(tbl))) do
+        bridge.udp:sendto(msg, bridge.host, bridge.port)
+    end
 end
 
 function bridge.send(tbl) send(tbl) end

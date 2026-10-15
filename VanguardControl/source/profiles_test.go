@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"net"
 	"net/http/httptest"
 	"os"
@@ -138,5 +139,31 @@ func TestProfileLoadsByItself(t *testing.T) {
 	conn.WriteToUDP(prof, h.conn.LocalAddr().(*net.UDPAddr))
 	if msgs := collect(got, 2500*time.Millisecond); cfgText(msgs) != "" {
 		t.Error("the profile is only sent when the job changes")
+	}
+}
+
+func TestBigMessageInParts(t *testing.T) {
+	h := testHub(t)
+	c, _ := net.ListenUDP("udp", &net.UDPAddr{IP: net.IPv4(127, 0, 0, 1)})
+	defer c.Close()
+	big, _ := json.Marshal(map[string]any{"type": "profile", "name": "CharC", "job": "SCH", "pad": strings.Repeat("Regen V,", 2500)})
+	text := string(big)
+	var msgs []string
+	for i, n := 0, (len(text)+5999)/6000; i < n; i++ {
+		end := (i + 1) * 6000
+		if end > len(text) {
+			end = len(text)
+		}
+		msgs = append(msgs, fmt.Sprintf("vgpart 7 %d/%d %s", i+1, n, text[i*6000:end]))
+	}
+	for i := len(msgs) - 1; i >= 0; i-- { // out of order on purpose
+		c.WriteToUDP([]byte(msgs[i]), h.conn.LocalAddr().(*net.UDPAddr))
+	}
+	time.Sleep(300 * time.Millisecond)
+	h.mu.Lock()
+	ch := h.chars["CharC"]
+	h.mu.Unlock()
+	if len(msgs) < 3 || ch == nil || ch.Profile["job"] != "SCH" {
+		t.Fatalf("a profile sent in %d parts should arrive whole", len(msgs))
 	}
 }
