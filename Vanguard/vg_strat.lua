@@ -125,7 +125,9 @@ function strat.pools(player)
             end
         end
     end
-    local by = function(a, b) return (a.n or a) < (b.n or b) end
+    -- (Windower's string library errors on unknown fields like ("text").n, so check the type first)
+    local key = function(x) return type(x) == 'table' and x.n or x end
+    local by = function(a, b) return key(a) < key(b) end
     for _, t in pairs(p) do table.sort(t, by) end
     return p
 end
