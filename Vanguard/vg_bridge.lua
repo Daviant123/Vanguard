@@ -77,6 +77,18 @@ function bridge.poll(settings, state)
         if not data then break end
         local cmd = data:match('^cmd (.+)$')
         if cmd then windower.send_command('vg ' .. cmd) end
+        local n, total, part = data:match('^cfg (%d+)/(%d+) (.*)$')
+        if n then
+            n, total = tonumber(n), tonumber(total)
+            if n == 1 then bridge.parts = {} end
+            bridge.parts = bridge.parts or {}
+            bridge.parts[n] = part
+            if n == total and #bridge.parts == total and bridge.on_cfg then
+                local json = table.concat(bridge.parts)
+                bridge.parts = nil
+                bridge.on_cfg(json)
+            end
+        end
     end
     -- Outgoing status
     if now() - bridge.last_send >= settings.bridge.interval then

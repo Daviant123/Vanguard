@@ -54,12 +54,31 @@ function engine.available(action, player, ja_set)
 end
 
 -- All actions this character can use, with their on/off state.
+-- The action with this profile's threshold changes on top of the job's defaults.
+function engine.effective(a, profile)
+    local o = profile and profile.opts and profile.opts[a.id]
+    if not o then return a end
+    local t = {}
+    for k, v in pairs(o) do t[k] = v end
+    return setmetatable(t, { __index = a })
+end
+
+local LIMITS = { 'party_below', 'hpp_below', 'mpp_below', 'mpp_above', 'tp_min', 'tp_max' }
+
+-- All actions this character can use, with their on/off state and editable thresholds.
 function engine.list(profile, player)
     local out = {}
     local ja_set = ability_set()
     for _, a in ipairs(jobs.actions_for(player.main_job)) do
         if engine.available(a, player, ja_set) then
-            out[#out + 1] = { id = a.id, label = a.label, group = a.group, on = engine.enabled(a, profile) }
+            local e = engine.effective(a, profile)
+            local limits = {}
+            for _, k in ipairs(LIMITS) do
+                if a[k] ~= nil or e[k] ~= nil then limits[#limits + 1] = { k = k, v = e[k], d = a[k] } end
+            end
+            limits[#limits + 1] = { k = 'cooldown', v = e.cooldown or 5, d = a.cooldown or 5 }
+            limits[#limits + 1] = { k = 'when', v = e.when, d = a.when }
+            out[#out + 1] = { id = a.id, label = a.label, group = a.group, on = engine.enabled(a, profile), limits = limits }
         end
     end
     return out
@@ -219,7 +238,7 @@ function engine.run(ctx, profile, filter)
     if not ctx.settings.modules.actions or not profile then return false end
     for _, a in ipairs(jobs.actions_for(ctx.player.main_job)) do
         if (not filter or filter(a)) and engine.enabled(a, profile) then
-            if try(a, ctx) then return true end
+            if try(engine.effective(a, profile), ctx) then return true end
         end
     end
     return false

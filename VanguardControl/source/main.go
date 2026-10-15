@@ -55,6 +55,8 @@ type logLine struct {
 
 type hub struct {
 	updateNow chan string
+	dumps     map[string]chan json.RawMessage // characters asked for their setup (profiles)
+	jobs      map[string]string               // last job seen per character (auto-load profiles)
 	mu     sync.Mutex
 	conn   *net.UDPConn
 	chars  map[string]*character
@@ -108,6 +110,24 @@ func (h *hub) listen() {
 				h.chars[name] = c
 			}
 			c.Profile, c.addr = msg, addr
+			job, _ := msg["job"].(string)
+			changed := job != "" && h.jobs[name] != job
+			if changed {
+				h.jobs[name] = job
+			}
+			h.mu.Unlock()
+			if changed {
+				go h.autoProfile(name, job)
+			}
+		case "dump":
+			raw, _ := json.Marshal(msg["data"])
+			h.mu.Lock()
+			if ch, ok := h.dumps[name]; ok {
+				select {
+				case ch <- raw:
+				default:
+				}
+			}
 			h.mu.Unlock()
 		case "log":
 			text, _ := msg["text"].(string)
@@ -234,9 +254,11 @@ func handleOpenSettings(w http.ResponseWriter, r *http.Request) {
 			dir = filepath.Join(dir, "data")
 		}
 	}
-	exec.Command("explorer", filepath.Clean(dir)).Start()
+	openFolder(dir)
 	w.WriteHeader(http.StatusNoContent)
 }
+
+func openFolder(dir string) { exec.Command("explorer", filepath.Clean(dir)).Start() }
 
 // ---------------------------------------------------------------- launch
 
@@ -271,7 +293,8 @@ func main() {
 		openWindow()
 		return
 	}
-	h := &hub{conn: conn, chars: map[string]*character{}, updateNow: make(chan string, 1)}
+	h := &hub{conn: conn, chars: map[string]*character{}, updateNow: make(chan string, 1),
+		dumps: map[string]chan json.RawMessage{}, jobs: map[string]string{}}
 	h.addLog("Vanguard Control %s. Listening on %s. Load the addon in game with //lua load vanguard", panelVersion, udpAddr)
 	go h.listen()
 	// The addon: find Windower, install / update the one built into this exe, reload old copies.
@@ -291,6 +314,7 @@ func main() {
 	mux.HandleFunc("/api/setup", h.handleSetup)
 	mux.HandleFunc("/api/open-settings", handleOpenSettings)
 	mux.HandleFunc("/api/addon", h.handleAddon)
+	mux.HandleFunc("/api/profiles", h.handleProfiles)
 	mux.HandleFunc("/api/quit", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNoContent)
 		go func() { time.Sleep(200 * time.Millisecond); os.Exit(0) }()

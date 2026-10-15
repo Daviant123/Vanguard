@@ -94,6 +94,15 @@ label.field select { min-width: 190px; color: var(--text); font-size: 13px; }
 .btns button.on { border-color: var(--good); color: var(--good); }
 .kv { display: grid; grid-template-columns: 150px 1fr; gap: 4px 10px; font-size: 12px; }
 .kv span:nth-child(odd) { color: var(--muted); }
+.profbar { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; padding: 7px 10px; margin-bottom: 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel-2); }
+.profbar b { color: var(--accent); margin-right: 4px; }
+.act { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; padding: 3px 0; border-bottom: 1px dashed rgba(255,255,255,.04); }
+.act .chk { flex: 1 1 150px; padding: 0; }
+.lim { display: inline-flex; align-items: center; gap: 3px; font-size: 11px; color: var(--muted); }
+.lim input { width: 52px; padding: 2px 4px; font: inherit; font-size: 12px; color: var(--text); background: var(--bg); border: 1px solid var(--line); border-radius: 4px; }
+.lim input.changed, .lim select.changed { border-color: var(--accent); }
+.lim select { padding: 2px 4px; font-size: 11px; }
+table.grid input[type=number] { width: 70px; height: auto; }
 </style>
 </head>
 <body>
@@ -173,7 +182,8 @@ const slider = (label, setting, val, min, max, step = 1, unit = "%") =>
 function tabsFor(p) {
   const m = p.menu || {}, cfg = p.config || {};
   const t = [{id: "team", label: "Team"}, {id: "job", label: "Job & abilities"}];
-  if (m.can_cure || m.can_raise || arr(m.cleanse).length) t.push({id: "heal", label: "Healing"});
+  if (m.can_cure || m.can_raise || arr(m.cleanse).length) t.push({id: "heal", label: "Healing & MP"});
+  else t.push({id: "heal", label: "Recovery"});
   if (arr(m.party_buffs).length || arr(m.self_buffs).length) t.push({id: "buffs", label: "Buffs", n: arr(cfg.buffs).length});
   if (arr(m.debuffs).length || m.can_dispel) t.push({id: "debuffs", label: "Enfeebles", n: arr(cfg.debuffs).length});
   if (arr(m.songs).length) t.push({id: "songs", label: "Songs", n: arr(cfg.songs).length});
@@ -195,11 +205,60 @@ function jobTab(c, p) {
       <label class="field">Follow / assist ${sel("leader ", [{v: "", l: "Nobody (I lead)"}].concat(others.map(n => ({v: n, l: n}))), s.leader || "", "none")}</label>
     </div>
     <div class="cols">${GROUPS.filter(g => by[g]).map(g => `<div class="box"><h3>${g}</h3>` +
-      by[g].map(a => chk(a.label, a.on, `action ${a.id} on`, `action ${a.id} off`)).join("") + `</div>`).join("")
+      by[g].map(a => `<div class="act">${chk(a.label, a.on, `action ${a.id} on`, `action ${a.id} off`)}${limits(a)}</div>`).join("") + `</div>`).join("")
       || `<div class="empty">Waiting for ${esc(selected)}'s job info…</div>`}</div>
     ${jobExtras(p)}
     <div class="hint">Only abilities ${esc(selected)} can use right now are listed (sub-job included). Changing the role re-ticks the recommended set.</div>
   </div>`;
+}
+
+// Each ability's thresholds: edit them like CurePlease; the job's recommended value is in the tooltip.
+const LIMIT_LABEL = {party_below: "party HP <", hpp_below: "my HP <", mpp_below: "MP <", mpp_above: "MP >",
+  tp_min: "TP \u2265", tp_max: "TP <", cooldown: "every", when: ""};
+const WHEN_OPTS = [["always", "always"], ["combat", "party fighting"], ["engaged", "I'm fighting"], ["idle", "out of combat"]];
+function limits(a) {
+  return arr(a.limits).map(l => {
+    const changed = l.v !== l.d ? "changed" : "";
+    if (l.k === "when") return `<span class="lim"><select class="${changed}" data-cmd="actopt ${esc(a.id)} when " title="Recommended: ${esc(l.d)}">${
+      WHEN_OPTS.map(([v, t]) => opt(v, t, l.v)).join("")}</select></span>`;
+    const unit = l.k === "cooldown" ? "s" : (l.k.startsWith("tp") ? "" : "%");
+    return `<span class="lim">${LIMIT_LABEL[l.k] || l.k}<input type="number" class="${changed}" value="${esc(l.v)}" min="0"
+      data-cmd="actopt ${esc(a.id)} ${l.k} " title="Recommended: ${esc(l.d)}${unit}">${unit}</span>`;
+  }).join("");
+}
+
+// ---------- profiles (files kept by the app) ----------
+let profiles = [], autoProf = {}, profKey = "";
+async function profDo(q) {
+  try { const d = await (await fetch("/api/profiles?" + q)).json(); profiles = d.profiles || []; autoProf = d.auto || {}; } catch (e) {}
+  profKey = ""; render();
+}
+function renderProfBar(p) {
+  const bar = $("profbar"); if (!bar) return;
+  const job = p.job || "", mine = profiles.filter(x => x.job === job), auto = ((autoProf[selected] || {})[job]) || "";
+  const key = JSON.stringify([selected, job, mine, auto]);
+  if (key === profKey) return;
+  profKey = key;
+  bar.innerHTML = `<b>Profile</b>
+    <select id="profsel">${mine.length ? mine.map(x => opt(x.name, x.name + (x.from && x.from !== selected ? ` (from ${x.from})` : ""), auto)).join("")
+      : `<option value="">no ${esc(job)} profiles yet</option>`}</select>
+    <button onclick="profLoad()" ${mine.length ? "" : "disabled"}>Load</button>
+    <button onclick="profSave()">Save as…</button>
+    <button onclick="profDelete()" ${mine.length ? "" : "disabled"}>Delete</button>
+    <label class="chk ${auto ? "" : "off"}" title="Loads by itself whenever ${esc(selected)} is on ${esc(job)}">
+      <input type="checkbox" id="profauto" ${auto ? "checked" : ""}><span>Load by itself on ${esc(job)}</span></label>
+    <span class="hint" style="margin-left:auto">Saved on this PC; load any profile onto any character.</span>`;
+}
+const profPick = () => ($("profsel") || {}).value || "";
+function profLoad() { const n = profPick(); if (n) profDo(`do=load&char=${encodeURIComponent(selected)}&job=${(chars[selected].profile || {}).job}&name=${encodeURIComponent(n)}`); }
+function profSave() {
+  const job = (chars[selected].profile || {}).job || "";
+  const n = prompt(`Save ${selected}'s ${job} setup as profile:`, profPick() || `${selected} ${job}`);
+  if (n && n.trim()) profDo(`do=save&char=${encodeURIComponent(selected)}&name=${encodeURIComponent(n.trim())}`);
+}
+function profDelete() {
+  const n = profPick(), job = (chars[selected].profile || {}).job;
+  if (n && confirm(`Delete the ${job} profile "${n}"?`)) profDo(`do=delete&job=${job}&name=${encodeURIComponent(n)}`);
 }
 
 // Job know-how from the community guides (rounds 9-10): only the boxes for this character's job.
@@ -375,17 +434,50 @@ function healTab(p) {
       ${m.can_curaga ? slider("Curaga when members are below", "heal.curaga_at", h.curaga_at, 30, 95, 5) : ""}
       ${m.can_curaga ? slider("…and at least this many are hurt", "heal.curaga_count", h.curaga_count, 2, 6, 1, "") : ""}
     </div></div>` : ""}
-    <div class="box"><h3>Party</h3>
+    ${m.can_cure ? cureTiers(h.tiers) : ""}
+    ${recoveryBox(p)}
+    ${m.can_cure || m.can_raise || arr(m.cleanse).length ? `<div class="box"><h3>Party</h3>
       ${party.length ? `<table class="grid"><thead><tr><th>Member</th><th>Heal &amp; cleanse</th><th title="Cured first, at the priority threshold">Priority</th></tr></thead><tbody>
       ${party.map((n, i) => `<tr><td class="${i === 0 ? "me" : ""}">${esc(n)}${i === 0 ? " (self)" : ""}</td>
         <td><input type="checkbox" ${ignore.includes(lc(n)) ? "" : "checked"} data-on="menu heal ${esc(n)} on" data-off="menu heal ${esc(n)} off"></td>
         <td><input type="checkbox" ${prio.includes(lc(n)) ? "checked" : ""} data-on="menu priority ${esc(n)} on" data-off="menu priority ${esc(n)} off"></td></tr>`).join("")}
       </tbody></table>` : `<div class="empty">Not in a party.</div>`}
-    </div>
+    </div>` : ""}
     ${arr(m.cleanse).length ? `<div class="box"><h3>Remove these effects</h3><div class="checks">
       ${arr(m.cleanse).map(st => chk(cap(st), !skip.includes(lc(st)), `menu cleanse on ${st}`, `menu cleanse off ${st}`)).join("")}
     </div></div>` : ""}
   </div>`;
+}
+
+const CURES = ["Cure", "Cure II", "Cure III", "Cure IV", "Cure V", "Cure VI"];
+function parseTiers(str) {
+  const t = {}; String(str || "").split(",").forEach(e => { const m = e.match(/^\s*(.+?)\s*:\s*(\d+)\s*$/); if (m) t[m[1]] = Number(m[2]); });
+  return t;
+}
+function cureTiers(str) {
+  const t = parseTiers(str);
+  return `<div class="box"><h3>Cure tiers: use each one when this much HP is missing (0 = never)</h3>
+    <table class="grid"><thead><tr>${CURES.map(c => `<th>${c}</th>`).join("")}</tr></thead><tbody><tr>
+    ${CURES.map(c => `<td><input type="number" min="0" step="10" value="${t[c] ?? 0}" data-tiers="${esc(c)}"></td>`).join("")}
+    </tr></tbody></table>
+    <div class="hint" style="margin-top:4px">The smallest tier that covers the missing HP is cast; if none does, the biggest one available.</div></div>`;
+}
+function tierString() {
+  return [...document.querySelectorAll("[data-tiers]")].map(i => `${i.dataset.tiers}:${Math.max(0, Number(i.value) || 0)}`).reverse().join(",");
+}
+function recoveryBox(p) {
+  const cfg = p.config || {}, rest = cfg.rest || {}, mana = cfg.mana || {}, mods = cfg.modules || {};
+  return `<div class="box"><h3>Recovery</h3>
+    <div class="master" style="margin-bottom:8px">${modChk("Rest (/heal) when idle and low", mods, "rest")}${modChk("Convert / Sublimation", mods, "mana")}
+      ${chk("Keep Sublimation going (SCH)", mana.sublimation, "set mana.sublimation true", "set mana.sublimation false")}</div>
+    <div class="sliders">
+      ${slider("Rest when HP is below", "rest.hp_low", rest.hp_low ?? 40, 0, 95, 5)}
+      ${slider("...until HP is", "rest.hp_high", rest.hp_high ?? 95, 50, 100, 5)}
+      ${slider("Rest when MP is below", "rest.mp_low", rest.mp_low ?? 25, 0, 95, 5)}
+      ${slider("...until MP is", "rest.mp_high", rest.mp_high ?? 95, 50, 100, 5)}
+      ${slider("Use Sublimation's MP below", "mana.sublimation_mpp", mana.sublimation_mpp ?? 70, 10, 95, 5)}
+      ${slider("Convert when MP is below", "mana.convert_mpp", mana.convert_mpp ?? 15, 0, 60, 5)}
+    </div></div>`;
 }
 
 function buffsTab(p) {
@@ -495,6 +587,13 @@ function sendCmd() {
 // ---------- events (one listener for every control) ----------
 document.addEventListener("change", e => {
   const el = e.target;
+  if (el.id === "profauto") {
+    const job = (chars[selected].profile || {}).job;
+    profDo(`do=auto&char=${encodeURIComponent(selected)}&job=${job}&name=${el.checked ? encodeURIComponent(profPick()) : ""}`);
+    return;
+  }
+  if (el.id === "profsel") return;
+  if (el.dataset.tiers !== undefined) { send("set heal.tiers " + tierString()); return; }
   if (el.id === "entSpell" || el.id === "entWho") {
     const sp = $("entSpell").value, who = $("entWho").value;
     send(sp && who ? `menu entrust ${who} ${sp}` : "menu entrust none");
@@ -521,7 +620,7 @@ function renderList() {
     const role = arr(p.roles).find(r => r.id === p.role);
     const sub = [role ? role.label : "", c.online ? (s.status || "") : "offline", s.target ? `${s.target} ${s.target_hpp}%` : ""].filter(Boolean).join(" · ");
     return `<div class="card ${n === selected ? "sel" : ""} ${c.online ? "" : "offline"}" data-name="${esc(n)}">
-      <div class="top"><span class="nm">${esc(n)}</span><span class="jb">${esc(s.job || p.job || "")}${p.sub ? "/" + esc(p.sub) : ""}</span>
+      <div class="top"><span class="nm">${esc(n)}</span><span class="jb">${esc(s.job || p.job || "")}${p.sub && !String(s.job || "").includes("/") ? "/" + esc(p.sub) : ""}</span>
         ${addon.installed && s.version && s.version !== addon.installed && c.online ? `<span class="pill warn" title="Runs Vanguard ${esc(s.version)}; ${esc(addon.installed)} is installed">OLD</span>` : ""}
         <span class="pill ${s.enabled ? "on" : "off"}">${s.enabled ? "ON" : "OFF"}</span></div>
       <div class="sub">${esc(sub)}</div>
@@ -539,18 +638,20 @@ function renderPanel() {
 
   const hk = JSON.stringify([selected, s.enabled, p.job, p.sub, tab, tabs]);
   if (hk !== headKey || !$("tabbody")) {
-    headKey = hk; bodyKey = "";
+    headKey = hk; bodyKey = ""; profKey = "";
     $("panel").innerHTML = `
       <div class="who" style="margin-bottom:10px"><span class="nm">${esc(selected)}</span>
         <span class="jb">${esc(p.job || s.job || "")}${p.sub ? " / " + esc(p.sub) : ""} · ${s.enabled ? "running" : "stopped"}</span><span class="sp"></span>
         <button class="${s.enabled ? "stop" : "go"}" onclick="send('${s.enabled ? "off" : "on"}')">${s.enabled ? "Stop" : "Start"}</button>
         <button onclick="send('reset')" title="Back to the recommended setup for this job; clears your ticks for this job">Reset to recommended</button></div>
+      <div class="profbar" id="profbar"></div>
       <div class="tabs">${tabs.map(t => `<div class="tab ${t.id === tab ? "on" : ""}" onclick="setTab('${t.id}')">${t.label}${t.n ? `<span class="n">${t.n}</span>` : ""}</div>`).join("")}</div>
       <div class="body" id="tabbody"></div>`;
   }
-  // Don't redraw under the user's hand while a slider or text box is in use.
+  renderProfBar(p);
+  // Don't redraw under the user's hand while a slider, number or text box is in use.
   const a = document.activeElement;
-  if (a && $("tabbody").contains(a) && (a.type === "range" || a.type === "text")) return;
+  if (a && $("tabbody").contains(a) && (a.type === "range" || a.type === "text" || a.type === "number")) return;
   const team = tab === "team" ? Object.keys(chars).map(n => [n, (chars[n].snapshot || {}).hold, (chars[n].snapshot || {}).camp,
     (chars[n].snapshot || {}).retreat, (chars[n].snapshot || {}).defense, (chars[n].snapshot || {}).leader]) : 0;
   const bk = JSON.stringify([tab, p, s.leader, Object.keys(chars), team, tab === "app" ? addon : 0]);
@@ -591,6 +692,7 @@ async function poll() {
 }
 poll();
 pollAddon();
+profDo("");
 </script>
 </body>
 </html>

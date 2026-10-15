@@ -5,6 +5,7 @@ vg_bridge.lua
 vg_combat.lua
 vg_hud.lua
 vg_jobs.lua
+vg_link.lua
 vg_mages.lua
 vg_menu.lua
 vg_party.lua

@@ -218,6 +218,20 @@ Settings are now saved safely with several characters running (one character's s
   Got a Terpander / Daurdabla? Just put 3 or 4 songs in the song list.
 - **Horde Lullaby.** With `//vg sleep on`, two or more extra mobs get Horde Lullaby (or Sleepga) at once.
 
+## Profiles and thresholds, CurePlease-style (new in 0.14.0 / Vanguard Control 1.3.0)
+
+Everything is chosen in Vanguard Control and kept there; the addon only carries it out.
+- **Profiles.** The bar above the tabs: **Save as...** keeps the character's whole setup for its job (role, weapon
+  skill, abilities and their thresholds, cure tiers, buffs, songs, Geo, enfeebles, modules, recovery and the other
+  settings) as a file in `VanguardControl\profiles`. **Load** puts any profile onto any character (a WHM profile on a
+  character that's on another job waits until it's on WHM). **Load by itself on <job>** loads it whenever that
+  character logs in or changes to that job.
+- **Ability thresholds.** Next to every ability on the Job tab: party HP / my HP / MP / TP limits, how often, and
+  when (always, party fighting, I'm fighting, out of combat). Changed values are outlined; the tooltip shows the
+  recommended one; clear a box to go back to it.
+- **Cure tiers** (Healing & MP tab): how much HP must be missing before each Cure tier is used; 0 = never.
+- **Recovery:** rest HP / MP limits, Convert and Sublimation thresholds, for every job with MP.
+
 ## The app does the work (new in 0.13.0 / Vanguard Control 1.2.0)
 
 - **Installs Vanguard for you.** Vanguard Control finds the Windower folder (or asks you to pick it), installs the

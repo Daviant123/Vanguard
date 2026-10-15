@@ -1,6 +1,6 @@
 _addon.name = 'Vanguard'
 _addon.author = 'Daviant'
-_addon.version = '0.13.0'
+_addon.version = '0.14.0'
 _addon.commands = {'vanguard', 'vg'}
 
 --[[
@@ -44,6 +44,7 @@ local store = require('vg_store')
 local mages = require('vg_mages')
 local support = require('vg_support')
 local update = require('vg_update')
+local link = require('vg_link')
 
 ------------------------------------------------------------------------
 -- Settings
@@ -70,7 +71,9 @@ local defaults = {
     assist = { engage = true, approach = true, melee_range = 3.0, engage_range = 25, disengage = true, defend = true,
                autotarget = true },
     -- priority = names healed first at a higher threshold (tanks). wake_sleep = cure sleeping members.
+    -- tiers: HP missing before each Cure tier is used (0 = never use it), like CurePlease's cure thresholds
     heal = { cure_at = 75, curaga_at = 70, curaga_count = 3, range = 20,
+             tiers = 'Cure VI:1300,Cure V:1000,Cure IV:650,Cure III:350,Cure II:170,Cure:70',
              priority = '', priority_at = 85, wake_sleep = true,
              ignore = '', curaga = true },
     -- Statuses NOT to remove (comma list of status names).
@@ -383,13 +386,26 @@ for _, pair in ipairs(status_cures) do
     if id then status_ids[#status_ids + 1] = {id, pair[2], pair[1]} end
 end
 
+-- The cure tiers from settings.heal.tiers ("Cure IV:650,..."), biggest first; 0 leaves a tier out.
+local function tiers()
+    local out = {}
+    for _, entry in ipairs(util.split(settings.heal.tiers or '', ',')) do
+        local name, hp = entry:match('^(.-)%s*:%s*(%d+)$')
+        if name and tonumber(hp) > 0 then out[#out + 1] = { name, tonumber(hp) } end
+    end
+    if #out == 0 then return cure_tiers end
+    table.sort(out, function(a, b) return a[2] > b[2] end)
+    return out
+end
+
 local function pick_cure(missing, player)
     local best
-    for i = #cure_tiers, 1, -1 do          -- smallest first
-        local s = util.spell(cure_tiers[i][1])
+    local list = tiers()
+    for i = #list, 1, -1 do                 -- smallest first
+        local s = util.spell(list[i][1])
         if util.spell_ready(s, player) then
             best = s
-            if cure_tiers[i][2] >= missing then return s end
+            if list[i][2] >= missing then return s end
         end
     end
     return best                              -- biggest available
@@ -986,7 +1002,8 @@ local function encode_profile(pr)
         if v then on[#on + 1] = id else off[#off + 1] = id end
     end
     -- '+' separates ids (commas would be split by Windower's config library).
-    return ('role=%s|ws=%s|on=%s|off=%s'):format(pr.role, pr.ws or '', table.concat(on, '+'), table.concat(off, '+'))
+    return ('role=%s|ws=%s|on=%s|off=%s|o=%s'):format(pr.role, pr.ws or '', table.concat(on, '+'), table.concat(off, '+'),
+        link.encode_opts(pr.opts))
 end
 
 local function decode_profile(job, str)
@@ -996,6 +1013,7 @@ local function decode_profile(job, str)
         elseif k == 'ws' then pr.ws = v
         elseif k == 'on' then for _, id in ipairs(util.split(v, '+')) do pr.toggles[id] = true end
         elseif k == 'off' then for _, id in ipairs(util.split(v, '+')) do pr.toggles[id] = false end
+        elseif k == 'o' then pr.opts = link.decode_opts(v)
         end
     end
     return pr
@@ -1140,6 +1158,13 @@ travel.init(settings, state, {
     ability = util.ability, ability_ready = util.ability_ready,
 })
 update.init(settings, log, function() store.save(settings) end)
+link.init(settings, state, {
+    log = log, store = store.save, save_profile = save_profile, load_profile = function(p) load_profile(p) end,
+})
+bridge.on_cfg = function(json)
+    local player = windower.ffxi.get_player()
+    if player then link.on_cfg(player, json) end
+end
 support.init(settings, state, {
     log = log, recently = recently, mark = mark, cast = cast, use_ja = use_ja, try_cast = try_cast, silenced = silenced,
     amnesia = amnesia, party_members = party_members, buffs_of = buffs_of, battle_target = battle_target,
@@ -1529,6 +1554,14 @@ windower.register_event('addon command', function(cmd, ...)
         safety.gs(windower.ffxi.get_player(), rest)
     elseif cmd == 'update' then
         update.command(args)
+    elseif cmd == 'dump' then
+        local player = windower.ffxi.get_player()
+        if player then bridge.send({ type = 'dump', name = player.name, data = link.dump(player) }) end
+    elseif cmd == 'actopt' then
+        if link.actopt(state.profile, args[1], args[2], args[3]) then
+            save_profile()
+            send_profile()
+        end
     elseif cmd == 'reload' then
         log('Reloading Vanguard...')
         windower.send_command('lua reload vanguard')
