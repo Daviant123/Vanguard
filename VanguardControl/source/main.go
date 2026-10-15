@@ -245,15 +245,22 @@ func openWindow() {
 }
 
 func main() {
+	// --no-window: started by the self-update; the old panel's window stays open and keeps working.
+	restarted := len(os.Args) > 1 && os.Args[1] == "--no-window"
+	cleanupOld()
 	addr, _ := net.ResolveUDPAddr("udp", udpAddr)
 	conn, err := net.ListenUDP("udp", addr)
+	for i := 0; err != nil && restarted && i < 20; i++ { // the old one is still letting go of the port
+		time.Sleep(250 * time.Millisecond)
+		conn, err = net.ListenUDP("udp", addr)
+	}
 	if err != nil {
 		// Already running: just bring up another window on the existing instance.
 		openWindow()
 		return
 	}
 	h := &hub{conn: conn, chars: map[string]*character{}}
-	h.addLog("Listening on %s. Load the addon in game with //lua load vanguard", udpAddr)
+	h.addLog("Vanguard Control %s. Listening on %s. Load the addon in game with //lua load vanguard", panelVersion, udpAddr)
 	go h.listen()
 
 	web, _ := fs.Sub(webFS, "web")
@@ -270,9 +277,25 @@ func main() {
 	})
 
 	ln, err := net.Listen("tcp", httpAddr)
+	for i := 0; err != nil && restarted && i < 20; i++ {
+		time.Sleep(250 * time.Millisecond)
+		ln, err = net.Listen("tcp", httpAddr)
+	}
 	if err != nil {
 		os.Exit(1)
 	}
-	go openWindow()
+	go h.autoUpdate(func(exe string) {
+		// Start the new one first (it waits for the ports), then step aside.
+		if err := startDetached(exe); err != nil {
+			h.addLog("Couldn't restart (%v): close and reopen Vanguard Control to use the new version.", err)
+			return
+		}
+		ln.Close()
+		conn.Close()
+		os.Exit(0)
+	})
+	if !restarted {
+		go openWindow()
+	}
 	http.Serve(ln, mux)
 }
