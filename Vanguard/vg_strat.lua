@@ -91,6 +91,66 @@ function strat.charges(player)
     return math.max(0, math.min(max, math.floor((max * per - r) / per + 1e-6)))
 end
 
+------------------------------------------------------------------------
+-- The spells each stratagem can be ticked for (only what this character can cast)
+------------------------------------------------------------------------
+local SKILL = { [32] = 'Divine', [33] = 'Healing', [34] = 'Enhancing', [35] = 'Enfeebling', [36] = 'Elemental', [37] = 'Dark' }
+local NO_ACCESSION = { Haste = true, ['Haste II'] = true, Raise = true, ['Raise II'] = true, ['Raise III'] = true, Arise = true,
+                       Reraise = true, ['Reraise II'] = true, ['Reraise III'] = true, ['Reraise IV'] = true,
+                       ['Cure V'] = true, ['Cure VI'] = true, ['Full Cure'] = true }
+
+-- Accession works on single-target healing / enhancing white magic (not Raise, Reraise, Haste, Cure V / VI)
+local function accession_ok(sp)
+    if sp.type ~= 'WhiteMagic' or (sp.skill ~= 33 and sp.skill ~= 34) or NO_ACCESSION[sp.en] then return false end
+    if sp.en:find('ga') and sp.en:find('^Cura') then return false end
+    if sp.en:find('ra$') or sp.en:find('ra [IVX]+$') then return false end       -- Protectra, Barfira, ... are party already
+    return true
+end
+
+-- Pools of spell names for the panel: white (with skill), enhancing, accession, black, enfeebling.
+function strat.pools(player)
+    local p = { white = {}, enhancing = {}, accession = {}, black = {}, enfeebling = {} }
+    local seen = {}
+    for _, sp in pairs(require('resources').spells) do
+        if sp.en and not seen[sp.en] and (sp.type == 'WhiteMagic' or sp.type == 'BlackMagic') and util.can_cast(sp, player) then
+            seen[sp.en] = true
+            local item = { n = sp.en, s = SKILL[sp.skill] or 'Other' }
+            if sp.type == 'WhiteMagic' then
+                p.white[#p.white + 1] = item
+                if sp.skill == 34 then p.enhancing[#p.enhancing + 1] = sp.en end
+                if accession_ok(sp) then p.accession[#p.accession + 1] = sp.en end
+            else
+                p.black[#p.black + 1] = item
+                if sp.skill == 35 then p.enfeebling[#p.enfeebling + 1] = sp.en end
+            end
+        end
+    end
+    local by = function(a, b) return (a.n or a) < (b.n or b) end
+    for _, t in pairs(p) do table.sort(t, by) end
+    return p
+end
+
+-- Lists that can be ticked from the panel (//vg stratspell <list> on|off|clear <spell>)
+strat.LISTS = { perpetuance = true, accession = true, celerity = true, penury = true, rapture = true, altruism = true,
+                tranquility = true, parsimony = true, alacrity = true, manifestation = true, ebullience = true,
+                focalization = true, equanimity = true }
+
+function strat.list(name) return S.strat[name] end
+
+function strat.toggle(list, what, name)
+    if not strat.LISTS[list or ''] then return false, 'unknown list' end
+    if what == 'clear' then S.strat[list] = '' return true end
+    local sp = name and util.spell(name)
+    if not sp then return false, 'unknown spell' end
+    local out = {}
+    for _, n in ipairs(util.split(S.strat[list] or '', ',')) do
+        if n:lower() ~= sp.en:lower() then out[#out + 1] = n end
+    end
+    if what == 'on' then out[#out + 1] = sp.en end
+    S.strat[list] = table.concat(out, ',')
+    return true
+end
+
 local function light(player) return util.has_buff(player.buffs, 358) or util.has_buff(player.buffs, 401) end
 local function dark(player) return util.has_buff(player.buffs, 359) or util.has_buff(player.buffs, 402) end
 
@@ -103,7 +163,8 @@ function strat.info(player)
     return { level = strat.level(player), max = strat.max_charges(player), per = strat.per_charge(player),
              charges = strat.charges(player), main = player.main_job == 'SCH', available = avail,
              arts = light(player) and 'light' or (dark(player) and 'dark' or 'none'),
-             can_arts = strat.has('Light Arts', set) ~= nil }
+             can_arts = strat.has('Light Arts', set) ~= nil,
+             pools = strat.max_charges(player) > 0 and strat.pools(player) or nil }
 end
 
 ------------------------------------------------------------------------

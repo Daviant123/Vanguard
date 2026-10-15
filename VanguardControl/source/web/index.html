@@ -107,7 +107,12 @@ table.grid input[type=number] { width: 70px; height: auto; }
 .strat:last-child { border-bottom: none; }
 .strat .nm { font-weight: 600; color: var(--accent); }
 .strat .ds { color: var(--muted); font-size: 11px; }
-.strat input[type=text] { width: 100%; }
+.strat details { margin-top: 4px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel); }
+.strat summary { cursor: pointer; padding: 5px 8px; user-select: none; }
+.strat summary b { color: var(--text); font-weight: 600; }
+.strat details .pick { padding: 4px 10px 8px; }
+.strat details h4 { margin: 6px 0 2px; font-size: 11px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
+.strat details .checks { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
 .charges { display: flex; gap: 4px; align-items: center; }
 .charges i { width: 16px; height: 16px; border-radius: 50%; background: var(--panel); border: 1px solid var(--line); }
 .charges i.on { background: var(--accent); border-color: var(--accent); }
@@ -374,24 +379,50 @@ function teamTab(c, p) {
 // ---------- Stratagems tab (SCH main or /SCH) ----------
 // key: settings name; list: spells it is used on; num: [setting, label, min, max, step, unit]
 const STRATS = [
-  {n: "Perpetuance", w: 1, d: "Next enhancing spell lasts twice as long (x2.5 with Arbatel / Savant bracers). Main SCH 87.", list: "perpetuance"},
-  {n: "Accession", w: 1, d: "Next healing / enhancing spell hits the party within 10'. Works with Cure I-IV, Regen, Protect, Shell, -na, Erase, Refresh, Phalanx, Stoneskin, Blink, Aquaveil, Adloquium, Embrava, storms; not Raise, Reraise or Haste.",
+  {n: "Perpetuance", w: 1, need: "Scholar main job only (level 87)", d: "Next enhancing spell lasts twice as long (x2.5 with Arbatel / Savant bracers). Main SCH 87.", list: "perpetuance"},
+  {n: "Accession", w: 1, need: "Scholar level 40", d: "Next healing / enhancing spell hits the party within 10'. Works with Cure I-IV, Regen, Protect, Shell, -na, Erase, Refresh, Phalanx, Stoneskin, Blink, Aquaveil, Adloquium, Embrava, storms; not Raise, Reraise or Haste.",
    list: "accession", num: [["accession_count", "Use on a listed buff when this many party members nearby need it", 2, 6, 1, ""]],
    sel: ["accession_cure", "Scholar's Curaga: Accession + Cure when this many are hurt", [["0", "Off"], ["2", "2 members"], ["3", "3 members"], ["4", "4 members"], ["5", "5 members"]]]},
-  {n: "Celerity", w: 1, d: "Next white spell casts in half the time. Raise spells in the list always get it (even from the reserve).",
+  {n: "Celerity", w: 1, need: "Scholar level 25", d: "Next white spell casts in half the time. Raise spells in the list always get it (even from the reserve).",
    list: "celerity", num: [["celerity_hp", "Emergency: any Cure on someone under", 0, 60, 5, "%"]]},
-  {n: "Penury", w: 1, d: "Next white spell costs half the MP.", list: "penury", num: [["penury_mp", "Any white spell (20+ MP) when my MP is under", 0, 80, 5, "%"]]},
-  {n: "Rapture", w: 1, d: "Next white spell is stronger (cures, Regen). Main SCH 55.", list: "rapture", num: [["rapture_hp", "Emergency: any Cure on someone under", 0, 60, 5, "%"]]},
-  {n: "Altruism", w: 1, d: "Next white spell is more accurate (merit).", list: "altruism"},
-  {n: "Tranquility", w: 1, d: "Next white spell draws less hate (merit).", list: "tranquility"},
-  {n: "Parsimony", w: 0, d: "Next black spell costs half the MP.", list: "parsimony", num: [["parsimony_mp", "Any black spell (20+ MP) when my MP is under", 0, 80, 5, "%"]]},
-  {n: "Alacrity", w: 0, d: "Next black spell casts in half the time (helixes, bursts).", list: "alacrity"},
-  {n: "Manifestation", w: 0, d: "Next enfeeble hits everything in range (Sleep, Sleepga, Gravity...).", list: "manifestation"},
-  {n: "Ebullience", w: 0, d: "Next black spell is stronger (nukes, helixes). Main SCH 55.", list: "ebullience"},
-  {n: "Focalization", w: 0, d: "Next black spell is more accurate (merit).", list: "focalization"},
-  {n: "Equanimity", w: 0, d: "Next black spell draws less hate (merit).", list: "equanimity"},
-  {n: "Immanence", w: 0, d: "Lets the next elemental spell skillchain: set the self-skillchain on the Job tab (Scholar box)."},
+  {n: "Penury", w: 1, need: "Scholar level 10", d: "Next white spell costs half the MP.", list: "penury", num: [["penury_mp", "Any white spell (20+ MP) when my MP is under", 0, 80, 5, "%"]]},
+  {n: "Rapture", w: 1, need: "Scholar level 55 (main, or /SCH with master levels)", d: "Next white spell is stronger (cures, Regen). Main SCH 55.", list: "rapture", num: [["rapture_hp", "Emergency: any Cure on someone under", 0, 60, 5, "%"]]},
+  {n: "Altruism", w: 1, need: "Scholar main job merit", d: "Next white spell is more accurate (merit).", list: "altruism"},
+  {n: "Tranquility", w: 1, need: "Scholar main job merit", d: "Next white spell draws less hate (merit).", list: "tranquility"},
+  {n: "Parsimony", w: 0, need: "Scholar level 10", d: "Next black spell costs half the MP.", list: "parsimony", num: [["parsimony_mp", "Any black spell (20+ MP) when my MP is under", 0, 80, 5, "%"]]},
+  {n: "Alacrity", w: 0, need: "Scholar level 25", d: "Next black spell casts in half the time (helixes, bursts).", list: "alacrity"},
+  {n: "Manifestation", w: 0, need: "Scholar level 40", d: "Next enfeeble hits everything in range (Sleep, Sleepga, Gravity...).", list: "manifestation"},
+  {n: "Ebullience", w: 0, need: "Scholar level 55 (main, or /SCH with master levels)", d: "Next black spell is stronger (nukes, helixes). Main SCH 55.", list: "ebullience"},
+  {n: "Focalization", w: 0, need: "Scholar main job merit", d: "Next black spell is more accurate (merit).", list: "focalization"},
+  {n: "Equanimity", w: 0, need: "Scholar main job merit", d: "Next black spell draws less hate (merit).", list: "equanimity"},
+  {n: "Immanence", w: 0, need: "Scholar main job only (level 87)", d: "Lets the next elemental spell skillchain: set the self-skillchain on the Job tab (Scholar box)."},
 ];
+const STRAT_POOL = {perpetuance: "enhancing", accession: "accession", manifestation: "enfeebling",
+  celerity: "white", penury: "white", rapture: "white", altruism: "white", tranquility: "white",
+  parsimony: "black", alacrity: "black", ebullience: "black", focalization: "black", equanimity: "black"};
+const stratOpen = new Set();
+document.addEventListener("toggle", e => {
+  const d = e.target; if (!d.dataset || !d.dataset.k) return;
+  if (d.open) stratOpen.add(d.dataset.k); else stratOpen.delete(d.dataset.k);
+}, true);
+// Tick-boxes of the spells this character can cast that the stratagem works on.
+function spellPicker(key, pools, chosenStr) {
+  const raw = arr(pools[STRAT_POOL[key]]);
+  const items = raw.map(x => typeof x === "string" ? {n: x, s: ""} : x);
+  const chosen = new Set(String(chosenStr || "").split(",").map(x => lc(x.trim())).filter(Boolean));
+  const on = items.filter(x => chosen.has(lc(x.n)));
+  const groups = {};
+  items.forEach(x => (groups[x.s] = groups[x.s] || []).push(x));
+  const order = ["Healing", "Enhancing", "Enfeebling", "Divine", "Elemental", "Dark", "Other", ""];
+  const box = x => chk(x.n, chosen.has(lc(x.n)), `stratspell ${key} on ${x.n}`, `stratspell ${key} off ${x.n}`);
+  return `<details data-k="${key}" ${stratOpen.has(key) ? "open" : ""}>
+    <summary>Used before: <b>${on.length ? on.map(x => esc(x.n)).join(", ") : "nothing yet"}</b> <span class="hint">(click to choose)</span></summary>
+    <div class="pick">${items.length ? Object.keys(groups).sort((a, b) => order.indexOf(a) - order.indexOf(b)).map(g =>
+      `${g ? `<h4>${g}</h4>` : ""}<div class="checks">${groups[g].map(box).join("")}</div>`).join("") : `<div class="hint">No spells for this yet.</div>`}
+      ${on.length ? `<div style="margin-top:6px"><button onclick="send('stratspell ${key} clear')">Untick all</button></div>` : ""}
+    </div></details>`;
+}
+
 function stratTab(c, p) {
   const s = c.snapshot || {}, cfg = p.config || {}, info = cfg.strat_info || {}, st = (cfg.extra || {}).strat || {};
   const [now, max] = String(s.strat || `${info.charges ?? 0}/${info.max ?? 0}`).split("/").map(Number);
@@ -399,9 +430,9 @@ function stratTab(c, p) {
   const set = (k, v) => `set strat.${k} ${v}`;
   const row = d => {
     const on = avail.has(d.n);
-    return `<div class="strat" style="${on ? "" : "opacity:.45"}"><div><div class="nm">${d.n}</div><div class="ds">${on ? "" : "not available on this job / level"}</div></div>
+    return `<div class="strat" style="${on ? "" : "opacity:.45"}"><div><div class="nm">${d.n}</div><div class="ds">${on ? "" : "needs " + esc(d.need || "a higher Scholar level")}</div></div>
       <div><div class="ds" style="margin-bottom:4px">${esc(d.d)}</div>
-      ${d.list ? `<label class="field">Use it before these spells (comma list)<input type="text" value="${esc(st[d.list] || "")}" data-cmd="${set(d.list, "")}" placeholder="none"></label>` : ""}
+      ${d.list && on ? spellPicker(d.list, info.pools || {}, st[d.list]) : ""}
       ${arr(d.num).map(([k, label, mn, mx, step, unit]) => slider(label, "strat." + k, st[k] ?? 0, mn, mx, step, unit)).join("")}
       ${d.sel ? `<label class="field" style="margin-top:4px">${esc(d.sel[1])} ${sel(set(d.sel[0], ""), d.sel[2].map(([v, l]) => ({v, l})), String(st[d.sel[0]] ?? 0))}</label>` : ""}
       </div></div>`;
@@ -463,6 +494,7 @@ function renderAddonBar() {
   const a = addon || {}, bar = $("addonbar"), names = Object.keys(chars);
   const online = names.filter(n => chars[n].online);
   const old = online.filter(n => { const v = (chars[n].snapshot || {}).version; return a.installed && v && v !== a.installed; });
+  const ancient = online.filter(n => !(chars[n].snapshot || {}).version);
   let html = "", cls = "show";
   if (!a.bundled) html = "";
   else if (!a.found) html = `<b>Where is Windower?</b> The app couldn't find your Windower folder.
@@ -472,6 +504,9 @@ function renderAddonBar() {
   else if (!online.length) html = `Vanguard ${esc(a.installed)} is installed${a.autoload ? " and loads when the game starts" : ""}.
     Start the game, or type <b>//lua load vanguard</b> once in each game window that's already open.
     ${a.autoload ? "" : `<button onclick="addonDo('autoload')">Load it at game start</button>`}`;
+  else if (ancient.length) html = `<b>${ancient.map(esc).join(", ")}</b> still run${ancient.length === 1 ? "s" : ""} an old Vanguard
+    that can't be reloaded from the app. Type <b>//lua r vanguard</b> once in ${ancient.length === 1 ? "its game window" : "each of their game windows"};
+    after that the app keeps it up to date by itself.`;
   else if (old.length) html = `${old.map(esc).join(", ")} still run${old.length === 1 ? "s" : ""} an older Vanguard.
     <button class="primary" onclick="addonDo('reload')">Reload them</button>`;
   else cls = "";
@@ -686,7 +721,7 @@ function renderList() {
     const sub = [role ? role.label : "", c.online ? (s.status || "") : "offline", s.target ? `${s.target} ${s.target_hpp}%` : ""].filter(Boolean).join(" · ");
     return `<div class="card ${n === selected ? "sel" : ""} ${c.online ? "" : "offline"}" data-name="${esc(n)}">
       <div class="top"><span class="nm">${esc(n)}</span><span class="jb">${esc(s.job || p.job || "")}${p.sub && !String(s.job || "").includes("/") ? "/" + esc(p.sub) : ""}</span>
-        ${addon.installed && s.version && s.version !== addon.installed && c.online ? `<span class="pill warn" title="Runs Vanguard ${esc(s.version)}; ${esc(addon.installed)} is installed">OLD</span>` : ""}
+        ${addon.installed && c.online && (!s.version || s.version !== addon.installed) ? `<span class="pill warn" title="Runs Vanguard ${esc(s.version || "from before 0.13")}; ${esc(addon.installed)} is installed">OLD</span>` : ""}
         <span class="pill ${s.enabled ? "on" : "off"}">${s.enabled ? "ON" : "OFF"}</span></div>
       <div class="sub">${esc(sub)}</div>
       <div class="bars">${bar(s.hpp, "var(--hp)", 100, "HP")}${bar(s.mpp, "var(--mp)", 100, "MP")}${bar(s.tp, "var(--tp)", 3000, "TP")}</div>

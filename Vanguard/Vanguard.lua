@@ -1,6 +1,6 @@
 _addon.name = 'Vanguard'
 _addon.author = 'Daviant'
-_addon.version = '0.15.0'
+_addon.version = '0.16.0'
 _addon.commands = {'vanguard', 'vg'}
 
 --[[
@@ -1576,6 +1576,16 @@ windower.register_event('addon command', function(cmd, ...)
     elseif cmd == 'dump' then
         local player = windower.ffxi.get_player()
         if player then bridge.send({ type = 'dump', name = player.name, data = link.dump(player) }) end
+    elseif cmd == 'stratspell' then
+        -- from the panel's Stratagems tab: //vg stratspell <list> on|off <spell>  |  //vg stratspell <list> clear
+        local list, what = (args[1] or ''):lower(), (args[2] or ''):lower()
+        local ok, why = strat.toggle(list, what, table.concat(args, ' ', 3))
+        if ok then
+            store.save(settings)
+            send_profile()
+        else
+            log('Stratagem list: ' .. tostring(why))
+        end
     elseif cmd == 'actopt' then
         if link.actopt(state.profile, args[1], args[2], args[3]) then
             save_profile()

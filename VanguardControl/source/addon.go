@@ -259,6 +259,7 @@ func (h *hub) ensureAddon(force bool) string {
 // reloadWatch: characters still running an older addon than the one on disk are told to reload (once each).
 func (h *hub) reloadWatch() {
 	asked := map[string]string{}
+	toldOld := map[string]bool{}
 	for {
 		time.Sleep(5 * time.Second)
 		st := currentAddonState()
@@ -266,15 +267,22 @@ func (h *hub) reloadWatch() {
 			continue
 		}
 		h.mu.Lock()
-		var todo []string
+		var todo, old []string
 		for name, c := range h.chars {
 			v, _ := c.Snapshot["version"].(string)
 			online := time.Since(c.LastSeen) < 5*time.Second
+			if online && v == "" && c.Snapshot["type"] == "state" && !toldOld[name] {
+				toldOld[name] = true
+				old = append(old, name)
+			}
 			if online && v != "" && newer(st.Installed, v) && asked[name] != st.Installed {
 				todo = append(todo, name+"|"+v)
 			}
 		}
 		h.mu.Unlock()
+		for _, name := range old {
+			h.addLog("%s runs an old Vanguard that can't be reloaded from here: type //lua r vanguard once in its game window.", name)
+		}
 		for _, t := range todo {
 			parts := strings.SplitN(t, "|", 2)
 			asked[parts[0]] = st.Installed
