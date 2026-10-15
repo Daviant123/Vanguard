@@ -1,6 +1,6 @@
 _addon.name = 'Vanguard'
 _addon.author = 'Daviant'
-_addon.version = '0.16.2'
+_addon.version = '0.17.0'
 _addon.commands = {'vanguard', 'vg'}
 
 --[[
@@ -75,6 +75,7 @@ local defaults = {
     -- tiers: HP missing before each Cure tier is used (0 = never use it), like CurePlease's cure thresholds
     heal = { cure_at = 75, curaga_at = 70, curaga_count = 3, range = 20,
              tiers = 'Cure VI:1300,Cure V:1000,Cure IV:650,Cure III:350,Cure II:170,Cure:70',
+             curagas = 'Curaga V,Curaga IV,Curaga III,Curaga II,Curaga',   -- Curaga tiers it may use
              priority = '', priority_at = 85, wake_sleep = true,
              ignore = '', curaga = true },
     -- Statuses NOT to remove (comma list of status names).
@@ -465,8 +466,10 @@ local function do_heal(player)
     if not worst then return false end
 
     if settings.heal.curaga and low_count >= settings.heal.curaga_count then
+        local allowed = {}
+        for _, n in ipairs(util.split(settings.heal.curagas or '', ',')) do allowed[n:lower()] = true end
         for _, name in ipairs(curaga_tiers) do
-            if try_cast(name, worst.name, low_count .. ' members hurt', player) then
+            if allowed[name:lower()] and try_cast(name, worst.name, low_count .. ' members hurt', player) then
                 local sp = util.spell(name)
                 share.cure(player, '*', sp and sp.cast_time or 3)
                 return true
@@ -1576,6 +1579,34 @@ windower.register_event('addon command', function(cmd, ...)
     elseif cmd == 'dump' then
         local player = windower.ffxi.get_player()
         if player then bridge.send({ type = 'dump', name = player.name, data = link.dump(player) }) end
+    elseif cmd == 'curetier' or cmd == 'curagatier' then
+        local val = table.remove(args)
+        local name = table.concat(args, ' ')
+        local sp = util.spell(name)
+        local family = cmd == 'curetier' and '^Cure' or '^Curaga'
+        if not sp or not sp.en:find(family) or (cmd == 'curetier' and sp.en:find('^Curaga')) then
+            log('Usage: //vg curetier Cure IV 650|off   //vg curagatier Curaga III on|off')
+        elseif cmd == 'curetier' then
+            local DEFAULT = { Cure = 70, ['Cure II'] = 170, ['Cure III'] = 350, ['Cure IV'] = 650, ['Cure V'] = 1000, ['Cure VI'] = 1300 }
+            local t, order = {}, { 'Cure VI', 'Cure V', 'Cure IV', 'Cure III', 'Cure II', 'Cure' }
+            for _, e in ipairs(util.split(settings.heal.tiers or '', ',')) do
+                local n, hp = e:match('^(.-)%s*:%s*(%d+)$')
+                if n then t[n] = tonumber(hp) end
+            end
+            t[sp.en] = (val == 'off') and 0 or (val == 'on' and DEFAULT[sp.en]) or tonumber(val) or t[sp.en] or DEFAULT[sp.en]
+            local out = {}
+            for _, n in ipairs(order) do out[#out + 1] = ('%s:%d'):format(n, t[n] or DEFAULT[n]) end
+            settings.heal.tiers = table.concat(out, ',')
+            store.save(settings) send_profile()
+        else
+            local out = {}
+            for _, n in ipairs(util.split(settings.heal.curagas or '', ',')) do
+                if n:lower() ~= sp.en:lower() then out[#out + 1] = n end
+            end
+            if val == 'on' then out[#out + 1] = sp.en end
+            settings.heal.curagas = table.concat(out, ',')
+            store.save(settings) send_profile()
+        end
     elseif cmd == 'stratspell' then
         -- from the panel's Stratagems tab: //vg stratspell <list> on|off <spell>  |  //vg stratspell <list> clear
         local list, what = (args[1] or ''):lower(), (args[2] or ''):lower()

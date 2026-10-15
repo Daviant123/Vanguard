@@ -138,7 +138,16 @@ function menu.catalog(player, status_cures)
         return false
     end
 
+    local cures, curagas = {}, {}
+    for _, n in ipairs({ 'Cure', 'Cure II', 'Cure III', 'Cure IV', 'Cure V', 'Cure VI' }) do
+        if has[n:lower()] then cures[#cures + 1] = n end
+    end
+    for _, n in ipairs({ 'Curaga', 'Curaga II', 'Curaga III', 'Curaga IV', 'Curaga V' }) do
+        if has[n:lower()] then curagas[#curagas + 1] = n end
+    end
+
     cache.data = {
+        cures = cures, curagas = curagas,
         party_buffs = party, self_buffs = self_only, debuffs = debuffs,
         songs = songs, indi = indi, geo = geo, cleanse = cleanse,
         can_cure = any('Cure', 'Cure II', 'Cure III', 'Cure IV', 'Cure V', 'Cure VI'),
@@ -177,7 +186,7 @@ function menu.config(settings)
             cure_at = settings.heal.cure_at, curaga_at = settings.heal.curaga_at,
             curaga_count = settings.heal.curaga_count, priority_at = settings.heal.priority_at,
             priority = util.split(settings.heal.priority, ','), ignore = util.split(settings.heal.ignore, ','),
-            wake_sleep = settings.heal.wake_sleep, curaga = settings.heal.curaga, tiers = settings.heal.tiers,
+            wake_sleep = settings.heal.wake_sleep, curaga = settings.heal.curaga, tiers = settings.heal.tiers, curagas = settings.heal.curagas,
         },
         rest = settings.rest, mana = settings.mana,
         cleanse_skip = util.split(settings.cleanse.skip, ','),

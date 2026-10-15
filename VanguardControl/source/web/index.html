@@ -107,6 +107,16 @@ table.grid input[type=number] { width: 70px; height: auto; }
 .strat:last-child { border-bottom: none; }
 .strat .nm { font-weight: 600; color: var(--accent); }
 .strat .ds { color: var(--muted); font-size: 11px; }
+table.sgrid { border-collapse: collapse; width: 100%; }
+table.sgrid th { font-size: 11px; color: var(--accent); padding: 4px 6px; text-align: center; border-bottom: 1px solid var(--line); position: sticky; top: 0; background: var(--panel-2); }
+table.sgrid th small { display: block; color: var(--muted); font-weight: 400; }
+table.sgrid th button { font-size: 10px; padding: 0 5px; margin: 2px 1px 0; }
+table.sgrid td { padding: 2px 6px; text-align: center; border-bottom: 1px solid rgba(255,255,255,.04); }
+table.sgrid td:first-child { text-align: left; white-space: nowrap; }
+table.sgrid tr.grp td { color: var(--muted); font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; padding-top: 8px; text-align: left; }
+table.sgrid tr:hover td { background: rgba(255,255,255,.03); }
+table.sgrid input { accent-color: var(--good); width: 16px; height: 16px; cursor: pointer; }
+table.sgrid .na { color: var(--line); }
 .strat details { margin-top: 4px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel); }
 .strat summary { cursor: pointer; padding: 5px 8px; user-select: none; }
 .strat summary b { color: var(--text); font-weight: 600; }
@@ -423,21 +433,45 @@ function spellPicker(key, pools, chosenStr) {
     </div></details>`;
 }
 
+function stratGrid(white, info, st) {
+  const pools = info.pools || {}, avail = new Set(arr(info.available));
+  const cols = STRATS.filter(d => !!d.w === white && d.list && avail.has(d.n));
+  const items = arr(pools[white ? "white" : "black"]).map(x => typeof x === "string" ? {n: x, s: ""} : x);
+  if (!cols.length) return `<div class="hint">${white ? "Light" : "Dark"} Arts stratagems aren't available on this job / level.</div>`;
+  const poolSet = {};
+  cols.forEach(d => poolSet[d.list] = new Set(arr(pools[STRAT_POOL[d.list]]).map(x => lc(typeof x === "string" ? x : x.n))));
+  const chosen = {};
+  cols.forEach(d => chosen[d.list] = new Set(String(st[d.list] || "").split(",").map(x => lc(x.trim())).filter(Boolean)));
+  const rows = items.filter(x => cols.some(d => poolSet[d.list].has(lc(x.n))));
+  const order = ["Healing", "Enhancing", "Enfeebling", "Divine", "Elemental", "Dark", "Other", ""];
+  rows.sort((a, b) => (order.indexOf(a.s) - order.indexOf(b.s)) || a.n.localeCompare(b.n));
+  const allOf = d => rows.filter(x => poolSet[d.list].has(lc(x.n))).map(x => x.n).join(",");
+  let last = null, body = "";
+  rows.forEach(x => {
+    if (x.s !== last) { last = x.s; body += `<tr class="grp"><td colspan="${cols.length + 1}">${esc(x.s || "Other")}</td></tr>`; }
+    body += `<tr><td>${esc(x.n)}</td>${cols.map(d => poolSet[d.list].has(lc(x.n))
+      ? `<td><input type="checkbox" title="${esc(d.n)} before ${esc(x.n)}" ${chosen[d.list].has(lc(x.n)) ? "checked" : ""}
+          data-on="stratspell ${d.list} on ${esc(x.n)}" data-off="stratspell ${d.list} off ${esc(x.n)}"></td>`
+      : `<td class="na" title="${esc(d.n)} doesn't work on ${esc(x.n)}">·</td>`).join("")}</tr>`;
+  });
+  return `<table class="sgrid"><thead><tr><th style="text-align:left">Spell</th>${cols.map(d => `<th title="${esc(d.d)}">${d.n}
+      <small>${chosen[d.list].size ? [...rows].filter(x => chosen[d.list].has(lc(x.n))).length + " ticked" : "none"}</small>
+      <button onclick="send('stratspell ${d.list} set ${esc(allOf(d))}')">all</button><button onclick="send('stratspell ${d.list} clear')">none</button></th>`).join("")}</tr></thead>
+    <tbody>${body}</tbody></table>`;
+}
+
 function stratTab(c, p) {
   const s = c.snapshot || {}, cfg = p.config || {}, info = cfg.strat_info || {}, st = (cfg.extra || {}).strat || {};
   const [now, max] = String(s.strat || `${info.charges ?? 0}/${info.max ?? 0}`).split("/").map(Number);
   const avail = new Set(arr(info.available));
   const set = (k, v) => `set strat.${k} ${v}`;
-  const row = d => {
-    const on = avail.has(d.n);
-    return `<div class="strat" style="${on ? "" : "opacity:.45"}"><div><div class="nm">${d.n}</div><div class="ds">${on ? "" : "needs " + esc(d.need || "a higher Scholar level")}</div></div>
-      <div><div class="ds" style="margin-bottom:4px">${esc(d.d)}</div>
-      ${d.list && on ? spellPicker(d.list, info.pools || {}, st[d.list]) : ""}
+  const arts = info.arts === "light" ? "Light Arts" : info.arts === "dark" ? "Dark Arts" : "no Arts";
+  // the automatic rules (thresholds), one line per stratagem that has one
+  const rules = STRATS.filter(d => (d.num || d.sel) && avail.has(d.n)).map(d => `<div class="strat"><div class="nm">${d.n}</div><div>
       ${arr(d.num).map(([k, label, mn, mx, step, unit]) => slider(label, "strat." + k, st[k] ?? 0, mn, mx, step, unit)).join("")}
       ${d.sel ? `<label class="field" style="margin-top:4px">${esc(d.sel[1])} ${sel(set(d.sel[0], ""), d.sel[2].map(([v, l]) => ({v, l})), String(st[d.sel[0]] ?? 0))}</label>` : ""}
-      </div></div>`;
-  };
-  const arts = info.arts === "light" ? "Light Arts" : info.arts === "dark" ? "Dark Arts" : "no Arts";
+    </div></div>`).join("");
+  const missing = STRATS.filter(d => !avail.has(d.n)).map(d => `${d.n} (${d.need || "higher level"})`);
   return `<div class="stack">
     <div class="box"><h3>Stratagems: ${info.main ? "Scholar" : "/SCH"} level ${info.level}</h3>
       <div class="row" style="align-items:center;gap:18px">
@@ -451,10 +485,13 @@ function stratTab(c, p) {
         <label class="field">Keep for emergencies ${sel(set("reserve", ""), Array.from({length: Math.max(1, max)}, (_, i) => ({v: String(i), l: i === 0 ? "none" : i + " charge" + (i > 1 ? "s" : "")})), String(st.reserve ?? 1))}</label>
         ${info.main && max === 5 ? chk("550 Job Point gift (33 s a charge)", st.jp_gift, set("jp_gift", "true"), set("jp_gift", "false")) : ""}
       </div>
-      <div class="hint" style="margin-top:6px">Each stratagem works on the next spell of its kind and uses one charge. The reserve is only spent on emergencies (Raise with Celerity, emergency cures).</div>
     </div>
-    <div class="box"><h3>Light Arts</h3>${STRATS.filter(d => d.w).map(row).join("")}</div>
-    <div class="box"><h3>Dark Arts</h3>${STRATS.filter(d => !d.w).map(row).join("")}</div>
+    <div class="box"><h3>Light Arts: tick a box to use that stratagem before that spell</h3>${stratGrid(true, info, st)}
+      <div class="hint" style="margin-top:6px">· = that stratagem doesn't work on that spell. Hover a column name for what it does.</div></div>
+    ${rules ? `<div class="box"><h3>Also use them automatically</h3>${rules}</div>` : ""}
+    <div class="box"><h3>Dark Arts</h3>${stratGrid(false, info, st)}</div>
+    ${missing.length ? `<div class="hint">Not on this job / level: ${missing.map(esc).join(", ")}.</div>` : ""}
+    <div class="hint">Each stratagem works on the next spell of its kind and uses one charge. The reserve is only spent on emergencies (Raise with Celerity, emergency cures).</div>
   </div>`;
 }
 
@@ -534,7 +571,7 @@ function healTab(p) {
       ${m.can_curaga ? slider("Curaga when members are below", "heal.curaga_at", h.curaga_at, 30, 95, 5) : ""}
       ${m.can_curaga ? slider("…and at least this many are hurt", "heal.curaga_count", h.curaga_count, 2, 6, 1, "") : ""}
     </div></div>` : ""}
-    ${m.can_cure ? cureTiers(h.tiers) : ""}
+    ${m.can_cure ? cureTiers(h.tiers, m, h) : ""}
     ${recoveryBox(p)}
     ${m.can_cure || m.can_raise || arr(m.cleanse).length ? `<div class="box"><h3>Party</h3>
       ${party.length ? `<table class="grid"><thead><tr><th>Member</th><th>Heal &amp; cleanse</th><th title="Cured first, at the priority threshold">Priority</th></tr></thead><tbody>
@@ -554,13 +591,22 @@ function parseTiers(str) {
   const t = {}; String(str || "").split(",").forEach(e => { const m = e.match(/^\s*(.+?)\s*:\s*(\d+)\s*$/); if (m) t[m[1]] = Number(m[2]); });
   return t;
 }
-function cureTiers(str) {
-  const t = parseTiers(str);
-  return `<div class="box"><h3>Cure tiers: use each one when this much HP is missing (0 = never)</h3>
-    <table class="grid"><thead><tr>${CURES.map(c => `<th>${c}</th>`).join("")}</tr></thead><tbody><tr>
-    ${CURES.map(c => `<td><input type="number" min="0" step="10" value="${t[c] ?? 0}" data-tiers="${esc(c)}"></td>`).join("")}
-    </tr></tbody></table>
-    <div class="hint" style="margin-top:4px">The smallest tier that covers the missing HP is cast; if none does, the biggest one available.</div></div>`;
+const HP_STEPS = [50, 70, 100, 150, 170, 200, 250, 300, 350, 400, 450, 500, 550, 600, 650, 700, 800, 900, 1000, 1100, 1200, 1300, 1500, 1800, 2000, 2500];
+function cureTiers(str, m, h) {
+  const t = parseTiers(str), cures = arr(m.cures).length ? arr(m.cures) : CURES;
+  const curagas = arr(m.curagas), on = new Set(String(h.curagas || "").split(",").map(x => lc(x.trim())));
+  const hpSel = c => { const v = t[c] || 0; const steps = HP_STEPS.includes(v) || !v ? HP_STEPS : [...HP_STEPS, v].sort((a, b) => a - b);
+    return `<select data-cmd="curetier ${esc(c)} " ${v ? "" : "disabled"}>${steps.map(n => opt(String(n), n + " HP", String(v))).join("")}</select>`; };
+  return `<div class="box"><h3>Which cures to use</h3>
+    <table class="grid"><thead><tr><th>Cure</th><th>Use it</th><th>When this much HP is missing</th></tr></thead><tbody>
+    ${cures.map(c => `<tr><td>${esc(c)}</td><td><input type="checkbox" ${t[c] ? "checked" : ""} data-on="curetier ${esc(c)} on" data-off="curetier ${esc(c)} off"></td>
+      <td>${hpSel(c)}</td></tr>`).join("")}
+    </tbody></table>
+    <div class="hint" style="margin-top:4px">The smallest ticked cure that covers the missing HP is cast; if none does, the biggest ticked one.</div>
+    ${curagas.length ? `<div style="margin-top:10px"><b style="font-size:12px;color:var(--accent)">Curaga tiers to use</b>
+      <div class="checks">${curagas.map(c => chk(c, on.has(lc(c)), `curagatier ${c} on`, `curagatier ${c} off`)).join("")}</div>
+      <div class="hint">The strongest ticked Curaga is cast when enough members are hurt (see the sliders above).</div></div>` : ""}
+  </div>`;
 }
 function tierString() {
   return [...document.querySelectorAll("[data-tiers]")].map(i => `${i.dataset.tiers}:${Math.max(0, Number(i.value) || 0)}`).reverse().join(",");

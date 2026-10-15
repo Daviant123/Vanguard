@@ -142,6 +142,15 @@ function strat.list(name) return S.strat[name] end
 function strat.toggle(list, what, name)
     if not strat.LISTS[list or ''] then return false, 'unknown list' end
     if what == 'clear' then S.strat[list] = '' return true end
+    if what == 'set' then
+        local out = {}
+        for _, n in ipairs(util.split(name or '', ',')) do
+            local sp = util.spell(n)
+            if sp then out[#out + 1] = sp.en end
+        end
+        S.strat[list] = table.concat(out, ',')
+        return true
+    end
     local sp = name and util.spell(name)
     if not sp then return false, 'unknown spell' end
     local out = {}
