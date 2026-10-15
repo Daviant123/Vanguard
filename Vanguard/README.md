@@ -20,8 +20,9 @@ sing, roll, bubble and enfeeble on their own, with a desktop control panel. Comm
 
 Vanguard checks this page when it loads and tells you when there's a newer version.
 `//vg update install` downloads it (only Vanguard's own files; your settings are never touched), then
-`//lua r vanguard` on each character. `//vg update off` stops the check. If the panel changed, download the
-VanguardControl folder again.
+`//lua r vanguard` on each character. `//vg update off` stops the check.
+Vanguard Control updates itself: when it starts (and every 6 hours) it checks this page and, if there's a newer
+panel, downloads it and restarts. To turn that off, put an empty file named `noupdate.txt` next to the exe.
 
 ## What it sends to the game
 
@@ -225,6 +226,8 @@ Vanguard has its own GitHub page: github.com/Daviant123/Vanguard (the addon is i
 in **VanguardControl**). Friends who install it from there get told when there's a new version, and
 `//vg update install` fetches it (only Vanguard's own files, never settings), then `//lua r vanguard`.
 `//vg update` checks now, `//vg update off` stops the check when it loads.
+Vanguard Control 1.1.0+ updates itself the same way when it starts (and every 6 hours): it downloads the new panel
+and restarts. An empty `noupdate.txt` next to the exe turns that off.
 
 ## Commands (same as the panel)
 
