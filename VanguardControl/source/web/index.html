@@ -677,7 +677,7 @@ function songsTab(p) {
   const pian = bi.pianissimo || {};
   const pianOf = n => { const k = Object.keys(pian).find(k => lc(k) === lc(n)); return k ? arr(pian[k]) : []; };
   const slotSel = [{v: "0", l: `Automatic (${bi.instrument && bi.instrument !== "none" ? bi.instrument + ": " : ""}${bi.auto ? base : "?"} songs)`},
-                   {v: "2", l: "2 songs"}, {v: "3", l: "3 songs"}, {v: "4", l: "4 songs"}];
+                   {v: "2", l: "2 songs"}, {v: "3", l: "3 songs"}, {v: "4", l: "4 songs"}, {v: "5", l: "5 songs"}];
   return `<div class="stack">
     <div class="master">${modChk("Sing these songs", mods, "songs")}
       ${chk("NiTro in fights (Nightingale + Troubadour)", x.nitro, "set songs.nitro true", "set songs.nitro false")}
@@ -688,8 +688,9 @@ function songsTab(p) {
         <div class="hint" style="margin-top:4px">Found from the instrument in your inventory / wardrobes: Daurdabla 4, Terpander or Blurred Harp 3, otherwise 2.</div>
       </div>
       <div class="box"><h3>Songs (in order)</h3><div class="slots" style="grid-template-columns:1fr">
-        ${Array.from({length: base}, (_, i) => `<label class="field">Song ${i + 1} ${sel(`menu song ${i + 1} `, opts, cur[i] || "", "none")}</label>`).join("")}
-        ${cur.length > base ? `<div class="hint">Not sung (no slot): ${cur.slice(base).map(esc).join(", ")}</div>` : ""}
+        ${Array.from({length: 5}, (_, i) => `<label class="field">Song ${i + 1}${i < slots ? (i >= base ? " (Clarion Call)" : "")
+          : (i === base ? " (with Clarion Call)" : " (needs more song slots)")} ${sel(`menu song ${i + 1} `, opts, cur[i] || "", "none")}</label>`).join("")}
+        <div class="hint">Songs past your slots wait for Clarion Call (+1) or a harp. Up to 5 songs: Daurdabla (4) + Clarion Call.</div>
       </div></div>
       ${true ? `<div class="box"><h3>Dummy songs</h3>
         ${Array.from({length: 2}, (_, i) => `<label class="field">Dummy ${i + 1} ${sel(`dummy ${i + 1} `, none, dummies[i] || "none")}</label>`).join("")}
