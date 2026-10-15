@@ -1,6 +1,6 @@
 _addon.name = 'Vanguard'
 _addon.author = 'Daviant'
-_addon.version = '0.14.0'
+_addon.version = '0.15.0'
 _addon.commands = {'vanguard', 'vg'}
 
 --[[
@@ -45,6 +45,7 @@ local mages = require('vg_mages')
 local support = require('vg_support')
 local update = require('vg_update')
 local link = require('vg_link')
+local strat = require('vg_strat')
 
 ------------------------------------------------------------------------
 -- Settings
@@ -130,9 +131,18 @@ local defaults = {
     -- //vg update: GitHub page (owner/name) and folder that hold the newest Vanguard
     update = { repo = 'Daviant123/Vanguard', path = 'Vanguard', branch = 'main', check = true },
     cor = { risk = 0, snake_eye = true, fold = true, range = 8 },
+    -- Scholar stratagems, main or sub SCH (vg_strat): which spells get which stratagem, reserve, Arts upkeep
+    strat = { enabled = true, arts = 'auto', reserve = 1, jp_gift = false,
+              perpetuance = 'Regen V,Regen IV,Regen III,Adloquium,Embrava,Haste,Haste II,Refresh,Refresh II,Refresh III,Phalanx,Phalanx II,Flurry,Flurry II,Aquaveil',
+              accession = 'Regen V,Regen IV,Regen III,Regen II,Regen,Protect V,Protect IV,Shell V,Shell IV,Stoneskin,Blink,Aquaveil,Phalanx,Adloquium,Embrava',
+              accession_count = 3, accession_cure = 3,
+              penury = '', penury_mp = 30, celerity = 'Raise,Raise II,Raise III,Arise', celerity_hp = 30,
+              rapture = '', rapture_hp = 0, altruism = '', tranquility = '',
+              parsimony = '', parsimony_mp = 30, alacrity = '', manifestation = '', ebullience = '',
+              focalization = '', equanimity = '' },
     mages = { aoe_na = true, bar = '', bar_status = '', pld = false, saboteur = true, stymie = true,
               sleep = false, sleep_skip = '', accession = true, perpetuance = true, immanence = true,
-              chain = 'liquefaction', chain_every = 40, strat_secs = 33 },
+              chain = 'liquefaction', chain_every = 40 },
 }
 
 local settings = config.load(defaults)
@@ -190,6 +200,7 @@ end
 local function mark(key) state.attempts[key] = now() end
 
 local function cast(spell, target, why)
+    if strat.before_cast(spell, target, why) then return true end      -- a stratagem first; the spell follows
     stop_running()
     windower.send_command(('input /ma "%s" %s'):format(spell.en, target))
     state.busy_until = now() + (spell.cast_time or 2) + 3
@@ -1087,7 +1098,7 @@ local function send_profile(player)
         actions = engine.list(pr, player),
         leader = settings.leader,
         menu = menu.catalog(player, status_cures),
-        config = menu.config(settings),
+        config = (function() local c = menu.config(settings) c.strat_info = strat.info(player) return c end)(),
         party = menu.party(),
     })
     state.profile_sent = now()
@@ -1158,6 +1169,10 @@ travel.init(settings, state, {
     ability = util.ability, ability_ready = util.ability_ready,
 })
 update.init(settings, log, function() store.save(settings) end)
+strat.init(settings, state, {
+    log = log, recently = recently, use_ja = use_ja, cast = cast, party_members = party_members,
+    buffs_of = buffs_of, amnesia = amnesia,
+})
 link.init(settings, state, {
     log = log, store = store.save, save_profile = save_profile, load_profile = function(p) load_profile(p) end,
 })
@@ -1203,7 +1218,11 @@ local function tick()
     support.roll_walk_tick(player)
     safety.watch(player)
     safety.auto_defense(player)
+    if player.main_job == 'SCH' or player.sub_job == 'SCH' then
+        state.strat_now = ('%d/%d'):format(strat.charges(player), strat.max_charges(player))
+    end
     if not can_act(player) then return end
+    if strat.run_queue() then return end                             -- the spell that waited for its stratagem
     if alts.mount_sync(player) then return end
     -- Retreat: stop fighting first (the movement step then brings us back).
     if state.retreat and player.status == 1 and not recently('attackoff', 3) then
@@ -1223,7 +1242,7 @@ local function tick()
     local ctx = make_ctx(player)
     local pr = state.profile
 
-    local _ = do_raise(player) or do_heal(player) or do_status(player) or mages.crowd(player)
+    local _ = do_raise(player) or do_heal(player) or do_status(player) or strat.arts(player) or mages.crowd(player)
         or do_assist(player) or do_pull(player) or support.double_up(ctx, engine) or mages.bar(player)
         or engine.run(ctx, pr, pre_ws_filter) or do_skillchain(player) or do_ws(player)
         or do_burst(player) or mages.sch(player) or engine.run(ctx, pr, normal_filter) or do_mana(player)

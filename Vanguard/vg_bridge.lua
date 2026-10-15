@@ -66,6 +66,7 @@ local function snapshot(settings, state)
         retreat = state and state.retreat or false,
         away = state and state.away or false,
         defense = state and state.defense or 'off',
+        strat = state and state.strat_now or nil,
     }
 end
 

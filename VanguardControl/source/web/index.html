@@ -103,6 +103,14 @@ label.field select { min-width: 190px; color: var(--text); font-size: 13px; }
 .lim input.changed, .lim select.changed { border-color: var(--accent); }
 .lim select { padding: 2px 4px; font-size: 11px; }
 table.grid input[type=number] { width: 70px; height: auto; }
+.strat { display: grid; grid-template-columns: 130px 1fr; gap: 6px 12px; align-items: start; padding: 8px 0; border-bottom: 1px solid var(--line); }
+.strat:last-child { border-bottom: none; }
+.strat .nm { font-weight: 600; color: var(--accent); }
+.strat .ds { color: var(--muted); font-size: 11px; }
+.strat input[type=text] { width: 100%; }
+.charges { display: flex; gap: 4px; align-items: center; }
+.charges i { width: 16px; height: 16px; border-radius: 50%; background: var(--panel); border: 1px solid var(--line); }
+.charges i.on { background: var(--accent); border-color: var(--accent); }
 </style>
 </head>
 <body>
@@ -188,6 +196,7 @@ function tabsFor(p) {
   if (arr(m.debuffs).length || m.can_dispel) t.push({id: "debuffs", label: "Enfeebles", n: arr(cfg.debuffs).length});
   if (arr(m.songs).length) t.push({id: "songs", label: "Songs", n: arr(cfg.songs).length});
   if (arr(m.indi).length || arr(m.geo).length) t.push({id: "geo", label: "Geomancy"});
+  if ((cfg.strat_info || {}).max > 0) t.push({id: "strat", label: "Stratagems"});
   t.push({id: "adv", label: "Advanced"});
   t.push({id: "app", label: "App & updates"});
   return t;
@@ -359,6 +368,62 @@ function teamTab(c, p) {
         <div class="row" style="margin-top:6px"><label class="field">Pause when I'm away for ${sel("__all set away.minutes ", [{v: "0", l: "Never"}, {v: "10", l: "10 minutes"}, {v: "20", l: "20 minutes"}, {v: "30", l: "30 minutes"}, {v: "60", l: "1 hour"}], String(x.away ?? 20))}</label></div>
       </div>
     </div>
+  </div>`;
+}
+
+// ---------- Stratagems tab (SCH main or /SCH) ----------
+// key: settings name; list: spells it is used on; num: [setting, label, min, max, step, unit]
+const STRATS = [
+  {n: "Perpetuance", w: 1, d: "Next enhancing spell lasts twice as long (x2.5 with Arbatel / Savant bracers). Main SCH 87.", list: "perpetuance"},
+  {n: "Accession", w: 1, d: "Next healing / enhancing spell hits the party within 10'. Works with Cure I-IV, Regen, Protect, Shell, -na, Erase, Refresh, Phalanx, Stoneskin, Blink, Aquaveil, Adloquium, Embrava, storms; not Raise, Reraise or Haste.",
+   list: "accession", num: [["accession_count", "Use on a listed buff when this many party members nearby need it", 2, 6, 1, ""]],
+   sel: ["accession_cure", "Scholar's Curaga: Accession + Cure when this many are hurt", [["0", "Off"], ["2", "2 members"], ["3", "3 members"], ["4", "4 members"], ["5", "5 members"]]]},
+  {n: "Celerity", w: 1, d: "Next white spell casts in half the time. Raise spells in the list always get it (even from the reserve).",
+   list: "celerity", num: [["celerity_hp", "Emergency: any Cure on someone under", 0, 60, 5, "%"]]},
+  {n: "Penury", w: 1, d: "Next white spell costs half the MP.", list: "penury", num: [["penury_mp", "Any white spell (20+ MP) when my MP is under", 0, 80, 5, "%"]]},
+  {n: "Rapture", w: 1, d: "Next white spell is stronger (cures, Regen). Main SCH 55.", list: "rapture", num: [["rapture_hp", "Emergency: any Cure on someone under", 0, 60, 5, "%"]]},
+  {n: "Altruism", w: 1, d: "Next white spell is more accurate (merit).", list: "altruism"},
+  {n: "Tranquility", w: 1, d: "Next white spell draws less hate (merit).", list: "tranquility"},
+  {n: "Parsimony", w: 0, d: "Next black spell costs half the MP.", list: "parsimony", num: [["parsimony_mp", "Any black spell (20+ MP) when my MP is under", 0, 80, 5, "%"]]},
+  {n: "Alacrity", w: 0, d: "Next black spell casts in half the time (helixes, bursts).", list: "alacrity"},
+  {n: "Manifestation", w: 0, d: "Next enfeeble hits everything in range (Sleep, Sleepga, Gravity...).", list: "manifestation"},
+  {n: "Ebullience", w: 0, d: "Next black spell is stronger (nukes, helixes). Main SCH 55.", list: "ebullience"},
+  {n: "Focalization", w: 0, d: "Next black spell is more accurate (merit).", list: "focalization"},
+  {n: "Equanimity", w: 0, d: "Next black spell draws less hate (merit).", list: "equanimity"},
+  {n: "Immanence", w: 0, d: "Lets the next elemental spell skillchain: set the self-skillchain on the Job tab (Scholar box)."},
+];
+function stratTab(c, p) {
+  const s = c.snapshot || {}, cfg = p.config || {}, info = cfg.strat_info || {}, st = (cfg.extra || {}).strat || {};
+  const [now, max] = String(s.strat || `${info.charges ?? 0}/${info.max ?? 0}`).split("/").map(Number);
+  const avail = new Set(arr(info.available));
+  const set = (k, v) => `set strat.${k} ${v}`;
+  const row = d => {
+    const on = avail.has(d.n);
+    return `<div class="strat" style="${on ? "" : "opacity:.45"}"><div><div class="nm">${d.n}</div><div class="ds">${on ? "" : "not available on this job / level"}</div></div>
+      <div><div class="ds" style="margin-bottom:4px">${esc(d.d)}</div>
+      ${d.list ? `<label class="field">Use it before these spells (comma list)<input type="text" value="${esc(st[d.list] || "")}" data-cmd="${set(d.list, "")}" placeholder="none"></label>` : ""}
+      ${arr(d.num).map(([k, label, mn, mx, step, unit]) => slider(label, "strat." + k, st[k] ?? 0, mn, mx, step, unit)).join("")}
+      ${d.sel ? `<label class="field" style="margin-top:4px">${esc(d.sel[1])} ${sel(set(d.sel[0], ""), d.sel[2].map(([v, l]) => ({v, l})), String(st[d.sel[0]] ?? 0))}</label>` : ""}
+      </div></div>`;
+  };
+  const arts = info.arts === "light" ? "Light Arts" : info.arts === "dark" ? "Dark Arts" : "no Arts";
+  return `<div class="stack">
+    <div class="box"><h3>Stratagems: ${info.main ? "Scholar" : "/SCH"} level ${info.level}</h3>
+      <div class="row" style="align-items:center;gap:18px">
+        <div class="charges">${Array.from({length: max || 0}, (_, i) => `<i class="${i < now ? "on" : ""}"></i>`).join("")}
+          <span style="margin-left:6px">${now} of ${max} ready, one back every ${Math.round(info.per || 0)} s</span></div>
+        <span class="hint">Now in ${arts}</span>
+      </div>
+      <div class="row" style="margin-top:8px;align-items:flex-end">
+        ${chk("Use stratagems", st.enabled, set("enabled", "true"), set("enabled", "false"))}
+        <label class="field">Keep Arts up ${sel(set("arts", ""), [{v: "auto", l: "Auto (Light; Dark for nukers)"}, {v: "light", l: "Light Arts"}, {v: "dark", l: "Dark Arts"}, {v: "off", l: "Off"}], st.arts || "auto")}</label>
+        <label class="field">Keep for emergencies ${sel(set("reserve", ""), Array.from({length: Math.max(1, max)}, (_, i) => ({v: String(i), l: i === 0 ? "none" : i + " charge" + (i > 1 ? "s" : "")})), String(st.reserve ?? 1))}</label>
+        ${info.main && max === 5 ? chk("550 Job Point gift (33 s a charge)", st.jp_gift, set("jp_gift", "true"), set("jp_gift", "false")) : ""}
+      </div>
+      <div class="hint" style="margin-top:6px">Each stratagem works on the next spell of its kind and uses one charge. The reserve is only spent on emergencies (Raise with Celerity, emergency cures).</div>
+    </div>
+    <div class="box"><h3>Light Arts</h3>${STRATS.filter(d => d.w).map(row).join("")}</div>
+    <div class="box"><h3>Dark Arts</h3>${STRATS.filter(d => !d.w).map(row).join("")}</div>
   </div>`;
 }
 
@@ -654,12 +719,12 @@ function renderPanel() {
   if (a && $("tabbody").contains(a) && (a.type === "range" || a.type === "text" || a.type === "number")) return;
   const team = tab === "team" ? Object.keys(chars).map(n => [n, (chars[n].snapshot || {}).hold, (chars[n].snapshot || {}).camp,
     (chars[n].snapshot || {}).retreat, (chars[n].snapshot || {}).defense, (chars[n].snapshot || {}).leader]) : 0;
-  const bk = JSON.stringify([tab, p, s.leader, Object.keys(chars), team, tab === "app" ? addon : 0]);
+  const bk = JSON.stringify([tab, p, s.leader, Object.keys(chars), team, tab === "app" ? addon : 0, tab === "strat" ? s.strat : 0]);
   if (bk === bodyKey) return;
   bodyKey = bk;
   const fn = {job: () => jobTab(c, p), heal: () => healTab(p), buffs: () => buffsTab(p), debuffs: () => debuffsTab(p),
               songs: () => songsTab(p), geo: () => geoTab(p), adv: () => advTab(p), team: () => teamTab(c, p),
-              app: () => appTab()}[tab];
+              app: () => appTab(), strat: () => stratTab(c, p)}[tab];
   $("tabbody").innerHTML = fn();
 }
 

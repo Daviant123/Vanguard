@@ -207,6 +207,7 @@ function menu.extra(settings)
         hate_first = settings.geo.hate_first, party_mp = settings.geo.party_mp,
         disengage = settings.assist.disengage, defend = settings.assist.defend, autotarget = settings.assist.autotarget,
         setups = setups,
+        strat = settings.strat,
     }
 end
 

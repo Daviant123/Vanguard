@@ -218,6 +218,19 @@ Settings are now saved safely with several characters running (one character's s
   Got a Terpander / Daurdabla? Just put 3 or 4 songs in the song list.
 - **Horde Lullaby.** With `//vg sleep on`, two or more extra mobs get Horde Lullaby (or Sleepga) at once.
 
+## Scholar stratagems, main job and /SCH (new in 0.15.0 / Vanguard Control 1.4.0)
+
+The **Stratagems** tab appears for any character with Scholar as main or sub job.
+- **Charges** are worked out from the Scholar level: SCH 99 has 5 (one back every 48 s, 33 s with the 550 Job Point
+  gift), /SCH at 49 has 2 (one every 2 minutes). The tab shows how many are ready.
+- **Keep Arts up:** Light Arts (Dark Arts for nukers), or pick one; stratagems need it.
+- **Which spells get which stratagem:** a list per stratagem, plus thresholds:
+  Perpetuance (enhancing buffs that should last longer), Accession (party buffs when enough members need them, and a
+  Scholar's Curaga: Accession + Cure when several are hurt), Celerity (Raise spells, emergency cures), Penury (when
+  MP is low), Rapture (emergency cures), and on the Dark side Parsimony, Alacrity, Manifestation, Ebullience and the
+  merit ones. The stratagem is used right before the spell, whichever part of Vanguard casts it.
+- **Keep for emergencies:** charges only spent on Raise (Celerity) and emergency cures.
+
 ## Profiles and thresholds, CurePlease-style (new in 0.14.0 / Vanguard Control 1.3.0)
 
 Everything is chosen in Vanguard Control and kept there; the addon only carries it out.

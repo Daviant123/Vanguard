@@ -50,15 +50,11 @@ local function ja_ready(name, player)
     return nil
 end
 
--- Scholar stratagem charges (5; recast_id 231 counts down to full charges).
-function mages.charges()
-    local per = tonumber(S.mages.strat_secs) or 33
-    local r = (windower.ffxi.get_ability_recasts() or {})[231] or 0
-    return math.max(0, math.floor((5 * per - r) / per))
-end
+-- Scholar stratagem charges and use: vg_strat (main or sub SCH, charges by level).
+function mages.charges() return require('vg_strat').charges() end
 
 local function strat(name, player, keep)
-    local ja = has_ja(name)
+    local ja = require('vg_strat').has(name)
     if not ja or h.amnesia(player) or mages.charges() <= (keep or 0) then return nil end
     return ja
 end
@@ -72,7 +68,8 @@ local function role() return state.profile and state.profile.role or '' end
 function mages.aoe_na(player, status_ids, members)
     if not S.mages.aoe_na then return false end
     local job = player.main_job
-    if job ~= 'WHM' and job ~= 'SCH' then return false end
+    local sch = job == 'SCH' or player.sub_job == 'SCH'
+    if job ~= 'WHM' and not sch then return false end
     for _, entry in ipairs(status_ids) do
         if entry[2] ~= 'Erase' and entry[2] ~= 'Esuna' or (entry[2] == 'Erase' and job == 'WHM') then
             local who, count = nil, 0
@@ -85,13 +82,15 @@ function mages.aoe_na(player, status_ids, members)
             end
             local spell = util.spell(entry[2])
             if count >= 2 and spell and util.spell_ready(spell, player) then
-                local ja_name = job == 'WHM' and 'Divine Seal' or 'Accession'
-                if has(player.buffs, ja_name) then
-                    local tgt = who.name == player.name and '<me>' or who.name
-                    return h.cast(spell, tgt, ('%s on %d members (%s)'):format(entry[3], count, ja_name))
+                local tgt = who.name == player.name and '<me>' or who.name
+                for _, ja_name in ipairs({ 'Divine Seal', 'Accession' }) do
+                    if has(player.buffs, ja_name) then
+                        return h.cast(spell, tgt, ('%s on %d members (%s)'):format(entry[3], count, ja_name))
+                    end
                 end
+                -- WHM: Divine Seal; Scholar (main or sub) in Light Arts: Accession (WHM/SCH: either)
                 local ok = job == 'WHM' and ja_ready('Divine Seal', player)
-                    or (job == 'SCH' and (has(player.buffs, 'Light Arts') or has(player.buffs, 'Addendum: White'))
+                    or (sch and (has(player.buffs, 'Light Arts') or has(player.buffs, 'Addendum: White'))
                         and strat('Accession', player))
                 if ok and not h.recently('ja:' .. ok.en .. ':<me>', 4) then
                     h.log(('%s: %d members have %s'):format(ok.en, count, entry[3]))
@@ -355,37 +354,30 @@ local function has_regen(bl) return util.has_buff(bl, 42) or util.has_buff(bl, 5
 local function sch_healer(player)
     if not (has(player.buffs, 'Light Arts') or has(player.buffs, 'Addendum: White')) then return false end
     if not h.party_engaged(player) then return false end
-    -- Accession + Regen for the whole party.
+    local st = require('vg_strat')
+    -- Regen for the whole party: only when Accession can be spent (the stratagem manager uses it on the cast).
     if S.mages.accession then
         local missing = 0
         for _, m in ipairs(h.party_members(10)) do
             local bl = h.buffs_of(m, player)
             if bl and m.hpp > 0 and not has_regen(bl) then missing = missing + 1 end
         end
-        if missing >= 3 then
-            if has(player.buffs, 'Accession') then
-                local s = best(REGENS, player)
-                if s then return h.cast(s, '<me>', ('Accession Regen: %d members'):format(missing)) end
-            elseif not h.recently('acc_regen', 20) then
-                local ja = strat('Accession', player, 1)
-                if ja then h.mark('acc_regen') h.log('Accession: Regen for the party') return h.use_ja(ja, '<me>') end
-            end
+        local can = has(player.buffs, 'Accession')
+            or (st.has('Accession') and mages.charges() > (tonumber(S.strat.reserve) or 0))
+        if missing >= (tonumber(S.strat.accession_count) or 3) and can and not h.recently('acc_regen', 20) then
+            local s = best(REGENS, player)
+            if s then h.mark('acc_regen') return h.cast(s, '<me>', ('party Regen: %d members'):format(missing)) end
         end
     end
-    -- Perpetuance + Regen V on the leader (lasts much longer).
+    -- Regen V on the leader (Perpetuance makes it last much longer).
     if S.mages.perpetuance and S.leader ~= '' and S.leader:lower() ~= player.name:lower() then
         for _, m in ipairs(h.party_members(20)) do
             if m.name:lower() == S.leader:lower() then
                 local bl = h.buffs_of(m, player)
-                if bl and m.hpp > 0 and not has_regen(bl) then
-                    local s = util.spell('Regen V')
-                    if s and util.spell_ready(s, player) then
-                        if has(player.buffs, 'Perpetuance') then return h.cast(s, m.name, 'Perpetuance Regen V') end
-                        if not h.recently('perp_regen', 20) then
-                            local ja = strat('Perpetuance', player, 1)
-                            if ja then h.mark('perp_regen') h.log('Perpetuance: Regen V on ' .. m.name) return h.use_ja(ja, '<me>') end
-                        end
-                    end
+                local s = util.spell('Regen V')
+                if bl and m.hpp > 0 and not has_regen(bl) and s and util.spell_ready(s, player)
+                    and not h.recently('ma:Regen V:' .. m.name, 6) then
+                    return h.cast(s, m.name, 'Regen V on ' .. m.name)
                 end
             end
         end
