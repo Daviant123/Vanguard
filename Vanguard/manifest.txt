@@ -1,6 +1,7 @@
 Vanguard.lua
 vg_actions.lua
 vg_alts.lua
+vg_bard.lua
 vg_bridge.lua
 vg_combat.lua
 vg_hud.lua

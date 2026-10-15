@@ -1,6 +1,6 @@
 _addon.name = 'Vanguard'
 _addon.author = 'Daviant'
-_addon.version = '0.17.0'
+_addon.version = '0.18.0'
 _addon.commands = {'vanguard', 'vg'}
 
 --[[
@@ -46,6 +46,7 @@ local support = require('vg_support')
 local update = require('vg_update')
 local link = require('vg_link')
 local strat = require('vg_strat')
+local bard = require('vg_bard')
 
 ------------------------------------------------------------------------
 -- Settings
@@ -104,7 +105,10 @@ local defaults = {
         window = 8,
     },
     -- nitro: Nightingale + Troubadour (+ Marcato) then all songs; pianissimo = "Song>Name|Name,..." single-target songs
-    songs = { list = '', duration = 240, refresh_before = 30, when = 'always', nitro = true, marcato = true, pianissimo = '' },
+    -- Bard (vg_bard, after the Singer addon): slots 0 = from the instrument owned; dummy = up to 2 dummy songs;
+    -- marcato_song / clarion_song ('' = first / next song); aoe_names = members that must be within 10'
+    songs = { list = '', duration = 240, refresh_before = 30, when = 'always', nitro = true, marcato = true, pianissimo = '',
+              slots = 0, dummy = '', marcato_song = '', clarion_song = '', aoe_names = '' },
     -- entrust = 'Indi-Spell>Member'. full_circle_range = recall luopan when target is this far from it.
     -- entrust = 'auto' for Indi-Haste/Fury on the leader; hate_first = Dia before a Geo debuff;
     -- party_mp = Radial Arcana when 2+ members are under this MP%
@@ -672,18 +676,7 @@ end
 local function do_songs(player)
     if not settings.modules.songs or settings.songs.list == '' or silenced(player) then return false end
     if settings.songs.when == 'engaged' and not party_engaged(player) then return false end
-    state.song_len = state.song_len or {}
-    local due = {}
-    for _, name in ipairs(util.split(settings.songs.list, ',')) do
-        local last = state.songs[name:lower()]
-        local keep = (state.song_len[name:lower()] or settings.songs.duration) - settings.songs.refresh_before
-        if not last or now() - last > keep then due[#due + 1] = name end
-    end
-    if support.nitro(player, #due > 0) then return true end
-    for _, name in ipairs(due) do
-        if try_cast(name, '<me>', 'song', player) then return true end
-    end
-    return false
+    return bard.sing(player)
 end
 
 local function do_geo(player)
@@ -1101,7 +1094,12 @@ local function send_profile(player)
         actions = engine.list(pr, player),
         leader = settings.leader,
         menu = menu.catalog(player, status_cures),
-        config = (function() local c = menu.config(settings) c.strat_info = strat.info(player) return c end)(),
+        config = (function()
+            local c = menu.config(settings)
+            c.strat_info = strat.info(player)
+            if player.main_job == 'BRD' then c.bard_info = bard.info(player) end
+            return c
+        end)(),
         party = menu.party(),
     })
     state.profile_sent = now()
@@ -1172,6 +1170,18 @@ travel.init(settings, state, {
     ability = util.ability, ability_ready = util.ability_ready,
 })
 update.init(settings, log, function() store.save(settings) end)
+local function ja_ready(name)
+    local ja = util.ability(name)
+    if not ja or not util.ability_ready(ja) then return nil end
+    local ab = windower.ffxi.get_abilities()
+    for _, id in pairs(ab and ab.job_abilities or {}) do if id == ja.id then return ja end end
+    return nil
+end
+bard.init(settings, state, {
+    log = log, recently = recently, mark = mark, try_cast = try_cast, use_ja = use_ja, amnesia = amnesia,
+    party_members = party_members, ja_ready = ja_ready,
+    nitro = function(p, due) return support.nitro(p, due) end,
+})
 strat.init(settings, state, {
     log = log, recently = recently, use_ja = use_ja, cast = cast, party_members = party_members,
     buffs_of = buffs_of, amnesia = amnesia,
@@ -1628,7 +1638,35 @@ windower.register_event('addon command', function(cmd, ...)
     elseif cmd == 'rolls' then
         support.rolls(windower.ffxi.get_player(), rest, apply_rolls)
     elseif cmd == 'pianissimo' then
-        if support.set_pianissimo(rest) then store.save(settings) end
+        if (args[1] or ''):lower() == 'set' then
+            -- from the panel: //vg pianissimo set <name> <1|2> <song|none>
+            if bard.pian_set(args[2], args[3], table.concat(args, ' ', 4)) then store.save(settings) send_profile() end
+        elseif support.set_pianissimo(rest) then store.save(settings) send_profile() end
+    elseif cmd == 'dummy' then
+        -- //vg dummy <1|2> <song|none>
+        local slot, song = tonumber(args[1]), table.concat(args, ' ', 2)
+        local sp = util.spell(song)
+        if slot and slot >= 1 and slot <= 2 and (song == 'none' or (sp and sp.type == 'BardSong')) then
+            local d = util.split(settings.songs.dummy, ',')
+            d[slot] = sp and sp.en or nil
+            local out = {}
+            for i = 1, 2 do if d[i] then out[#out + 1] = d[i] end end
+            settings.songs.dummy = table.concat(out, ',')
+            store.save(settings) send_profile()
+            log('Dummy songs: ' .. (settings.songs.dummy ~= '' and settings.songs.dummy or 'none'))
+        else
+            log('Usage: //vg dummy 1|2 <song|none>   e.g. //vg dummy 1 Knight\'s Minne')
+        end
+    elseif cmd == 'songrange' then
+        -- //vg songrange <name> on|off : wait for this member to be within 10' before party songs
+        local name, v = args[1], (args[2] or 'on'):lower()
+        if name then
+            local out = {}
+            for _, n in ipairs(util.split(settings.songs.aoe_names, ',')) do if n:lower() ~= name:lower() then out[#out + 1] = n end end
+            if v == 'on' then out[#out + 1] = name end
+            settings.songs.aoe_names = table.concat(out, ',')
+            store.save(settings) send_profile()
+        end
     elseif cmd == 'bar' then
         if mages.set_bar(windower.ffxi.get_player(), args[1], args[2]) then store.save(settings) end
     elseif cmd == 'sleep' then

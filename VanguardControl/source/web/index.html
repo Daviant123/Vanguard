@@ -310,12 +310,6 @@ function jobExtras(p) {
     ${chk("Dia first, so Geo debuffs work (get on the hate list)", x.hate_first, set("geo.hate_first", "true"), set("geo.hate_first", "false"))}
     ${chk("Entrust Indi-Haste / Indi-Fury to the leader automatically", lc((p.config || {}).entrust) === "auto", set("geo.entrust", "auto"), "menu entrust none")}
     <div class="sliders">${slider("Radial Arcana when 2+ members are under", "geo.party_mp", x.party_mp ?? 40, 0, 80, 5)}</div></div>`);
-  if (job === "BRD") out.push(`<div class="box"><h3>Bard</h3>
-    ${chk("NiTro in fights: Nightingale + Troubadour + Marcato, then all songs", x.nitro, set("songs.nitro", "true"), set("songs.nitro", "false"))}
-    <div class="row" style="margin-top:6px"><input type="text" id="pian" placeholder="Pianissimo: Mage's Ballad III > Name|Name">
-      <button onclick="const v=$('pian').value.trim(); if(v){ send('pianissimo ' + v); $('pian').value=''; }">Add</button>
-      <button onclick="send('pianissimo clear')">Clear</button></div>
-    <div class="hint">Single-target songs now: ${esc(x.pianissimo || "none")}</div></div>`);
   if (["RDM", "BLM", "BRD", "SCH", "GEO", "WHM"].includes(job)) out.push(`<div class="box"><h3>Crowd control</h3>
     ${chk("Sleep extra mobs that attack the party (not the leader's target)", x.sleep, "sleep on", "sleep off")}</div>`);
   return out.length ? `<div class="cols">${out.join("")}</div>` : "";
@@ -671,15 +665,59 @@ function debuffsTab(p) {
 }
 
 function songsTab(p) {
-  const m = p.menu || {}, cfg = p.config || {}, mods = cfg.modules || {};
-  const cur = arr(cfg.songs), opts = [{v: "", l: "— none —"}].concat(arr(m.songs).map(s => ({v: s, l: s})));
-  const n = Math.min(5, Math.max(4, cur.length + 1));
+  const m = p.menu || {}, cfg = p.config || {}, mods = cfg.modules || {}, x = cfg.extra || {}, bi = cfg.bard_info || {};
+  const cur = arr(cfg.songs), all = arr(m.songs), party = arr(p.party).slice(1);
+  const base = bi.base || 2, slots = bi.slots || base;
+  const opts = [{v: "", l: "— none —"}].concat(all.map(s => ({v: s, l: s})));
+  const none = [{v: "none", l: "— none —"}].concat(all.map(s => ({v: s, l: s})));
+  const dummies = String(x.dummy || "").split(",").filter(Boolean);
+  const range = new Set(String(x.aoe_names || "").split(",").map(n => lc(n.trim())).filter(Boolean));
+  const pian = bi.pianissimo || {};
+  const pianOf = n => { const k = Object.keys(pian).find(k => lc(k) === lc(n)); return k ? arr(pian[k]) : []; };
+  const slotSel = [{v: "0", l: `Automatic (${bi.instrument && bi.instrument !== "none" ? bi.instrument + ": " : ""}${bi.auto ? base : "?"} songs)`},
+                   {v: "2", l: "2 songs"}, {v: "3", l: "3 songs"}, {v: "4", l: "4 songs"}];
   return `<div class="stack">
-    <div class="master">${modChk("Sing these songs", mods, "songs")}</div>
-    <div class="slots">${Array.from({length: n}, (_, i) =>
-      `<label class="field">Song ${i + 1} ${sel(`menu song ${i + 1} `, opts, cur[i] || "", "none")}</label>`).join("")}</div>
-    <div class="row"><label class="field">When ${sel("set songs.when ", [{v: "always", l: "Always keep them up"}, {v: "engaged", l: "Only during fights"}], cfg.songs_when || "always")}</label></div>
-    <div class="hint">Songs are sung in order and re-sung before they wear off. Slots 3+ need extra-song gear or Clarion Call.</div>
+    <div class="master">${modChk("Sing these songs", mods, "songs")}
+      ${chk("NiTro in fights (Nightingale + Troubadour)", x.nitro, "set songs.nitro true", "set songs.nitro false")}
+      ${chk("Marcato", x.marcato, "set songs.marcato true", "set songs.marcato false")}</div>
+    <div class="cols">
+      <div class="box"><h3>Song slots: ${slots}${slots > base ? " (Clarion Call +1)" : ""}</h3>
+        <label class="field">How many songs ${sel("set songs.slots ", slotSel, String(x.song_slots || 0))}</label>
+        <div class="hint" style="margin-top:4px">Found from the instrument in your inventory / wardrobes: Daurdabla 4, Terpander or Blurred Harp 3, otherwise 2.</div>
+      </div>
+      <div class="box"><h3>Songs (in order)</h3><div class="slots" style="grid-template-columns:1fr">
+        ${Array.from({length: base}, (_, i) => `<label class="field">Song ${i + 1} ${sel(`menu song ${i + 1} `, opts, cur[i] || "", "none")}</label>`).join("")}
+        ${cur.length > base ? `<div class="hint">Not sung (no slot): ${cur.slice(base).map(esc).join(", ")}</div>` : ""}
+      </div></div>
+      ${base > 2 ? `<div class="box"><h3>Dummy songs</h3>
+        ${Array.from({length: base - 2}, (_, i) => `<label class="field">Dummy ${i + 1} ${sel(`dummy ${i + 1} `, none, dummies[i] || "none")}</label>`).join("")}
+        <div class="hint" style="margin-top:4px">Sung after your first two songs to open slots 3${base > 3 ? "-4" : ""}; then the real songs replace them. Let your GearSwap equip the harp for these (e.g. Knight's Minne).</div>
+      </div>` : ""}
+      <div class="box"><h3>Marcato and Clarion Call</h3>
+        <label class="field">Marcato before ${sel("set songs.marcato_song ", [{v: "", l: "the first song"}].concat(cur.map(s => ({v: s, l: s}))), x.marcato_song || "")}</label>
+        <label class="field" style="margin-top:6px">Extra song under Clarion Call ${sel("set songs.clarion_song ", [{v: "", l: "the next song in the list"}].concat(all.map(s => ({v: s, l: s}))), x.clarion_song || "")}</label>
+      </div>
+    </div>
+    <div class="box"><h3>Pianissimo: single-target songs for each member</h3>
+      ${party.length ? `<table class="grid"><thead><tr><th>Member</th><th>Song 1</th><th>Song 2</th></tr></thead><tbody>
+        ${party.map(n => { const ps = pianOf(n); return `<tr><td>${esc(n)}</td>${[0, 1].map(i =>
+          `<td>${sel(`pianissimo set ${n} ${i + 1} `, none, ps[i] || "none")}</td>`).join("")}</tr>`; }).join("")}
+      </tbody></table>` : `<div class="empty">Party members appear here once ${esc(selected)} is in a party.</div>`}
+      <div class="hint" style="margin-top:4px">For example Mage's Ballad for the healers, Sentinel's Scherzo for the tank.</div>
+    </div>
+    <div class="cols">
+      <div class="box"><h3>Wait for these members to be in range (10')</h3>
+        ${party.length ? `<div class="checks">${party.map(n => chk(n, range.has(lc(n)), `songrange ${n} on`, `songrange ${n} off`)).join("")}</div>` : `<div class="empty">Not in a party.</div>`}
+        <div class="hint">Party songs wait until the ticked members are close enough to get them. None ticked = don't wait.</div>
+      </div>
+      <div class="box"><h3>Timing</h3>
+        <label class="field">When ${sel("set songs.when ", [{v: "always", l: "Always keep them up"}, {v: "engaged", l: "Only during fights"}], cfg.songs_when || "always")}</label>
+        <div class="sliders" style="margin-top:6px">
+          ${slider("Songs last (your gear)", "songs.duration", x.song_duration ?? 240, 120, 600, 10, " s")}
+          ${slider("Sing again this long before they wear", "songs.refresh_before", x.refresh_before ?? 30, 10, 90, 5, " s")}
+        </div>
+      </div>
+    </div>
   </div>`;
 }
 

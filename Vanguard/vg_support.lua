@@ -242,9 +242,7 @@ function support.nitro(player, songs_due)
             return true
         end
         if night and troub then
-            state.nitro_until = nil
-            local m = S.songs.marcato and not util.has_buff(p.buffs, 231) and ja_ready('Marcato', p)
-            if m then h.log('Marcato (next song)') return h.use_ja(m, '<me>') end
+            state.nitro_until = nil                              -- Marcato comes right before its song (vg_bard)
             return false
         end
         return true                                              -- waiting for Nightingale to show
