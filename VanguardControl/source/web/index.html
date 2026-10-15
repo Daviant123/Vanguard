@@ -1,0 +1,416 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Vanguard Control</title>
+<style>
+:root {
+  --bg: #14161b; --panel: #1c1f26; --panel-2: #232731; --line: #2e3340;
+  --text: #e6e8ee; --muted: #8b92a3; --accent: #d4a54a; --accent-ink: #1a1408;
+  --good: #4caf7a; --bad: #e0605a; --hp: #e0605a; --mp: #4a8fe0; --tp: #d4a54a;
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 13px/1.45 "Segoe UI", system-ui, sans-serif; display: flex; flex-direction: column; }
+header { display: flex; align-items: center; gap: 8px; padding: 8px 14px; border-bottom: 1px solid var(--line); background: var(--panel); flex-wrap: wrap; }
+header h1 { font-size: 15px; margin: 0 8px 0 0; letter-spacing: .04em; }
+header h1 span { color: var(--accent); }
+header .status { color: var(--muted); margin-left: auto; }
+.layout { flex: 1; display: grid; grid-template-columns: 250px 1fr; min-height: 0; }
+aside { border-right: 1px solid var(--line); background: var(--panel); overflow-y: auto; padding: 10px; display: flex; flex-direction: column; gap: 8px; }
+.card { border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; cursor: pointer; background: var(--panel-2); }
+.card:hover { border-color: #4a5060; }
+.card.sel { border-color: var(--accent); background: #2b2618; }
+.card.offline { opacity: .55; }
+.card .top { display: flex; align-items: center; gap: 6px; }
+.card .nm { font-weight: 600; font-size: 14px; }
+.card .jb { color: var(--muted); font-size: 12px; }
+.card .pill { margin-left: auto; }
+.card .sub { color: var(--muted); font-size: 11px; margin: 2px 0 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bars { display: grid; gap: 3px; }
+.bar { position: relative; height: 13px; background: var(--bg); border-radius: 3px; overflow: hidden; }
+.bar i { position: absolute; inset: 0 auto 0 0; }
+.bar b { position: absolute; left: 5px; top: 0; font-size: 10px; font-weight: 600; line-height: 13px; }
+.pill { display: inline-block; padding: 1px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; }
+.pill.on { background: rgba(76,175,122,.18); color: var(--good); }
+.pill.off { background: rgba(139,146,163,.15); color: var(--muted); }
+.main { overflow-y: auto; padding: 12px 16px; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.who { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.who .nm { font-size: 18px; font-weight: 600; }
+.who .jb { color: var(--muted); }
+.who .sp { flex: 1; }
+.tabs { display: flex; gap: 2px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+.tab { padding: 7px 14px; cursor: pointer; color: var(--muted); border: 1px solid transparent; border-bottom: none; border-radius: 6px 6px 0 0; user-select: none; }
+.tab:hover { color: var(--text); }
+.tab.on { color: var(--text); background: var(--panel); border-color: var(--line); margin-bottom: -1px; font-weight: 600; }
+.tab .n { color: var(--good); font-size: 11px; margin-left: 4px; }
+.body { background: var(--panel); border: 1px solid var(--line); border-top: none; border-radius: 0 0 8px 8px; padding: 12px 14px; }
+.box { background: var(--panel-2); border: 1px solid var(--line); border-radius: 8px; padding: 9px 11px; }
+.box h3 { margin: 0 0 7px; font-size: 12px; color: var(--accent); font-weight: 600; }
+.cols { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 10px; }
+.stack { display: grid; gap: 12px; }
+.chk { display: flex; align-items: center; gap: 8px; padding: 3px 0; cursor: pointer; user-select: none; }
+.chk input { accent-color: var(--good); width: 15px; height: 15px; cursor: pointer; margin: 0; }
+.chk.off span { color: var(--muted); }
+.master { display: flex; flex-wrap: wrap; gap: 6px 18px; padding: 8px 11px; border-radius: 8px; background: rgba(76,175,122,.07); border: 1px solid rgba(76,175,122,.25); }
+.master .chk { font-weight: 600; }
+.checks { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 0 12px; }
+table.grid { border-collapse: collapse; width: 100%; }
+table.grid th { font-size: 12px; font-weight: 600; color: var(--muted); padding: 5px 8px; text-align: center; border-bottom: 1px solid var(--line); }
+table.grid th:first-child, table.grid td:first-child { text-align: left; }
+table.grid td { padding: 4px 8px; border-bottom: 1px solid var(--line); text-align: center; }
+table.grid tr:hover td { background: rgba(255,255,255,.02); }
+table.grid input { accent-color: var(--good); width: 16px; height: 16px; cursor: pointer; }
+table.grid .me { color: var(--accent); }
+.sliders { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 8px 18px; }
+.slider label { display: flex; justify-content: space-between; font-size: 12px; color: var(--muted); }
+.slider output { color: var(--text); font-weight: 600; }
+.slider input { width: 100%; accent-color: var(--accent); }
+.row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+button, select, input[type=text] { font: inherit; color: var(--text); background: var(--panel-2); border: 1px solid var(--line); border-radius: 6px; padding: 5px 10px; }
+button { cursor: pointer; }
+button:hover { border-color: var(--accent); }
+button.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 600; }
+button.go { background: var(--good); border-color: var(--good); color: #0c1a12; font-weight: 600; }
+button.stop { border-color: var(--bad); color: var(--bad); }
+input[type=text] { flex: 1; min-width: 200px; }
+label.field { display: flex; flex-direction: column; gap: 3px; font-size: 11px; color: var(--muted); }
+label.field select { min-width: 190px; color: var(--text); font-size: 13px; }
+.slots { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px; }
+.hint { color: var(--muted); font-size: 11px; }
+.mods { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 0 10px; }
+#log { height: 120px; overflow-y: auto; font: 12px/1.5 Consolas, monospace; background: var(--bg); border-radius: 6px; padding: 6px 8px; border: 1px solid var(--line); }
+#log div span { color: var(--muted); margin-right: 8px; }
+.empty { color: var(--muted); padding: 10px 2px; }
+.steps { color: var(--muted); margin: 6px 0 0; padding-left: 18px; }
+.steps b { color: var(--text); }
+</style>
+</head>
+<body>
+<header>
+  <h1><span>VANGUARD</span> CONTROL</h1>
+  <button class="primary" onclick="setupParty()" title="The selected character leads; everyone else follows and uses their job's setup">Set up party</button>
+  <button class="go" onclick="post('*','on')">Start all</button>
+  <button class="stop" onclick="post('*','off')">Stop all</button>
+  <div class="status" id="status">Waiting for characters…</div>
+  <button onclick="quitApp()" title="Close Vanguard Control">Quit</button>
+</header>
+<div class="layout">
+  <aside id="chars">
+    <div class="empty">No characters yet.
+      <ol class="steps">
+        <li>Log in your characters with Windower.</li>
+        <li>Click the one you play, then <b>Set up party</b>.</li>
+        <li>Tick what each one should do, then <b>Start all</b>.</li>
+      </ol>
+    </div>
+  </aside>
+  <div class="main">
+    <div id="panel"></div>
+    <div><div class="hint" style="margin-bottom:4px">Activity</div><div id="log"></div></div>
+  </div>
+</div>
+
+<script>
+const MODULES = ["follow","assist","heal","raise","cleanse","buffs","mana","rest","actions","ws","sc","burst","songs","geo","debuff","dispel","triggers","trusts","farm"];
+const GROUPS = ["Buffs","Offense","Defense","Healing","Support","Debuffs","Pet","Recovery"];
+let chars = {}, selected = null, since = 0, tab = "job", bodyKey = "", headKey = "", listKey = "";
+try { tab = localStorage.getItem("vg.tab") || "job"; } catch (e) {}
+
+const $ = id => document.getElementById(id);
+const arr = x => Array.isArray(x) ? x : [];
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const lc = s => String(s ?? "").toLowerCase();
+const cap = s => String(s).charAt(0).toUpperCase() + String(s).slice(1);
+const bar = (v, c, max = 100, label) => { const n = Number(v) || 0; return `<div class="bar"><i style="width:${Math.min(100, n * 100 / max)}%;background:${c}"></i><b>${label ? label + " " : ""}${n}</b></div>`; };
+
+function post(target, command) {
+  fetch("/api/send", {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({target, command})})
+    .then(() => setTimeout(() => fetch("/api/send", {method: "POST", headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({target, command: "profile"})}), 350));
+}
+function send(cmd) { if (selected) post(selected, cmd); }
+function setupParty() {
+  if (!selected) { alert("Click the character you play first. It becomes the leader."); return; }
+  fetch("/api/setup?leader=" + encodeURIComponent(selected));
+}
+function selectChar(name) { selected = name; bodyKey = headKey = listKey = ""; render(); }
+function setTab(t) { tab = t; try { localStorage.setItem("vg.tab", t); } catch (e) {} bodyKey = headKey = ""; render(); }
+async function quitApp() { await fetch("/api/quit"); window.close(); }
+
+// ---------- small builders ----------
+// Checkbox that sends one command when ticked and another when unticked.
+const chk = (label, checked, on, off, title = "") =>
+  `<label class="chk ${checked ? "" : "off"}" title="${esc(title)}"><input type="checkbox" ${checked ? "checked" : ""}
+    data-on="${esc(on)}" data-off="${esc(off)}"><span>${esc(label)}</span></label>`;
+const modChk = (label, mods, m, title) => chk(label, !!mods[m], m + " on", m + " off", title);
+const opt = (v, l, cur) => `<option value="${esc(v)}" ${lc(v) === lc(cur) ? "selected" : ""}>${esc(l)}</option>`;
+const sel = (cmd, options, cur, empty = "") =>
+  `<select data-cmd="${esc(cmd)}" data-empty="${esc(empty)}">${options.map(o => opt(o.v, o.l, cur)).join("")}</select>`;
+const slider = (label, setting, val, min, max, step = 1, unit = "%") =>
+  `<div class="slider"><label>${esc(label)} <output>${val}${unit}</output></label>
+   <input type="range" min="${min}" max="${max}" step="${step}" value="${val}" data-cmd="set ${setting} " data-unit="${unit}"></div>`;
+
+// ---------- tabs ----------
+function tabsFor(p) {
+  const m = p.menu || {}, cfg = p.config || {};
+  const t = [{id: "job", label: "Job & abilities"}];
+  if (m.can_cure || m.can_raise || arr(m.cleanse).length) t.push({id: "heal", label: "Healing"});
+  if (arr(m.party_buffs).length || arr(m.self_buffs).length) t.push({id: "buffs", label: "Buffs", n: arr(cfg.buffs).length});
+  if (arr(m.debuffs).length || m.can_dispel) t.push({id: "debuffs", label: "Enfeebles", n: arr(cfg.debuffs).length});
+  if (arr(m.songs).length) t.push({id: "songs", label: "Songs", n: arr(cfg.songs).length});
+  if (arr(m.indi).length || arr(m.geo).length) t.push({id: "geo", label: "Geomancy"});
+  t.push({id: "adv", label: "Advanced"});
+  return t;
+}
+
+function jobTab(c, p) {
+  const s = c.snapshot || {};
+  const others = Object.keys(chars).filter(n => n !== selected).sort();
+  const acts = arr(p.actions), by = {};
+  acts.forEach(a => (by[a.group] = by[a.group] || []).push(a));
+  return `<div class="stack">
+    <div class="row" style="align-items:flex-end">
+      <label class="field">Role ${sel("role ", arr(p.roles).map(r => ({v: r.id, l: r.label})), p.role)}</label>
+      <label class="field">Weapon skill ${sel("ws ", [{v: "", l: "None"}].concat(arr(p.ws_list).map(w => ({v: w, l: w}))), p.ws)}</label>
+      <label class="field">Follow / assist ${sel("leader ", [{v: "", l: "Nobody (I lead)"}].concat(others.map(n => ({v: n, l: n}))), s.leader || "", "none")}</label>
+    </div>
+    <div class="cols">${GROUPS.filter(g => by[g]).map(g => `<div class="box"><h3>${g}</h3>` +
+      by[g].map(a => chk(a.label, a.on, `action ${a.id} on`, `action ${a.id} off`)).join("") + `</div>`).join("")
+      || `<div class="empty">Waiting for ${esc(selected)}'s job info…</div>`}</div>
+    <div class="hint">Only abilities ${esc(selected)} can use right now are listed (sub-job included). Changing the role re-ticks the recommended set.</div>
+  </div>`;
+}
+
+function healTab(p) {
+  const m = p.menu || {}, cfg = p.config || {}, h = cfg.heal || {}, mods = cfg.modules || {};
+  const party = arr(p.party), ignore = arr(h.ignore).map(lc), prio = arr(h.priority).map(lc), skip = arr(cfg.cleanse_skip).map(lc);
+  return `<div class="stack">
+    <div class="master">
+      ${m.can_cure ? modChk("Cure the party", mods, "heal") : ""}
+      ${m.can_raise ? modChk("Raise KO'd members", mods, "raise") : ""}
+      ${arr(m.cleanse).length ? modChk("Remove status effects", mods, "cleanse") : ""}
+      ${m.can_cure ? chk("Wake sleeping members", h.wake_sleep, "set heal.wake_sleep true", "set heal.wake_sleep false") : ""}
+      ${m.can_curaga ? chk("Use Curaga", h.curaga, "set heal.curaga true", "set heal.curaga false") : ""}
+    </div>
+    ${m.can_cure ? `<div class="box"><h3>When to cure</h3><div class="sliders">
+      ${slider("Cure members below", "heal.cure_at", h.cure_at, 30, 95, 5)}
+      ${slider("Cure priority members below", "heal.priority_at", h.priority_at, 30, 95, 5)}
+      ${m.can_curaga ? slider("Curaga when members are below", "heal.curaga_at", h.curaga_at, 30, 95, 5) : ""}
+      ${m.can_curaga ? slider("…and at least this many are hurt", "heal.curaga_count", h.curaga_count, 2, 6, 1, "") : ""}
+    </div></div>` : ""}
+    <div class="box"><h3>Party</h3>
+      ${party.length ? `<table class="grid"><thead><tr><th>Member</th><th>Heal &amp; cleanse</th><th title="Cured first, at the priority threshold">Priority</th></tr></thead><tbody>
+      ${party.map((n, i) => `<tr><td class="${i === 0 ? "me" : ""}">${esc(n)}${i === 0 ? " (self)" : ""}</td>
+        <td><input type="checkbox" ${ignore.includes(lc(n)) ? "" : "checked"} data-on="menu heal ${esc(n)} on" data-off="menu heal ${esc(n)} off"></td>
+        <td><input type="checkbox" ${prio.includes(lc(n)) ? "checked" : ""} data-on="menu priority ${esc(n)} on" data-off="menu priority ${esc(n)} off"></td></tr>`).join("")}
+      </tbody></table>` : `<div class="empty">Not in a party.</div>`}
+    </div>
+    ${arr(m.cleanse).length ? `<div class="box"><h3>Remove these effects</h3><div class="checks">
+      ${arr(m.cleanse).map(st => chk(cap(st), !skip.includes(lc(st)), `menu cleanse on ${st}`, `menu cleanse off ${st}`)).join("")}
+    </div></div>` : ""}
+  </div>`;
+}
+
+function buffsTab(p) {
+  const m = p.menu || {}, cfg = p.config || {}, mods = cfg.modules || {};
+  const party = arr(p.party), me = lc(party[0] || selected);
+  const have = new Set(arr(cfg.buffs).map(e => {
+    let [sp, who] = e.split(">"); who = lc((who || "me").trim());
+    if (who === me) who = "me";
+    return lc(sp.trim()) + ">" + who;
+  }));
+  const tgt = (n, i) => i === 0 ? "me" : n;
+  const pb = arr(m.party_buffs), sb = arr(m.self_buffs);
+  return `<div class="stack">
+    <div class="master">${modChk("Keep the ticked buffs up", mods, "buffs")}</div>
+    ${pb.length ? `<div class="box"><h3>Party buffs: tick who gets each one</h3>
+      <table class="grid"><thead><tr><th>Spell</th>${party.map((n, i) => `<th class="${i === 0 ? "me" : ""}">${esc(n)}</th>`).join("")}</tr></thead><tbody>
+      ${pb.map(sp => `<tr><td>${esc(sp)}</td>${party.map((n, i) => {
+        const t = tgt(n, i), on = have.has(lc(sp) + ">" + lc(t));
+        return `<td><input type="checkbox" ${on ? "checked" : ""} data-on="menu buff ${esc(t)} on ${esc(sp)}" data-off="menu buff ${esc(t)} off ${esc(sp)}"></td>`;
+      }).join("")}</tr>`).join("")}
+      </tbody></table>
+      ${party.length < 2 ? `<div class="hint" style="margin-top:6px">Party members appear here once ${esc(selected)} is in a party.</div>` : ""}
+    </div>` : ""}
+    ${sb.length ? `<div class="box"><h3>Self buffs</h3><div class="checks">
+      ${sb.map(sp => chk(sp, have.has(lc(sp) + ">me"), `menu buff me on ${sp}`, `menu buff me off ${sp}`)).join("")}
+    </div></div>` : ""}
+    <div class="hint">Buffs are recast when they wear off. Only the highest tier known is shown. Job abilities like Composure or Light Arts are on the Job tab.</div>
+  </div>`;
+}
+
+function debuffsTab(p) {
+  const m = p.menu || {}, cfg = p.config || {}, mods = cfg.modules || {};
+  const on = arr(cfg.debuffs).map(lc);
+  return `<div class="stack">
+    <div class="master">
+      ${arr(m.debuffs).length ? modChk("Enfeeble the battle target", mods, "debuff") : ""}
+      ${m.can_dispel ? modChk("Dispel when the mob buffs itself", mods, "dispel") : ""}
+    </div>
+    ${arr(m.debuffs).length ? `<div class="box"><h3>Land these on each new mob</h3><div class="checks">
+      ${arr(m.debuffs).map(sp => chk(sp, on.includes(lc(sp)), `menu debuff on ${sp}`, `menu debuff off ${sp}`)).join("")}
+    </div></div>
+    <div class="row"><label class="field">If resisted, retry ${sel("set debuff.retries ", [0,1,2,3].map(n => ({v: String(n), l: n === 0 ? "Never" : n + (n === 1 ? " time" : " times")})), String(cfg.debuff_retries ?? 1))}</label></div>` : ""}
+    <div class="hint">Sleep spells are left out on purpose so the battle target is never put to sleep.</div>
+  </div>`;
+}
+
+function songsTab(p) {
+  const m = p.menu || {}, cfg = p.config || {}, mods = cfg.modules || {};
+  const cur = arr(cfg.songs), opts = [{v: "", l: "— none —"}].concat(arr(m.songs).map(s => ({v: s, l: s})));
+  const n = Math.min(5, Math.max(4, cur.length + 1));
+  return `<div class="stack">
+    <div class="master">${modChk("Sing these songs", mods, "songs")}</div>
+    <div class="slots">${Array.from({length: n}, (_, i) =>
+      `<label class="field">Song ${i + 1} ${sel(`menu song ${i + 1} `, opts, cur[i] || "", "none")}</label>`).join("")}</div>
+    <div class="row"><label class="field">When ${sel("set songs.when ", [{v: "always", l: "Always keep them up"}, {v: "engaged", l: "Only during fights"}], cfg.songs_when || "always")}</label></div>
+    <div class="hint">Songs are sung in order and re-sung before they wear off. Slots 3+ need extra-song gear or Clarion Call.</div>
+  </div>`;
+}
+
+function geoTab(p) {
+  const m = p.menu || {}, cfg = p.config || {}, mods = cfg.modules || {};
+  const party = arr(p.party);
+  const indi = [{v: "", l: "— none —"}].concat(arr(m.indi).map(s => ({v: s, l: s})));
+  const geo = [{v: "", l: "— none —"}].concat(arr(m.geo).map(s => ({v: s, l: s})));
+  const targets = [{v: "bt", l: "Enemy (battle target)"}, {v: "me", l: "Me"}].concat(party.slice(1).map(n => ({v: n, l: n})));
+  const [entSpell, entWho] = (cfg.entrust || "").split(">").map(x => (x || "").trim());
+  return `<div class="stack">
+    <div class="master">${modChk("Keep bubbles up", mods, "geo")}</div>
+    <div class="slots">
+      <label class="field">Indi (on me) ${sel("menu indi ", indi, cfg.indi || "", "none")}</label>
+      <label class="field">Geo (luopan) ${sel("menu geo ", geo, cfg.geo || "", "none")}</label>
+      <label class="field">Place the luopan on ${sel("menu geotarget ", targets, cfg.geo_target || "bt")}</label>
+    </div>
+    <div class="box"><h3>Entrust (an Indi on a party member)</h3><div class="row">
+      <select id="entSpell">${indi.map(o => opt(o.v, o.l, entSpell)).join("")}</select>
+      <span class="hint">on</span>
+      <select id="entWho">${[{v: "", l: "— nobody —"}].concat(party.slice(1).map(n => ({v: n, l: n}))).map(o => opt(o.v, o.l, entWho)).join("")}</select>
+    </div></div>
+    <div class="hint">Full Circle recalls the luopan if the fight moves away from it.</div>
+  </div>`;
+}
+
+function advTab(p) {
+  const mods = (p.config || {}).modules || (chars[selected].snapshot || {}).modules || {};
+  return `<div class="stack">
+    <div class="box"><h3>All modules</h3><div class="mods">${MODULES.map(m => modChk(m, mods, m)).join("")}</div></div>
+    <div class="box"><h3>Farming</h3><div class="row">
+      <button onclick="send('route record')">Record route</button>
+      <button onclick="send('route stop')">Stop &amp; save</button>
+      <button onclick="send('route clear')">Clear</button>
+      <input type="text" id="farmtargets" placeholder="Farm targets: mob names, comma separated">
+      <button onclick="const v=$('farmtargets').value.trim(); if(v) send('set farm.targets ' + v)">Set</button>
+    </div></div>
+    <div class="box"><h3>Command</h3><div class="row">
+      <select id="cmdtarget"><option value="sel">${esc(selected)}</option><option value="*">All characters</option></select>
+      <input type="text" id="cmd" placeholder="Same as //vg … e.g. trigger add hpp<35 -> input /ja &quot;Sentinel&quot; <me> | 60" onkeydown="if(event.key==='Enter')sendCmd()">
+      <button onclick="sendCmd()">Send</button>
+      <button onclick="fetch('/api/open-settings')">Open settings folder</button>
+    </div></div>
+  </div>`;
+}
+function sendCmd() {
+  const c = $("cmd").value.trim(); if (!c) return;
+  post($("cmdtarget").value === "*" ? "*" : selected, c); $("cmd").value = "";
+}
+
+// ---------- events (one listener for every control) ----------
+document.addEventListener("change", e => {
+  const el = e.target;
+  if (el.id === "entSpell" || el.id === "entWho") {
+    const sp = $("entSpell").value, who = $("entWho").value;
+    send(sp && who ? `menu entrust ${who} ${sp}` : "menu entrust none");
+    return;
+  }
+  if (el.dataset.on !== undefined) { send(el.checked ? el.dataset.on : el.dataset.off); el.closest(".chk")?.classList.toggle("off", !el.checked); return; }
+  if (el.dataset.cmd !== undefined) { send(el.dataset.cmd + (el.value || el.dataset.empty || "")); el.blur(); }
+});
+document.addEventListener("input", e => {
+  const el = e.target;
+  if (el.type === "range") el.parentElement.querySelector("output").textContent = el.value + (el.dataset.unit || "");
+});
+document.addEventListener("click", e => { const card = e.target.closest(".card"); if (card) selectChar(card.dataset.name); });
+
+// ---------- render ----------
+function renderList() {
+  const names = Object.keys(chars).sort();
+  if (!names.length) return;
+  const key = JSON.stringify(names.map(n => [n, chars[n].online, chars[n].snapshot, (chars[n].profile || {}).role])) + selected;
+  if (key === listKey) return;
+  listKey = key;
+  $("chars").innerHTML = names.map(n => {
+    const c = chars[n], s = c.snapshot || {}, p = c.profile || {};
+    const role = arr(p.roles).find(r => r.id === p.role);
+    const sub = [role ? role.label : "", c.online ? (s.status || "") : "offline", s.target ? `${s.target} ${s.target_hpp}%` : ""].filter(Boolean).join(" · ");
+    return `<div class="card ${n === selected ? "sel" : ""} ${c.online ? "" : "offline"}" data-name="${esc(n)}">
+      <div class="top"><span class="nm">${esc(n)}</span><span class="jb">${esc(s.job || p.job || "")}${p.sub ? "/" + esc(p.sub) : ""}</span>
+        <span class="pill ${s.enabled ? "on" : "off"}">${s.enabled ? "ON" : "OFF"}</span></div>
+      <div class="sub">${esc(sub)}</div>
+      <div class="bars">${bar(s.hpp, "var(--hp)", 100, "HP")}${bar(s.mpp, "var(--mp)", 100, "MP")}${bar(s.tp, "var(--tp)", 3000, "TP")}</div>
+    </div>`;
+  }).join("");
+}
+
+function renderPanel() {
+  const c = chars[selected];
+  if (!c) { $("panel").innerHTML = ""; return; }
+  const s = c.snapshot || {}, p = c.profile || {};
+  const tabs = tabsFor(p);
+  if (!tabs.find(t => t.id === tab)) tab = "job";
+
+  const hk = JSON.stringify([selected, s.enabled, p.job, p.sub, tab, tabs]);
+  if (hk !== headKey || !$("tabbody")) {
+    headKey = hk; bodyKey = "";
+    $("panel").innerHTML = `
+      <div class="who" style="margin-bottom:10px"><span class="nm">${esc(selected)}</span>
+        <span class="jb">${esc(p.job || s.job || "")}${p.sub ? " / " + esc(p.sub) : ""} · ${s.enabled ? "running" : "stopped"}</span><span class="sp"></span>
+        <button class="${s.enabled ? "stop" : "go"}" onclick="send('${s.enabled ? "off" : "on"}')">${s.enabled ? "Stop" : "Start"}</button>
+        <button onclick="send('reset')" title="Back to the recommended setup for this job; clears your ticks for this job">Reset to recommended</button></div>
+      <div class="tabs">${tabs.map(t => `<div class="tab ${t.id === tab ? "on" : ""}" onclick="setTab('${t.id}')">${t.label}${t.n ? `<span class="n">${t.n}</span>` : ""}</div>`).join("")}</div>
+      <div class="body" id="tabbody"></div>`;
+  }
+  // Don't redraw under the user's hand while a slider or text box is in use.
+  const a = document.activeElement;
+  if (a && $("tabbody").contains(a) && (a.type === "range" || a.type === "text")) return;
+  const bk = JSON.stringify([tab, p, s.leader, Object.keys(chars)]);
+  if (bk === bodyKey) return;
+  bodyKey = bk;
+  const fn = {job: () => jobTab(c, p), heal: () => healTab(p), buffs: () => buffsTab(p), debuffs: () => debuffsTab(p),
+              songs: () => songsTab(p), geo: () => geoTab(p), adv: () => advTab(p)}[tab];
+  $("tabbody").innerHTML = fn();
+}
+
+function render() {
+  const names = Object.keys(chars).sort();
+  if (names.length && !selected) selected = names[0];
+  renderList();
+  renderPanel();
+  const online = names.filter(n => chars[n].online).length;
+  $("status").textContent = names.length ? `${online} of ${names.length} character(s) online` : "Waiting for characters…";
+}
+
+async function poll() {
+  try {
+    const d = await (await fetch("/api/state?since=" + since)).json();
+    chars = d.chars || {};
+    const log = $("log"), atBottom = log.scrollTop + log.clientHeight >= log.scrollHeight - 4;
+    for (const l of d.logs) {
+      const div = document.createElement("div");
+      div.innerHTML = `<span>${l.time}</span>${esc(l.text)}`;
+      log.appendChild(div); since = l.id;
+    }
+    while (log.children.length > 400) log.removeChild(log.firstChild);
+    if (atBottom) log.scrollTop = log.scrollHeight;
+    render();
+  } catch (e) {
+    $("status").textContent = "Vanguard Control stopped. Close this window.";
+  }
+  setTimeout(poll, 600);
+}
+poll();
+</script>
+</body>
+</html>
