@@ -5,8 +5,8 @@ enhance the BRD profile; it doesn't help to specify what the dummy songs are").
   Song slots    2, or 3 / 4 when an extra-song instrument is in the inventory or a wardrobe (Daurdabla 99: 4;
                 Daurdabla 90 / 95, Terpander, Blurred Harp (+1): 3 - Singer's table), +1 under Clarion Call.
                 songs.slots = 0 (auto) or 2 / 3 / 4 to set it yourself.
-  Dummy songs   songs.dummy = up to two songs (e.g. Knight's Minne, Knight's Minne II). With 3+ slots: the first two
-                real songs, then the dummies (sung with the harp to open the extra slots), then the real 3rd / 4th
+  Dummy songs   songs.dummy = up to three songs (e.g. Army's Paeon, Army's Paeon II, III). With 3+ slots: the first
+                two real songs, then one dummy per extra slot (sung with the harp to open the extra slots), then the real 3rd / 4th
                 songs over them. Your GearSwap equips the harp for the dummy songs (like with Singer).
   Marcato       songs.marcato_song: Marcato right before that song (default: the first song).
   Clarion Call  songs.clarion_song: the extra song while Clarion Call is up.

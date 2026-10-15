@@ -1,6 +1,6 @@
 _addon.name = 'Vanguard'
 _addon.author = 'Daviant'
-_addon.version = '0.18.3'
+_addon.version = '0.18.4'
 _addon.commands = {'vanguard', 'vg'}
 
 --[[
@@ -1646,19 +1646,19 @@ windower.register_event('addon command', function(cmd, ...)
             if bard.pian_set(args[2], args[3], table.concat(args, ' ', 4)) then store.save(settings) send_profile() end
         elseif support.set_pianissimo(rest) then store.save(settings) send_profile() end
     elseif cmd == 'dummy' then
-        -- //vg dummy <1|2> <song|none>
+        -- //vg dummy <1|2|3> <song|none>  (3 dummies open slots 3-5: Daurdabla + Clarion Call)
         local slot, song = tonumber(args[1]), table.concat(args, ' ', 2)
         local sp = util.spell(song)
-        if slot and slot >= 1 and slot <= 2 and (song == 'none' or (sp and sp.type == 'BardSong')) then
+        if slot and slot >= 1 and slot <= 3 and (song == 'none' or (sp and sp.type == 'BardSong')) then
             local d = util.split(settings.songs.dummy, ',')
             d[slot] = sp and sp.en or nil
             local out = {}
-            for i = 1, 2 do if d[i] then out[#out + 1] = d[i] end end
+            for i = 1, 3 do if d[i] then out[#out + 1] = d[i] end end
             settings.songs.dummy = table.concat(out, ',')
             store.save(settings) send_profile()
             log('Dummy songs: ' .. (settings.songs.dummy ~= '' and settings.songs.dummy or 'none'))
         else
-            log('Usage: //vg dummy 1|2 <song|none>   e.g. //vg dummy 1 Knight\'s Minne')
+            log('Usage: //vg dummy 1|2|3 <song|none>   e.g. //vg dummy 1 Knight\'s Minne')
         end
     elseif cmd == 'songrange' then
         -- //vg songrange <name> on|off : wait for this member to be within 10' before party songs

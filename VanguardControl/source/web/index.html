@@ -693,9 +693,9 @@ function songsTab(p) {
         <div class="hint">Songs past your slots wait for Clarion Call (+1) or a harp. Up to 5 songs: Daurdabla (4) + Clarion Call.</div>
       </div></div>
       ${true ? `<div class="box"><h3>Dummy songs</h3>
-        ${Array.from({length: 2}, (_, i) => `<label class="field">Dummy ${i + 1} ${sel(`dummy ${i + 1} `, none, dummies[i] || "none")}</label>`).join("")}
-        <div class="hint" style="margin-top:4px">${base > 2 ? `Sung after your first two songs to open slots 3${base > 3 ? "-4" : ""}; then the real songs replace them.`
-          : "Used once you have 3 or 4 song slots (a harp, or set How many songs)."} Dummy 2 is only used with 4 slots. Let your GearSwap equip the harp for these (e.g. Knight's Minne).</div>
+        ${Array.from({length: 3}, (_, i) => `<label class="field">Dummy ${i + 1} ${sel(`dummy ${i + 1} `, none, dummies[i] || "none")}</label>`).join("")}
+        <div class="hint" style="margin-top:4px">${slots > 2 ? `Sung after your first two songs to open slots 3-${slots}; then the real songs replace them.`
+          : "Used once you have 3 or more song slots (a harp, or set How many songs)."} One dummy per extra slot: 3 slots use Dummy 1, 4 slots Dummies 1-2, 5 slots (Daurdabla + Clarion Call) all 3. Let your GearSwap equip the harp for these.</div>
       </div>` : ""}
       <div class="box"><h3>Marcato and Clarion Call</h3>
         <label class="field">Marcato before ${sel("set songs.marcato_song ", [{v: "", l: "the first song"}].concat(cur.map(s => ({v: s, l: s}))), x.marcato_song || "")}</label>
