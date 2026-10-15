@@ -70,11 +70,36 @@ function util.has_buff(buff_list, id)
     return false
 end
 
+-- Songs that come with an instrument instead of a scroll (they aren't in the learned-spell list): available
+-- while that instrument is in the inventory or a wardrobe (Singer does the same for Marsyas).
+util.INSTRUMENT_SONGS = { ['honor march'] = { 21398 },                          -- Marsyas
+                          ['aria of passion'] = { 22304, 22305, 22306, 22307 } }  -- Loughnashade
+local owned = { t = -100, ids = {} }
+local BAGS = { 'inventory', 'wardrobe', 'wardrobe2', 'wardrobe3', 'wardrobe4', 'wardrobe5', 'wardrobe6', 'wardrobe7', 'wardrobe8' }
+function util.owns(ids)
+    if os.clock() - owned.t > 60 then
+        owned.t, owned.ids = os.clock(), {}
+        local all = windower.ffxi.get_items() or {}
+        for _, bag in ipairs(BAGS) do
+            if type(all[bag]) == 'table' then
+                for _, it in ipairs(all[bag]) do if type(it) == 'table' and it.id then owned.ids[it.id] = true end end
+            end
+        end
+    end
+    for _, id in ipairs(ids) do if owned.ids[id] then return true end end
+    return false
+end
+function util.forget_items() owned.t = -100 end
+function util.instrument_song(spell)
+    local ids = spell and spell.en and util.INSTRUMENT_SONGS[spell.en:lower()]
+    return ids ~= nil and util.owns(ids)
+end
+
 -- Can the player currently use this spell (known, job/level allows it)?
 function util.can_cast(spell, player)
     if not spell then return false end
     local known = windower.ffxi.get_spells()
-    if not known or not known[spell.id] then return false end
+    if not known or (not known[spell.id] and not util.instrument_song(spell)) then return false end
     local lv = spell.levels or {}
     local main_lv = lv[player.main_job_id]
     local sub_lv = lv[player.sub_job_id]

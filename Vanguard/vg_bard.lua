@@ -179,12 +179,30 @@ function bard.pian_set(name, slot, song)
     return true
 end
 
+-- People the panel can add to the Pianissimo table: alliance members, other Vanguard characters, players nearby.
+function bard.candidates(player)
+    local seen, out = { [player.name:lower()] = true }, {}
+    local function add(n) if n and n ~= '' and not seen[n:lower()] then seen[n:lower()] = true out[#out + 1] = n end end
+    local pt = windower.ffxi.get_party() or {}
+    for _, k in ipairs({ 'p1', 'p2', 'p3', 'p4', 'p5', 'a10', 'a11', 'a12', 'a13', 'a14', 'a15', 'a20', 'a21', 'a22', 'a23', 'a24', 'a25' }) do
+        add(pt[k] and pt[k].name)
+    end
+    for name in pairs(require('vg_party').known or {}) do add(name) end
+    local me = windower.ffxi.get_mob_by_target('me')
+    for _, m in pairs(windower.ffxi.get_mob_array() or {}) do
+        if type(m) == 'table' and not m.is_npc and m.spawn_type == 13 and m.name and util.dist(m) <= 30 then add(m.name) end
+    end
+    table.sort(out)
+    return out
+end
+
 -- What the panel shows.
 function bard.info(player)
     local slots, base = bard.slots(player)
     local _, harp = bard.instrument()
     local map = bard.pian_map()
-    return { slots = slots, base = base, instrument = harp or 'none', auto = (tonumber(S.songs.slots) or 0) < 2, pianissimo = map }
+    return { slots = slots, base = base, instrument = harp or 'none', auto = (tonumber(S.songs.slots) or 0) < 2,
+             pianissimo = map, candidates = bard.candidates(player) }
 end
 
 function bard.init(settings, runtime_state, helpers)

@@ -37,7 +37,7 @@ local function family(name)
 end
 
 local function castable(spell, player, known)
-    if not known[spell.id] then return false end
+    if not known[spell.id] and not util.instrument_song(spell) then return false end   -- Honor March, Aria of Passion
     local lv = spell.levels or {}
     local m, s = lv[player.main_job_id], lv[player.sub_job_id]
     if m and (m <= player.main_job_level or player.main_job_level >= 99) then return true end

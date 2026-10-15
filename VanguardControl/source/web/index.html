@@ -701,13 +701,7 @@ function songsTab(p) {
         <label class="field" style="margin-top:6px">Extra song under Clarion Call ${sel("set songs.clarion_song ", [{v: "", l: "the next song in the list"}].concat(all.map(s => ({v: s, l: s}))), x.clarion_song || "")}</label>
       </div>
     </div>
-    <div class="box"><h3>Pianissimo: single-target songs for each member</h3>
-      ${party.length ? `<table class="grid"><thead><tr><th>Member</th><th>Song 1</th><th>Song 2</th></tr></thead><tbody>
-        ${party.map(n => { const ps = pianOf(n); return `<tr><td>${esc(n)}</td>${[0, 1].map(i =>
-          `<td>${sel(`pianissimo set ${n} ${i + 1} `, none, ps[i] || "none")}</td>`).join("")}</tr>`; }).join("")}
-      </tbody></table>` : `<div class="empty">Party members appear here once ${esc(selected)} is in a party.</div>`}
-      <div class="hint" style="margin-top:4px">For example Mage's Ballad for the healers, Sentinel's Scherzo for the tank.</div>
-    </div>
+    ${pianBox(party, pian, pianOf, none, bi)}
     <div class="cols">
       <div class="box"><h3>Wait for these members to be in range (10')</h3>
         ${party.length ? `<div class="checks">${party.map(n => chk(n, range.has(lc(n)), `songrange ${n} on`, `songrange ${n} off`)).join("")}</div>` : `<div class="empty">Not in a party.</div>`}
@@ -723,6 +717,28 @@ function songsTab(p) {
     </div>
   </div>`;
 }
+
+// Pianissimo rows: the party, anyone who already has songs set, and anyone added with "+ Add someone".
+const pianAdded = new Set();
+function pianBox(party, pian, pianOf, none, bi) {
+  const inParty = new Set(party.map(lc));
+  const rows = [...party];
+  Object.keys(pian).concat([...pianAdded]).forEach(n => { if (!rows.some(r => lc(r) === lc(n))) rows.push(n); });
+  const cands = arr(bi.candidates).filter(n => !rows.some(r => lc(r) === lc(n)));
+  return `<div class="box"><h3>Pianissimo: single-target songs for each member</h3>
+    ${rows.length ? `<table class="grid"><thead><tr><th>Member</th><th>Song 1</th><th>Song 2</th><th></th></tr></thead><tbody>
+      ${rows.map(n => { const ps = pianOf(n); return `<tr><td>${esc(n)}${inParty.has(lc(n)) ? "" : ` <span class="hint">(not in the party)</span>`}</td>${[0, 1].map(i =>
+        `<td>${sel(`pianissimo set ${n} ${i + 1} `, none, ps[i] || "none")}</td>`).join("")}
+        <td>${inParty.has(lc(n)) ? "" : `<button title="Remove ${esc(n)}" onclick="pianRemove('${esc(n)}')">×</button>`}</td></tr>`; }).join("")}
+    </tbody></table>` : `<div class="empty">Party members appear here once ${esc(selected)} is in a party.</div>`}
+    <div class="row" style="margin-top:8px">
+      <select id="pianadd"><option value="">+ Add someone…</option>${cands.map(n => `<option value="${esc(n)}">${esc(n)}</option>`).join("")}</select>
+      <span class="hint">${cands.length ? "Alliance members, your other characters and players nearby." : "Nobody else around right now."}</span>
+    </div>
+    <div class="hint" style="margin-top:4px">For example Mage's Ballad for the healers, Sentinel's Scherzo for the tank. Pianissimo songs only reach people in your party: rows for others wait until they join.</div>
+  </div>`;
+}
+function pianRemove(n) { pianAdded.delete(n); send(`pianissimo set ${n} 2 none`); send(`pianissimo set ${n} 1 none`); bodyKey = ""; render(); }
 
 function geoTab(p) {
   const m = p.menu || {}, cfg = p.config || {}, mods = cfg.modules || {};
@@ -781,6 +797,7 @@ document.addEventListener("change", e => {
     return;
   }
   if (el.id === "profsel") return;
+  if (el.id === "pianadd") { if (el.value) { pianAdded.add(el.value); bodyKey = ""; render(); } return; }
   if (el.dataset.tiers !== undefined) { send("set heal.tiers " + tierString()); return; }
   if (el.id === "entSpell" || el.id === "entWho") {
     const sp = $("entSpell").value, who = $("entWho").value;
