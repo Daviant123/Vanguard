@@ -77,6 +77,7 @@ local function snapshot(settings, state)
         leader = settings.leader,
         modules = settings.modules,
         version = _addon.version,
+        autostart = settings.autostart,
         hold = state and state.hold or false,
         camp = state and state.camp ~= nil or false,
         retreat = state and state.retreat or false,

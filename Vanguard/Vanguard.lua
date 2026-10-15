@@ -1,6 +1,6 @@
 _addon.name = 'Vanguard'
 _addon.author = 'Daviant'
-_addon.version = '0.18.0'
+_addon.version = '0.18.1'
 _addon.commands = {'vanguard', 'vg'}
 
 --[[
@@ -53,6 +53,7 @@ local bard = require('vg_bard')
 ------------------------------------------------------------------------
 local defaults = {
     enabled = false,
+    autostart = false,       -- start by itself when Vanguard loads (login / reload); off = wait for Start
     leader = '',
     tick = 0.25,
     modules = {
@@ -151,6 +152,8 @@ local defaults = {
 }
 
 local settings = config.load(defaults)
+-- Running or not is decided now, not by whatever was saved last time: only Auto start starts it by itself.
+settings.enabled = settings.autostart == true
 
 ------------------------------------------------------------------------
 -- Runtime state

@@ -134,6 +134,8 @@ table.sgrid .na { color: var(--line); }
   <button class="primary" onclick="setupParty()" title="The selected character leads; everyone else follows and uses their job's setup">Set up party</button>
   <button class="go" onclick="post('*','on')">Start all</button>
   <button class="stop" onclick="post('*','off')">Stop all</button>
+  <label class="chk" id="autostartbox" title="On: characters start by themselves when they log in or Vanguard reloads. Off: they wait for Start.">
+    <input type="checkbox" id="autostart"><span>Auto start</span></label>
   <div class="status" id="status">Waiting for characters…</div>
   <button onclick="quitApp()" title="Close Vanguard Control">Quit</button>
 </header>
@@ -689,9 +691,10 @@ function songsTab(p) {
         ${Array.from({length: base}, (_, i) => `<label class="field">Song ${i + 1} ${sel(`menu song ${i + 1} `, opts, cur[i] || "", "none")}</label>`).join("")}
         ${cur.length > base ? `<div class="hint">Not sung (no slot): ${cur.slice(base).map(esc).join(", ")}</div>` : ""}
       </div></div>
-      ${base > 2 ? `<div class="box"><h3>Dummy songs</h3>
-        ${Array.from({length: base - 2}, (_, i) => `<label class="field">Dummy ${i + 1} ${sel(`dummy ${i + 1} `, none, dummies[i] || "none")}</label>`).join("")}
-        <div class="hint" style="margin-top:4px">Sung after your first two songs to open slots 3${base > 3 ? "-4" : ""}; then the real songs replace them. Let your GearSwap equip the harp for these (e.g. Knight's Minne).</div>
+      ${true ? `<div class="box"><h3>Dummy songs</h3>
+        ${Array.from({length: 2}, (_, i) => `<label class="field">Dummy ${i + 1} ${sel(`dummy ${i + 1} `, none, dummies[i] || "none")}</label>`).join("")}
+        <div class="hint" style="margin-top:4px">${base > 2 ? `Sung after your first two songs to open slots 3${base > 3 ? "-4" : ""}; then the real songs replace them.`
+          : "Used once you have 3 or 4 song slots (a harp, or set How many songs)."} Dummy 2 is only used with 4 slots. Let your GearSwap equip the harp for these (e.g. Knight's Minne).</div>
       </div>` : ""}
       <div class="box"><h3>Marcato and Clarion Call</h3>
         <label class="field">Marcato before ${sel("set songs.marcato_song ", [{v: "", l: "the first song"}].concat(cur.map(s => ({v: s, l: s}))), x.marcato_song || "")}</label>
@@ -771,6 +774,7 @@ function sendCmd() {
 // ---------- events (one listener for every control) ----------
 document.addEventListener("change", e => {
   const el = e.target;
+  if (el.id === "autostart") { post("*", `set autostart ${el.checked ? "true" : "false"}`); return; }
   if (el.id === "profauto") {
     const job = (chars[selected].profile || {}).job;
     profDo(`do=auto&char=${encodeURIComponent(selected)}&job=${job}&name=${el.checked ? encodeURIComponent(profPick()) : ""}`);
@@ -853,6 +857,11 @@ function render() {
   renderList();
   renderPanel();
   const online = names.filter(n => chars[n].online).length;
+  const as = $("autostart"), on = names.filter(n => chars[n].online);
+  if (as && document.activeElement !== as) {
+    as.checked = on.length > 0 && on.every(n => (chars[n].snapshot || {}).autostart === true);
+    $("autostartbox").classList.toggle("off", !as.checked);
+  }
   $("status").textContent = names.length ? `${online} of ${names.length} character(s) online` : "Waiting for characters…";
 }
 
