@@ -1,5 +1,14 @@
 [
   {
+    "version": "1.22.0",
+    "date": "2026-10-16",
+    "items": [
+      "New: Alarms. The app plays a sound, shows a red banner and flashes the character's card when one of your characters is KO'd, asleep, petrified or charmed, goes offline (disconnected), or is stuck behind or not fighting. It works even while the app is minimized behind the game.",
+      "Low HP and low MP alarms too (tick them and pick the %), and \"Keep ringing until I click OK\" for when you step away. App & updates > Alarms; Test sound to hear it.",
+      "Logging out with the Log out button or the stop timer doesn't set it off."
+    ]
+  },
+  {
     "version": "1.21.0",
     "date": "2026-10-16",
     "items": [

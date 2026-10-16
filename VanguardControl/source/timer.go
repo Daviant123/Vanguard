@@ -50,6 +50,7 @@ func (h *hub) fireTimer(t stopTimer) {
 		}
 		h.send(name, "off")
 		if t.Action == "logout" {
+			quietAlarms(3 * time.Minute)
 			h.send(name, "logout")
 		}
 		n++

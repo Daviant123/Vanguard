@@ -88,6 +88,7 @@ func (h *hub) addCrash(c crashReport) {
 	list = append(list, c)
 	saveCrashes(list)
 	if h != nil {
+		h.alarmProblem(c.Where)
 		h.addLog("A problem was caught (%s, %s): see App & updates > Problems to send a report.", c.Source, c.Where)
 	}
 }

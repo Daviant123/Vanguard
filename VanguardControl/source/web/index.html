@@ -23,6 +23,10 @@ aside { border-right: 1px solid var(--line); background: var(--panel); overflow-
 .card:hover { border-color: #4a5060; }
 .card.sel { border-color: var(--accent); background: #2b2618; }
 .card.offline { opacity: .55; }
+.card.alarm { animation: alarmflash 1s infinite; }
+@keyframes alarmflash { 0%, 100% { border-color: var(--bad); box-shadow: 0 0 0 2px rgba(224,96,90,.5); } 50% { border-color: var(--line); box-shadow: none; } }
+#alarmbar { display: none; background: rgba(224,96,90,.16); border: 1px solid var(--bad); border-radius: 8px; padding: 6px 10px; margin: 6px 0; align-items: center; gap: 10px; flex-wrap: wrap; }
+#alarmbar b { color: var(--bad); }
 .card .top { display: flex; align-items: center; gap: 6px; }
 .card .nm { font-weight: 600; font-size: 14px; }
 .card .jb { color: var(--muted); font-size: 12px; }
@@ -157,6 +161,7 @@ table.sgrid .na { color: var(--line); }
   <button onclick="quitApp()" title="Close Vanguard Control">Quit</button>
 </header>
 <div id="addonbar"></div>
+<div id="alarmbar"></div>
 <div id="quickbar"></div>
 <div class="layout">
   <aside id="chars">
@@ -825,10 +830,53 @@ function problemsBox() {
       Character names and your Windows user name are replaced first; nothing is sent until you click Submit.</div></div>`;
 }
 
+// ---------- Alarms: a sound, a red banner and a flashing card when a character needs you (alarms.go) ----------
+let alarmState = {cfg: {}, active: []}, alarmKey = "";
+const baseTitle = document.title;
+async function alarmDo(q) {
+  try { alarmState = await (await fetch("/api/alarms?" + q)).json(); } catch (e) { return; }
+  const k = JSON.stringify(alarmState);
+  if (k === alarmKey) return;
+  alarmKey = k; listKey = ""; bodyKey = "";
+  renderAlarmBar(); render();
+}
+setInterval(() => alarmDo(""), 1500);
+function renderAlarmBar() {
+  const b = $("alarmbar"); if (!b) return;
+  const act = arr(alarmState.active);
+  b.style.display = act.length ? "flex" : "none";
+  document.title = act.length ? `(!) ${act[act.length - 1].who || "Vanguard"}: ${act[act.length - 1].text}` : baseTitle;
+  if (!act.length) { b.innerHTML = ""; return; }
+  b.innerHTML = `<span>🔔</span>${act.slice(-4).map(a => `<span><b>${esc(a.who || "Vanguard")}</b> ${esc(a.text)} <span class="hint">${esc(a.time)}</span></span>`).join("")}
+    ${act.length > 4 ? `<span class="hint">+${act.length - 4} more</span>` : ""}<span class="sp" style="flex:1"></span>
+    <button class="primary" onclick="alarmDo('do=ok')">OK</button>`;
+}
+function alarmsBox() {
+  const c = alarmState.cfg || {};
+  const tick = (k, label) => `<label class="chk"><input type="checkbox" ${c[k] ? "checked" : ""} onchange="alarmDo('do=set&k=${k}&v=' + (this.checked ? 1 : 0))"> ${label}</label>`;
+  const pct = (k, list) => `<select onchange="alarmDo('do=set&k=${k}&v=' + this.value)">${list.map(v => `<option value="${v}" ${+c[k] === v ? "selected" : ""}>${v}%</option>`).join("")}</select>`;
+  return `<div class="box"><h3>Alarms</h3>
+    <div class="row">${tick("on", "<b>Alarms on</b>")} ${tick("sound", "Play a sound")} ${tick("ring", "Keep ringing until I click OK")}
+      <button onclick="alarmDo('do=test')">Test sound</button></div>
+    <div class="hint" style="margin:6px 0 4px">Ring when a character…</div>
+    <div class="row" style="flex-wrap:wrap;gap:6px 18px">
+      ${tick("ko", "is KO'd")}
+      ${tick("disabled", "is asleep, petrified, charmed, terrorized or stunned")}
+      ${tick("offline", "goes offline (disconnected or the game closed)")}
+      ${tick("alerts", "is stuck behind, not in your zone, or not fighting")}
+      <span style="display:inline-flex;align-items:center;gap:6px">${tick("hp", "HP under")} ${pct("hp_at", [20, 25, 30, 40, 50])}</span>
+      <span style="display:inline-flex;align-items:center;gap:6px">${tick("mp", "MP under")} ${pct("mp_at", [5, 10, 15, 20, 30])}</span>
+      ${tick("problem", "a problem is caught")}
+    </div>
+    <div class="hint" style="margin-top:6px">The app rings even while it's minimized behind the game. The character's card flashes red and the
+      app's taskbar title says what happened until you click OK. Logging out (Log out button or the stop timer) doesn't ring.
+      "Stuck behind / not fighting" need the alts' alerts on (Team tab).</div></div>`;
+}
+
 // ---------- App & updates tab ----------
 function appTab() {
   const a = addon || {};
-  return `<div class="stack">${problemsBox()}<div class="box"><h3>Vanguard Control</h3><div class="kv">
+  return `<div class="stack">${problemsBox()}${alarmsBox()}<div class="box"><h3>Vanguard Control</h3><div class="kv">
       <span>App version</span><span>${esc(a.panel || "?")}</span>
       <span>Addon in this app</span><span>${esc(a.bundled || "?")}</span>
       <span>Windower folder</span><span>${a.found ? esc(a.windower) : "not found"}</span>
@@ -1284,14 +1332,14 @@ document.addEventListener("click", e => { const card = e.target.closest(".card")
 function renderList() {
   const names = Object.keys(chars).sort();
   if (!names.length) return;
-  const key = JSON.stringify(names.map(n => [n, chars[n].online, chars[n].snapshot, (chars[n].profile || {}).role])) + selected + (addon.installed || "");
+  const key = JSON.stringify(names.map(n => [n, chars[n].online, chars[n].snapshot, (chars[n].profile || {}).role])) + selected + (addon.installed || "") + JSON.stringify(arr(alarmState.active).map(a => a.who));
   if (key === listKey) return;
   listKey = key;
   $("chars").innerHTML = names.map(n => {
     const c = chars[n], s = c.snapshot || {}, p = c.profile || {};
     const role = arr(p.roles).find(r => r.id === p.role);
     const sub = [role ? role.label : "", c.online ? (s.status || "") : "offline", s.target ? `${s.target} ${s.target_hpp}%` : ""].filter(Boolean).join(" · ");
-    return `<div class="card ${n === selected ? "sel" : ""} ${c.online ? "" : "offline"}" data-name="${esc(n)}">
+    return `<div class="card ${n === selected ? "sel" : ""} ${c.online ? "" : "offline"} ${arr(alarmState.active).some(a => a.who === n) ? "alarm" : ""}" data-name="${esc(n)}">
       <div class="top"><span class="nm">${esc(n)}</span><span class="jb">${esc(s.job || p.job || "")}${p.sub && !String(s.job || "").includes("/") ? "/" + esc(p.sub) : ""}</span>
         ${addon.installed && c.online && (!s.version || s.version !== addon.installed) ? `<span class="pill warn" title="Runs Vanguard ${esc(s.version || "from before 0.13")}; ${esc(addon.installed)} is installed">OLD</span>` : ""}
         <span class="pill ${s.enabled ? "on" : "off"}">${s.enabled ? "ON" : "OFF"}</span></div>
@@ -1377,6 +1425,7 @@ pollAddon();
 quickDo("");
 timerDo("");
 crashDo("");
+alarmDo("");
 profDo("");
 </script>
 </body>

@@ -185,6 +185,7 @@ func (h *hub) listen() {
 			}
 			h.mu.Unlock()
 			h.addLog("%s: %s", name, text)
+			h.alarmFromLog(name, text)
 		}
 	}
 }
@@ -248,6 +249,9 @@ func (h *hub) handleSend(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	cmd := strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(req.Command), "//vg "))
+	if strings.Contains(cmd, "logout") {
+		quietAlarms(3 * time.Minute) // logging out on purpose: no "went offline" alarm
+	}
 	sent := 0
 	if req.Target == "*" {
 		for _, n := range h.names() {
@@ -353,6 +357,8 @@ func main() {
 	}()
 	h.safeGo("listening to the characters", h.listen)
 	h.safeGo("stop timer", h.timerLoop)
+	loadAlarms()
+	h.safeGo("alarms", h.alarmLoop)
 	// The addon: find Windower, install / update the one built into this exe, reload old copies.
 	h.safeGo("addon install / reload", func() {
 		if msg := h.ensureAddon(false); msg != "" && msg != "ok" {
@@ -374,6 +380,7 @@ func main() {
 	mux.HandleFunc("/api/quick", h.handleQuick)
 	mux.HandleFunc("/api/timer", h.handleTimer)
 	mux.HandleFunc("/api/crashes", h.handleCrashes)
+	mux.HandleFunc("/api/alarms", h.handleAlarms)
 	mux.HandleFunc("/api/quit", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNoContent)
 		go func() { time.Sleep(200 * time.Millisecond); os.Exit(0) }()

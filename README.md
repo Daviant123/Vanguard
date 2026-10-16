@@ -225,6 +225,12 @@ Settings are now saved safely with several characters running (one character's s
 Healing & MP (or Recovery) tab: **Keep MP for cures**. Below that MP the character stops casting buffs, songs,
 enfeebles and nukes and saves the rest for Cures, Raise and status removal. 0 = off.
 
+## Alarms (new in Vanguard Control 1.22.0)
+
+App & updates > Alarms: the app plays a sound, shows a red banner and flashes the character's card when a character is
+KO'd, asleep / petrified / charmed, goes offline, is stuck or not fighting, or (if you tick them) is low on HP or MP.
+It works while the app is minimized. **Keep ringing until I click OK** if you step away from the screen.
+
 ## Enemy watch (new in 0.32.0 / Vanguard Control 1.21.0)
 
 Team tab > Enemy: what your characters are fighting, its HP and distance, its TP move as it readies it, and each
