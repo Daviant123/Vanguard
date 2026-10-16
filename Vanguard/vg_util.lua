@@ -24,6 +24,19 @@ util.abilities = build_index(res.job_abilities)
 util.wskills  = build_index(res.weapon_skills)
 util.buffs    = build_index(res.buffs)
 
+local target_bits = { Self = 1, Player = 2, Party = 4, Ally = 8, NPC = 16, Enemy = 32, Corpse = 64 }
+-- Does a spell / ability target <what> (Self, Party, Enemy...)? Windower gives targets as a set of names; the raw
+-- resource files have a number.
+function util.targets(entry, what)
+    local t = entry and entry.targets
+    if type(t) == 'number' then return math.floor(t / target_bits[what]) % 2 == 1 end
+    if type(t) == 'table' then
+        if t[what] then return true end
+        for _, v in pairs(t) do if v == what then return true end end
+    end
+    return false
+end
+
 function util.spell(name)   return name and util.spells[name:lower()] end
 function util.ability(name) return name and util.abilities[name:lower()] end
 function util.wskill(name)  return name and util.wskills[name:lower()] end

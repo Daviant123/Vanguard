@@ -173,7 +173,7 @@ end
 -- Before a Geo debuff on the battle target: get on its hate list (Dia II / Dia).
 function support.geo_hate(player, spell, mob)
     if not S.geo.hate_first or not spell or not mob then return false end
-    if (spell.targets or 0) ~= 32 then return false end           -- only enemy-target Geo spells
+    if not util.targets(spell, 'Enemy') or util.targets(spell, 'Self') then return false end   -- only enemy-target Geo spells
     state.geo_hate = state.geo_hate or {}
     if state.geo_hate[mob.id] then return false end
     for _, name in ipairs({ 'Dia II', 'Dia', 'Stone' }) do

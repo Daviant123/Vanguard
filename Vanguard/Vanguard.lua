@@ -1,6 +1,6 @@
 _addon.name = 'Vanguard'
 _addon.author = 'Daviant'
-_addon.version = '0.35.0'
+_addon.version = '0.35.1'
 _addon.commands = {'vanguard', 'vg'}
 
 --[[
@@ -1352,8 +1352,8 @@ windower.register_event('prerender', function()
     state.last_tick = t
     crash.guard('main loop', tick)()
     if state.profile and t - state.profile_sent > 15 then crash.guard('sending the setup to the app', send_profile)() end
-    local bok, berr = pcall(bridge.poll, settings, state)
-    if not bok then windower.add_to_chat(167, '[Vanguard] bridge error: ' .. tostring(berr)) end
+    -- talking to the app: a problem here is reported once a minute (crash report), not every second in chat
+    crash.guard('talking to Vanguard Control', bridge.poll)(settings, state)
 end)
 
 ------------------------------------------------------------------------

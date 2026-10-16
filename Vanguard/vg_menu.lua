@@ -17,15 +17,7 @@ local menu = {}
 ------------------------------------------------------------------------
 local target_bits = { Self = 1, Player = 2, Party = 4, Ally = 8, NPC = 16, Enemy = 32, Corpse = 64 }
 
-local function targets(spell, what)
-    local t = spell.targets
-    if type(t) == 'number' then return math.floor(t / target_bits[what]) % 2 == 1 end
-    if type(t) == 'table' then
-        if t[what] then return true end
-        for _, v in pairs(t) do if v == what then return true end end
-    end
-    return false
-end
+local function targets(spell, what) return util.targets(spell, what) end
 
 local roman = { I = 1, II = 2, III = 3, IV = 4, V = 5, VI = 6 }
 

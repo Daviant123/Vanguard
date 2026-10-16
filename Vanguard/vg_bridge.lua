@@ -99,8 +99,7 @@ function bridge.cooldowns()
             seen[ja.en] = true
             local left = ja.recast_id and rc[ja.recast_id] or 0
             if ja.recast_id == 231 and charges and charges > 0 then left = 0 end
-            local tg = ja.targets or 1
-            out[#out + 1] = { n = ja.en, s = math.floor((left or 0) + 0.5), t = (math.floor(tg / 32) % 2 == 1) and 'bt' or 'me',
+            out[#out + 1] = { n = ja.en, s = math.floor((left or 0) + 0.5), t = util.targets(ja, 'Enemy') and 'bt' or 'me',
                                  sp = (ja.recast_id == 0 or ja.recast_id == 254) or nil }   -- SP abilities (1-hour)
         end
     end

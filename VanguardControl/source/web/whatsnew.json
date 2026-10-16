@@ -1,5 +1,14 @@
 [
   {
+    "version": "1.25.1",
+    "date": "2026-10-16",
+    "items": [
+      "Fixed: red \"bridge error ... vg_bridge.lua:98\" lines filling the chat every second (from the new Cooldowns box). Cooldowns work now.",
+      "Fixed: Geomancer's \"Dia first\" (get on the hate list before a Geo debuff) never happened in game. It does now.",
+      "If something does go wrong talking to the app, it's shown once a minute and listed under App & updates > Problems instead of filling the chat."
+    ]
+  },
+  {
     "version": "1.25.0",
     "date": "2026-10-16",
     "items": [
