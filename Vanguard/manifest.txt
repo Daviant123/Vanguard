@@ -12,6 +12,7 @@ vg_menu.lua
 vg_party.lua
 vg_safety.lua
 vg_share.lua
+vg_stats.lua
 vg_store.lua
 vg_strat.lua
 vg_support.lua

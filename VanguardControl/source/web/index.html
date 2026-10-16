@@ -216,6 +216,7 @@ function tabsFor(p) {
   if ((cfg.strat_info || {}).max > 0) t.push({id: "strat", label: "Stratagems"});
   t.push({id: "adv", label: "Advanced"});
   t.push({id: "app", label: "App & updates"});
+  t.push({id: "news", label: "What's new", n: newsUnseen() ? "new" : 0});
   return t;
 }
 
@@ -336,6 +337,7 @@ function teamTab(c, p) {
   const setups = arr(x.setups);
   return `<div class="stack">
     <div class="hint">Orders go to the leader (<b>${esc(L || "nobody yet")}</b>), who passes them to everyone. Switches marked "everyone" are set on every character.</div>
+    ${statsBox()}
     <div class="cols">
       <div class="box"><h3>Party</h3><div class="btns">
         <button class="primary" onclick="setupParty()">Set up party (${esc(selected || "")} leads)</button>
@@ -489,6 +491,40 @@ function stratTab(c, p) {
     ${missing.length ? `<div class="hint">Not on this job / level: ${missing.map(esc).join(", ")}.</div>` : ""}
     <div class="hint">Each stratagem works on the next spell of its kind and uses one charge. The reserve is only spent on emergencies (Raise with Celerity, emergency cures).</div>
   </div>`;
+}
+
+// ---------- What's new (whatsnew.json, built into the app) ----------
+let news = [], newsSeen = "";
+try { newsSeen = localStorage.getItem("vg.newsSeen") || ""; } catch (e) {}
+fetch("/whatsnew.json").then(r => r.json()).then(d => { news = arr(d); headKey = ""; render(); }).catch(() => {});
+function newsUnseen() { return news.length && news[0].version !== newsSeen; }
+function newsTab() {
+  if (news.length && news[0].version !== newsSeen) {
+    newsSeen = news[0].version; try { localStorage.setItem("vg.newsSeen", newsSeen); } catch (e) {}
+    setTimeout(() => { headKey = ""; render(); }, 50);
+  }
+  return `<div class="stack">${news.map(v => `<div class="box"><h3>Version ${esc(v.version)} <span class="hint" style="font-weight:400">${esc(v.date || "")}</span></h3>
+    <ul style="margin:0;padding-left:18px">${arr(v.items).map(i => `<li style="margin:3px 0">${esc(i)}</li>`).join("")}</ul></div>`).join("")
+    || `<div class="empty">No notes yet.</div>`}</div>`;
+}
+
+// ---------- session stats (Team tab) ----------
+const fmtN = n => n >= 10000 ? (n / 1000).toFixed(n >= 100000 ? 0 : 1) + "k" : String(Math.round(n));
+const perHour = (v, secs) => (secs || 0) < 300 ? "–" : fmtN((v || 0) * 3600 / secs);   // too early for a fair hourly rate
+function statsBox() {
+  const names = Object.keys(chars).sort();
+  const rows = names.map(n => ({n, st: (chars[n].snapshot || {}).stats, on: chars[n].online})).filter(x => x.st);
+  if (!rows.length) return "";
+  const tot = k => rows.reduce((a, x) => a + (x.st[k] || 0), 0);
+  const mins = s => { const m = Math.floor((s || 0) / 60); return m >= 60 ? `${Math.floor(m / 60)}h ${m % 60}m` : `${m}m`; };
+  return `<div class="box"><h3>Session</h3>
+    <table class="grid"><thead><tr><th>Character</th><th>Time</th><th>XP / hour</th><th>CP / hour</th><th>Limit / hour</th><th>Kills</th><th>Deaths</th></tr></thead><tbody>
+    ${rows.map(x => `<tr${x.on ? "" : ' style="opacity:.5"'}><td>${esc(x.n)}</td><td>${mins(x.st.secs)}</td><td>${perHour(x.st.exp, x.st.secs)}</td>
+      <td>${perHour(x.st.cp, x.st.secs)}</td><td>${perHour(x.st.lp, x.st.secs)}</td><td>${x.st.kills || 0}</td><td>${x.st.deaths || 0}</td></tr>`).join("")}
+    <tr><td><b>Total</b></td><td></td><td><b>${fmtN(tot("exp"))}</b> XP</td><td><b>${fmtN(tot("cp"))}</b> CP</td><td><b>${fmtN(tot("lp"))}</b></td><td><b>${tot("kills")}</b></td><td><b>${tot("deaths")}</b></td></tr>
+    </tbody></table>
+    <div class="row" style="margin-top:6px"><button onclick="post('*','stats reset')">Reset (start a new session)</button>
+      <span class="hint">Counted from each character's own game messages. Per-hour numbers show after 5 minutes.</span></div></div>`;
 }
 
 // ---------- App & updates tab ----------
@@ -859,13 +895,14 @@ function renderPanel() {
   const a = document.activeElement;
   if (a && $("tabbody").contains(a) && (a.type === "range" || a.type === "text" || a.type === "number")) return;
   const team = tab === "team" ? Object.keys(chars).map(n => [n, (chars[n].snapshot || {}).hold, (chars[n].snapshot || {}).camp,
-    (chars[n].snapshot || {}).retreat, (chars[n].snapshot || {}).defense, (chars[n].snapshot || {}).leader]) : 0;
+    (chars[n].snapshot || {}).retreat, (chars[n].snapshot || {}).defense, (chars[n].snapshot || {}).leader,
+    (chars[n].snapshot || {}).stats, chars[n].online]) : 0;
   const bk = JSON.stringify([tab, p, s.leader, Object.keys(chars), team, tab === "app" ? addon : 0, tab === "strat" ? s.strat : 0]);
   if (bk === bodyKey) return;
   bodyKey = bk;
   const fn = {job: () => jobTab(c, p), heal: () => healTab(p), buffs: () => buffsTab(p), debuffs: () => debuffsTab(p),
               songs: () => songsTab(p), geo: () => geoTab(p), adv: () => advTab(p), team: () => teamTab(c, p),
-              app: () => appTab(), strat: () => stratTab(c, p)}[tab];
+              app: () => appTab(), strat: () => stratTab(c, p), news: () => newsTab()}[tab];
   $("tabbody").innerHTML = fn();
 }
 

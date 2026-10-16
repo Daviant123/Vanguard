@@ -1,6 +1,6 @@
 _addon.name = 'Vanguard'
 _addon.author = 'Daviant'
-_addon.version = '0.18.4'
+_addon.version = '0.19.0'
 _addon.commands = {'vanguard', 'vg'}
 
 --[[
@@ -47,6 +47,7 @@ local update = require('vg_update')
 local link = require('vg_link')
 local strat = require('vg_strat')
 local bard = require('vg_bard')
+local stats = require('vg_stats')
 
 ------------------------------------------------------------------------
 -- Settings
@@ -1215,6 +1216,7 @@ local function tick()
     local player = windower.ffxi.get_player()
     if not player then return end
     record_route()
+    stats.tick(player)
     alts.broadcast_mount(player)
     party.hello(player)
     party.send_pos(player)
@@ -1307,6 +1309,10 @@ end)
 local landed_msgs = S{2, 236, 237, 252, 264, 268, 271}
 local resist_msgs = S{85, 284, 653, 654, 655, 656}
 local buffed_msgs = S{230, 266, 280, 319}
+
+windower.register_event('action message', function(actor_id, target_id, actor_index, target_index, message_id, p1, p2)
+    stats.on_message(actor_id, target_id, message_id, p1, p2)
+end)
 
 windower.register_event('action', function(act)
     local player = windower.ffxi.get_player()
@@ -1635,6 +1641,10 @@ windower.register_event('addon command', function(cmd, ...)
             save_profile()
             send_profile()
         end
+    elseif cmd == 'stats' then
+        if (args[1] or ''):lower() == 'reset' then stats.reset() log('Session stats reset') end
+        local t = stats.get()
+        log(('Session %d min: %d XP, %d CP, %d LP, %d kills, %d deaths'):format(math.floor(t.secs / 60), t.exp, t.cp, t.lp, t.kills, t.deaths))
     elseif cmd == 'reload' then
         log('Reloading Vanguard...')
         windower.send_command('lua reload vanguard')

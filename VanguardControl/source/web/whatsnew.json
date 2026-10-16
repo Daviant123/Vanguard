@@ -1,0 +1,43 @@
+[
+  {"version": "1.8.0", "date": "2026-10-15", "items": [
+    "New: session stats for every character on the Team tab - experience, Capacity Points and limit points per hour, kills, deaths and time. Reset starts a new session. (Paid tools like MMOMinion and the RuneScape script clients all show these.)",
+    "New: this What's new tab, so you can see what each update adds or fixes."
+  ]},
+  {"version": "1.7.4", "date": "2026-10-15", "items": [
+    "Bard: a third dummy song, so with 5 song slots (Daurdabla + Clarion Call) it sings 2 songs, the 3 dummies, then songs 3-5."
+  ]},
+  {"version": "1.7.3", "date": "2026-10-15", "items": [
+    "Bard: 5 song menus and a \"5 songs\" option; under Clarion Call all 5 songs are sung."
+  ]},
+  {"version": "1.7.2", "date": "2026-10-15", "items": [
+    "Bard: Honor March and Aria of Passion show up when you own Marsyas / Loughnashade.",
+    "Bard: \"+ Add someone\" for Pianissimo songs (alliance members, your other characters, players nearby)."
+  ]},
+  {"version": "1.7.1", "date": "2026-10-15", "items": [
+    "New: Auto start switch at the top (off by default) - characters only start by themselves when it's on.",
+    "Bard: the dummy song menus are always there."
+  ]},
+  {"version": "1.7.0", "date": "2026-10-15", "items": [
+    "Bard rebuilt after the Singer addon: song slots from your harp, dummy songs, Marcato before the song you pick, the Clarion Call song, Pianissimo per member, waiting for the party to be in range."
+  ]},
+  {"version": "1.6.0", "date": "2026-10-15", "items": [
+    "Stratagems: one grid - tick which spells get Perpetuance, Accession, Celerity, Penury and the rest.",
+    "Healing: tick which Cure and Curaga tiers are used, and pick the HP amounts from menus."
+  ]},
+  {"version": "1.5.2", "date": "2026-10-15", "items": [
+    "Fixed: the red \"is not defined for strings\" error on Scholars."
+  ]},
+  {"version": "1.5.1", "date": "2026-10-15", "items": [
+    "Fixed: switching a character to Scholar now shows up in the app."
+  ]},
+  {"version": "1.4.0", "date": "2026-10-15", "items": [
+    "New: Scholar stratagems for SCH main job and /SCH - charges by level, a reserve for emergencies, Light / Dark Arts kept up."
+  ]},
+  {"version": "1.3.0", "date": "2026-10-15", "items": [
+    "New: profiles like CurePlease - save a character's whole setup, load it on anyone, or have it load by itself for a job.",
+    "New: thresholds next to every ability, cure tiers, rest / Convert / Sublimation settings."
+  ]},
+  {"version": "1.2.0", "date": "2026-10-15", "items": [
+    "The app installs and updates the Vanguard addon by itself; Team tab with every team order."
+  ]}
+]

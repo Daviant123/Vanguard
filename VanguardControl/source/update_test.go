@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -39,5 +40,23 @@ func TestCheckUpdate(t *testing.T) {
 	updateBase = srv.URL + "/missing/"
 	if v, err := checkUpdate(); err == nil || v != "" {
 		t.Errorf("page not reachable: an error and no update, got %q %v", v, err)
+	}
+}
+
+// The What's new tab must describe the version being built (every update adds its notes).
+func TestWhatsNewMatchesVersion(t *testing.T) {
+	b, err := webFS.ReadFile("web/whatsnew.json")
+	if err != nil {
+		t.Fatalf("whatsnew.json missing: %v", err)
+	}
+	var notes []struct {
+		Version string   `json:"version"`
+		Items   []string `json:"items"`
+	}
+	if err := json.Unmarshal(b, &notes); err != nil || len(notes) == 0 {
+		t.Fatalf("whatsnew.json unreadable: %v", err)
+	}
+	if notes[0].Version != panelVersion || len(notes[0].Items) == 0 {
+		t.Errorf("the first What's new entry is %q; it should describe %s", notes[0].Version, panelVersion)
 	}
 }

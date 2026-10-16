@@ -218,6 +218,12 @@ Settings are now saved safely with several characters running (one character's s
   Got a Terpander / Daurdabla? Just put 3 or 4 songs in the song list.
 - **Horde Lullaby.** With `//vg sleep on`, two or more extra mobs get Horde Lullaby (or Sleepga) at once.
 
+## Session stats and What's new (new in 0.19.0 / Vanguard Control 1.8.0)
+
+- **Session** box on the Team tab: for every character, experience, Capacity Points and limit points per hour,
+  kills, deaths and time, counted from its own game messages. **Reset** starts a new session (`//vg stats reset`).
+- **What's new** tab: what each update added or fixed, in plain words.
+
 ## Scholar stratagems, main job and /SCH (new in 0.15.0 / Vanguard Control 1.4.0)
 
 The **Stratagems** tab appears for any character with Scholar as main or sub job.
