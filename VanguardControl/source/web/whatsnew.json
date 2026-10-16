@@ -1,5 +1,13 @@
 [
   {
+    "version": "1.20.0",
+    "date": "2026-10-16",
+    "items": [
+      "New: keep MP for cures (an idea healer tools like CurePlease share). Healing & MP / Recovery tab: \"Keep MP for cures\" - below that MP the character stops casting buffs, songs, enfeebles and nukes, and saves the rest for Cures, Raise and status removal. Off (0) unless you set it.",
+      "The Vanguard page now says it plainly: Vanguard is free and always will be - no paid features, subscriptions, keys, ads or donations."
+    ]
+  },
+  {
     "version": "1.19.0",
     "date": "2026-10-16",
     "items": [

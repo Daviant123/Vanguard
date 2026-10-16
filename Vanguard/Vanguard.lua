@@ -1,6 +1,6 @@
 _addon.name = 'Vanguard'
 _addon.author = 'Daviant'
-_addon.version = '0.30.0'
+_addon.version = '0.31.0'
 _addon.commands = {'vanguard', 'vg'}
 
 --[[
@@ -95,7 +95,8 @@ local defaults = {
     -- Rest (/heal) when idle and low; stand back up when recovered.
     rest = { hp_low = 40, hp_high = 95, mp_low = 25, mp_high = 95 },
     -- Sublimation upkeep and Convert.
-    mana = { sublimation = true, sublimation_mpp = 70, convert_mpp = 15 },
+    -- reserve: below this MP% only cures / Raise / status removal are cast (0 = off) - MP saved for healing
+    mana = { sublimation = true, sublimation_mpp = 70, convert_mpp = 15, reserve = 0 },
     -- Summon trusts (spell names) until the party has party_size members.
     trusts = { list = '', party_size = 5 },
     -- Farming: target names (partial match), ignore list, claim filter (unclaimed|party|any),
@@ -217,7 +218,27 @@ end
 
 local function mark(key) state.attempts[key] = now() end
 
+-- MP reserve (series 3 round 3): the healing kinds of spells that may still be cast below mana.reserve.
+local KEEP_FOR = { Raise = true, ['Raise II'] = true, ['Raise III'] = true, Arise = true, Erase = true, Esuna = true,
+                   Sacrifice = true }
+local function healing_spell(spell)
+    if KEEP_FOR[spell.en] then return true end
+    if spell.en:find('^Cur') or spell.en:find('na$') then return true end        -- Cure / Curaga / Cura, the -na spells
+    return false
+end
+
 local function cast(spell, target, why)
+    local reserve = tonumber(settings.mana.reserve) or 0
+    if reserve > 0 and (spell.mp_cost or 0) > 0 and not healing_spell(spell) then
+        local p = windower.ffxi.get_player()
+        if p and (p.vitals.mpp or 100) < reserve then
+            if not recently('mp_reserve', 60) then
+                mark('mp_reserve')
+                log(('MP %d%% is under the %d%% kept for cures: %s waits'):format(p.vitals.mpp, reserve, spell.en))
+            end
+            return false
+        end
+    end
     if strat.before_cast(spell, target, why) then return true end      -- a stratagem first; the spell follows
     stop_running()
     windower.send_command(('input /ma "%s" %s'):format(spell.en, target))

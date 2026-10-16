@@ -6,6 +6,8 @@ sing, roll, bubble and enfeeble on their own, and you run them all from one desk
 > Automation tools break Square Enix's terms of service and can get accounts banned. Supervise your characters;
 > don't leave them running unattended.
 
+Vanguard is free and always will be: no paid features, subscriptions, keys, ads or donations.
+
 ## Install (the app does it)
 
 1. Download this page (green **Code** button > **Download ZIP**) and unzip it. Open the **VanguardControl** folder and
@@ -217,6 +219,11 @@ Settings are now saved safely with several characters running (one character's s
   add more lines (e.g. `Sentinel's Scherzo > CharA`). `//vg pianissimo` shows them, `//vg pianissimo clear` empties.
   Got a Terpander / Daurdabla? Just put 3 or 4 songs in the song list.
 - **Horde Lullaby.** With `//vg sleep on`, two or more extra mobs get Horde Lullaby (or Sleepga) at once.
+
+## Keep MP for cures (new in 0.31.0 / Vanguard Control 1.20.0)
+
+Healing & MP (or Recovery) tab: **Keep MP for cures**. Below that MP the character stops casting buffs, songs,
+enfeebles and nukes and saves the rest for Cures, Raise and status removal. 0 = off.
 
 ## Skillchain builder (new in 0.30.0 / Vanguard Control 1.19.0)
 

@@ -915,6 +915,7 @@ function recoveryBox(p) {
       ${slider("...until MP is", "rest.mp_high", rest.mp_high ?? 95, 50, 100, 5)}
       ${slider("Use Sublimation's MP below", "mana.sublimation_mpp", mana.sublimation_mpp ?? 70, 10, 95, 5)}
       ${slider("Convert when MP is below", "mana.convert_mpp", mana.convert_mpp ?? 15, 0, 60, 5)}
+      ${slider("Keep MP for cures: no other spells below (0 = off)", "mana.reserve", mana.reserve ?? 0, 0, 80, 5)}
     </div></div>`;
 }
 
