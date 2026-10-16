@@ -44,6 +44,7 @@ func init() {
 type character struct {
 	Snapshot map[string]any `json:"snapshot"`
 	Profile  map[string]any `json:"profile"`
+	Nearby   map[string]any `json:"nearby,omitempty"` // the last "Look around" answer (mobs near it)
 	LastSeen time.Time      `json:"-"`
 	Online   bool           `json:"online"`
 	addr     *net.UDPAddr
@@ -154,6 +155,13 @@ func (h *hub) listen() {
 			if changed {
 				go h.autoProfile(name, job)
 			}
+		case "nearby":
+			h.mu.Lock()
+			if c, ok := h.chars[name]; ok {
+				c.Nearby = msg
+				c.addr = addr
+			}
+			h.mu.Unlock()
 		case "dump":
 			raw, _ := json.Marshal(msg["data"])
 			h.mu.Lock()

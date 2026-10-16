@@ -1,5 +1,13 @@
 [
   {
+    "version": "1.14.0",
+    "date": "2026-10-16",
+    "items": [
+      "New: pick farm mobs by clicking (like MMOMinion's grind lists). Advanced tab > Farming > Look around lists the mobs near a character - how many, how close, who claimed them - with Fight these / Leave alone buttons. No more typing mob names.",
+      "The farm lists show as tags with an x to remove; a mob is on one list or the other, never both."
+    ]
+  },
+  {
     "version": "1.13.0",
     "date": "2026-10-16",
     "items": [

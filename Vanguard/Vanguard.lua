@@ -1,6 +1,6 @@
 _addon.name = 'Vanguard'
 _addon.author = 'Daviant'
-_addon.version = '0.24.0'
+_addon.version = '0.25.0'
 _addon.commands = {'vanguard', 'vg'}
 
 --[[
@@ -1666,6 +1666,15 @@ windower.register_event('addon command', function(cmd, ...)
         elseif sub == 'clear' then ok = quick.hk_clear(key) end
         if ok then store.save(settings) send_profile() log(('Hotkey %s %s'):format(key, sub == 'set' and 'set' or 'cleared'))
         else log('Hotkey: not changed') end
+    elseif cmd == 'nearby' then
+        -- the app's "Look around": mobs near this character, grouped by name
+        local player = windower.ffxi.get_player()
+        if player then bridge.send({ type = 'nearby', name = player.name, mobs = quick.nearby(50) }) end
+    elseif cmd == 'farmlist' then
+        if quick.farmlist((args[1] or ''):lower(), (args[2] or ''):lower(), table.concat(args, ' ', 3)) then
+            store.save(settings)
+            send_profile()
+        end
     elseif cmd == 'hk' then
         quick.hk_press(windower.ffxi.get_player(), args[1])
     elseif cmd == 'logout' then

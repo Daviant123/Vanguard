@@ -163,6 +163,62 @@ function quick.hk_press(player, key)
     return true
 end
 
+------------------------------------------------------------------------
+-- Mob lists by clicking (series 2 round 7; MMOMinion's grind whitelist / blacklist, filled by picking mobs, not
+-- typing): what's around this character for the app, and adding / removing names on the farm lists.
+------------------------------------------------------------------------
+function quick.nearby(range)
+    range = range or 50
+    local by, me = {}, windower.ffxi.get_mob_by_target('me')
+    local party = {}
+    local p = windower.ffxi.get_party() or {}
+    for _, k in ipairs({ 'p0', 'p1', 'p2', 'p3', 'p4', 'p5' }) do
+        if p[k] and p[k].mob and p[k].mob.id then party[p[k].mob.id] = true end
+    end
+    for _, m in pairs(windower.ffxi.get_mob_array() or {}) do
+        if type(m) == 'table' and m.is_npc and m.spawn_type == 16 and m.name and m.name ~= '' and (m.hpp or 0) > 0
+            and m.valid_target ~= false and util.dist(m) <= range then
+            local e = by[m.name] or { n = m.name, c = 0, d = 999, mine = 0, others = 0 }
+            by[m.name] = e
+            e.c = e.c + 1
+            e.d = math.min(e.d, math.floor(util.dist(m) + 0.5))
+            if m.claim_id and m.claim_id ~= 0 then
+                if party[m.claim_id] then e.mine = e.mine + 1 else e.others = e.others + 1 end
+            end
+        end
+    end
+    local out = {}
+    for _, e in pairs(by) do out[#out + 1] = e end
+    table.sort(out, function(a, b) if a.d ~= b.d then return a.d < b.d end return a.n < b.n end)
+    return out
+end
+
+-- //vg farmlist add|remove targets|ignore <mob name>   |   //vg farmlist clear targets|ignore
+function quick.farmlist(sub, which, name)
+    if which ~= 'targets' and which ~= 'ignore' then return false end
+    if sub == 'clear' then S.farm[which] = '' return true end
+    name = util.trim(name or '')
+    if name == '' or name:find(',') then return false end
+    local out = {}
+    for _, n in ipairs(util.split(S.farm[which] or '', ',')) do
+        if n:lower() ~= name:lower() then out[#out + 1] = n end
+    end
+    if sub == 'add' then
+        out[#out + 1] = name
+        -- a mob is on one list or the other, not both
+        local other = which == 'targets' and 'ignore' or 'targets'
+        local keep = {}
+        for _, n in ipairs(util.split(S.farm[other] or '', ',')) do if n:lower() ~= name:lower() then keep[#keep + 1] = n end end
+        S.farm[other] = table.concat(keep, ',')
+    elseif sub ~= 'remove' then
+        return false
+    end
+    S.farm[which] = table.concat(out, ',')
+    return true
+end
+
+function quick.farm_value(which) return S.farm[which] end
+
 function quick.init(settings, runtime_state, helpers)
     S, state, h = settings, runtime_state, helpers
 end

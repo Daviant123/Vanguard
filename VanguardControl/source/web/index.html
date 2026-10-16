@@ -934,17 +934,41 @@ function geoTab(p) {
   </div>`;
 }
 
+// Farming: mob lists filled by clicking what's around (MMOMinion's grind whitelist / blacklist), and the route.
+function farmBox(p) {
+  const x = (p.config || {}).extra || {}, mods = (p.config || {}).modules || {};
+  const tgt = String(x.farm_targets || "").split(",").map(t => t.trim()).filter(Boolean);
+  const ign = String(x.farm_ignore || "").split(",").map(t => t.trim()).filter(Boolean);
+  const nb = chars[selected] && chars[selected].nearby, mobs = arr(nb && nb.mobs);
+  const chip = (n, list) => `<span class="btag" style="font-size:12px">${esc(n)} <a href="#" style="color:var(--bad);text-decoration:none" title="Remove"
+      onclick="send('farmlist remove ${list} ${esc(n)}');return false">×</a></span>`;
+  const on = (n, list) => list.some(t => lc(t) === lc(n));
+  return `<div class="box"><h3>Farming</h3>
+    <div class="master" style="margin-bottom:8px">${modChk("Farm (find and fight mobs by itself)", mods, "farm")}</div>
+    <div class="row" style="align-items:flex-start;gap:24px">
+      <div><b style="font-size:12px;color:var(--accent)">Fight these</b><div>${tgt.length ? tgt.map(n => chip(n, "targets")).join("") : `<span class="hint">anything (no list)</span>`}</div></div>
+      <div><b style="font-size:12px;color:var(--accent)">Leave alone</b><div>${ign.length ? ign.map(n => chip(n, "ignore")).join("") : `<span class="hint">nothing</span>`}</div></div>
+      <label class="field">Which mobs ${sel("set farm.claim ", [{v: "unclaimed", l: "only unclaimed ones"}, {v: "party", l: "unclaimed or ours"}, {v: "any", l: "any"}], x.farm_claim || "unclaimed")}</label>
+    </div>
+    <div class="row" style="margin-top:10px"><button class="primary" onclick="send('nearby')">Look around</button>
+      <span class="hint">Lists the mobs near ${esc(selected)} - click to add them.${nb ? "" : " Nothing looked at yet."}</span></div>
+    ${mobs.length ? `<table class="grid" style="margin-top:6px"><thead><tr><th>Mob</th><th>How many</th><th>Nearest</th><th>Claimed</th><th></th></tr></thead><tbody>
+      ${mobs.map(m => `<tr><td>${esc(m.n)}</td><td>${m.c}</td><td>${m.d}'</td><td>${m.mine ? `${m.mine} by us` : ""}${m.mine && m.others ? ", " : ""}${m.others ? `${m.others} by others` : ""}${!m.mine && !m.others ? "—" : ""}</td>
+        <td><button ${on(m.n, tgt) ? "disabled" : ""} onclick="send('farmlist add targets ${esc(m.n)}')">Fight these</button>
+            <button ${on(m.n, ign) ? "disabled" : ""} onclick="send('farmlist add ignore ${esc(m.n)}')">Leave alone</button></td></tr>`).join("")}
+    </tbody></table>` : (nb ? `<div class="hint" style="margin-top:6px">No mobs within 50 yalms.</div>` : "")}
+    <div class="row" style="margin-top:10px"><span class="hint">Route:</span>
+      <button onclick="send('route record')">Record route</button>
+      <button onclick="send('route stop')">Stop &amp; save</button>
+      <button onclick="send('route clear')">Clear</button></div>
+  </div>`;
+}
+
 function advTab(p) {
   const mods = (p.config || {}).modules || (chars[selected].snapshot || {}).modules || {};
   return `<div class="stack">
     <div class="box"><h3>All modules</h3><div class="mods">${MODULES.map(m => modChk(m, mods, m)).join("")}</div></div>
-    <div class="box"><h3>Farming</h3><div class="row">
-      <button onclick="send('route record')">Record route</button>
-      <button onclick="send('route stop')">Stop &amp; save</button>
-      <button onclick="send('route clear')">Clear</button>
-      <input type="text" id="farmtargets" placeholder="Farm targets: mob names, comma separated">
-      <button onclick="const v=$('farmtargets').value.trim(); if(v) send('set farm.targets ' + v)">Set</button>
-    </div></div>
+    ${farmBox(p)}
     <div class="box"><h3>Command</h3><div class="row">
       <select id="cmdtarget"><option value="sel">${esc(selected)}</option><option value="*">All characters</option></select>
       <input type="text" id="cmd" placeholder="Same as //vg … e.g. trigger add hpp<35 -> input /ja &quot;Sentinel&quot; <me> | 60" onkeydown="if(event.key==='Enter')sendCmd()">
@@ -1040,7 +1064,7 @@ function renderPanel() {
     (chars[n].snapshot || {}).retreat, (chars[n].snapshot || {}).defense, (chars[n].snapshot || {}).leader,
     (chars[n].snapshot || {}).stats, chars[n].online, (chars[n].snapshot || {}).buffs, (chars[n].snapshot || {}).hpp,
     (chars[n].snapshot || {}).mpp, (chars[n].snapshot || {}).tp, (chars[n].snapshot || {}).status, (chars[n].snapshot || {}).target]) : 0;
-  const bk = JSON.stringify([tab, p, s.leader, Object.keys(chars), team, tab === "app" ? addon : 0, tab === "strat" ? s.strat : 0,
+  const bk = JSON.stringify([tab, p, s.leader, Object.keys(chars), team, tab === "app" ? addon : 0, tab === "strat" ? s.strat : 0, tab === "adv" ? c.nearby : 0,
     tab === "team" ? [stopTimer.until, Math.floor((stopTimer.left || 0) / 60)] : 0]);
   if (bk === bodyKey) return;
   bodyKey = bk;

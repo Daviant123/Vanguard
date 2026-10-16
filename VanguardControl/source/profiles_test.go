@@ -167,3 +167,16 @@ func TestBigMessageInParts(t *testing.T) {
 		t.Fatalf("a profile sent in %d parts should arrive whole", len(msgs))
 	}
 }
+
+func TestNearbyKept(t *testing.T) {
+	h := testHub(t)
+	conn, _ := fakeChar(t, h, "CharB", "WHM", nil)
+	msg, _ := json.Marshal(map[string]any{"type": "nearby", "name": "CharB", "mobs": []any{map[string]any{"n": "Apex Bat", "c": 2, "d": 5}}})
+	conn.WriteToUDP(msg, h.conn.LocalAddr().(*net.UDPAddr))
+	time.Sleep(200 * time.Millisecond)
+	rec := httptest.NewRecorder()
+	h.handleState(rec, httptest.NewRequest("GET", "/api/state", nil))
+	if !strings.Contains(rec.Body.String(), `"nearby":{`) || !strings.Contains(rec.Body.String(), "Apex Bat") {
+		t.Errorf("the Look around answer should reach the panel, got %.300s", rec.Body.String())
+	}
+}

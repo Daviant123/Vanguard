@@ -218,6 +218,12 @@ Settings are now saved safely with several characters running (one character's s
   Got a Terpander / Daurdabla? Just put 3 or 4 songs in the song list.
 - **Horde Lullaby.** With `//vg sleep on`, two or more extra mobs get Horde Lullaby (or Sleepga) at once.
 
+## Farm mob lists by clicking (new in 0.25.0 / Vanguard Control 1.14.0)
+
+Advanced tab > Farming > **Look around** lists the mobs near the selected character (how many, how close, who
+claimed them). Click **Fight these** or **Leave alone**; the lists show as tags with an x to remove. "Which mobs"
+picks unclaimed only, unclaimed or ours, or any.
+
 ## Quick-button hotkeys (new in 0.24.0 / Vanguard Control 1.13.0)
 
 Give any quick button a hotkey (Ctrl or Alt + a number) from its menu on the Team tab. Press it in the game window you

@@ -220,6 +220,8 @@ function menu.extra(settings)
         disengage = settings.assist.disengage, defend = settings.assist.defend, autotarget = settings.assist.autotarget,
         setups = setups,
         strat = settings.strat,
+        farm_targets = settings.farm.targets, farm_ignore = settings.farm.ignore,
+        farm_claim = settings.farm.claim,
     }
 end
 
