@@ -237,6 +237,7 @@ function tabsFor(p) {
   if (arr(m.songs).length) t.push({id: "songs", label: "Songs", n: arr(cfg.songs).length});
   if (arr(m.indi).length || arr(m.geo).length) t.push({id: "geo", label: "Geomancy"});
   if ((cfg.strat_info || {}).max > 0) t.push({id: "strat", label: "Stratagems"});
+  t.push({id: "farm", label: "Farming", n: ((chars[selected] || {}).snapshot || {}).modules?.farm ? "on" : 0});
   t.push({id: "adv", label: "Advanced"});
   t.push({id: "app", label: "App & updates"});
   t.push({id: "news", label: "What's new", n: newsUnseen() ? "new" : 0});
@@ -254,6 +255,7 @@ function jobTab(c, p) {
       <label class="field">Weapon skill ${sel("ws ", [{v: "", l: "None"}].concat(arr(p.ws_list).map(w => ({v: w, l: w}))), p.ws)}</label>
       <label class="field">Follow / assist ${sel("leader ", [{v: "", l: "Nobody (I lead)"}].concat(others.map(n => ({v: n, l: n}))), s.leader || "", "none")}</label>
     </div>
+    ${finishBox(p)}
     ${acts.length ? `<div class="box"><h3>Abilities, in priority order: the top one is tried first <button style="float:right;font-size:11px" onclick="send('actmove reset')">Reset order</button></h3>
       ${acts.map((a, i) => `<div class="act"><span class="hint" style="width:20px;text-align:right">${i + 1}</span>
         <span style="display:inline-flex;gap:2px"><button title="Move up" ${i ? "" : "disabled"} onclick="send('actmove ${esc(a.id)} up')">▲</button><button title="Move down" ${i < acts.length - 1 ? "" : "disabled"} onclick="send('actmove ${esc(a.id)} down')">▼</button><button title="Move to the top" ${i ? "" : "disabled"} onclick="send('actmove ${esc(a.id)} top')">⤒</button></span>
@@ -367,6 +369,7 @@ function teamTab(c, p) {
     <div class="hint">Orders go to the leader (<b>${esc(L || "nobody yet")}</b>), who passes them to everyone. Switches marked "everyone" are set on every character.</div>
     ${foeBox()}
     ${boardBox()}
+    <div class="box" id="cdbox" style="display:none"></div>
     ${timerBox()}
     ${statsBox()}
     ${scBox()}
@@ -698,6 +701,36 @@ function scSave() {
 }
 
 // ---------- Upkeep: food, Reraise and mount per character, from what each one really has ----------
+// ---------- Cooldowns: every character's job abilities, time until ready, click a ready one to use it ----------
+// Drawn into its own box every poll (not part of the Team tab redraw), so menus stay open while the timers tick.
+let cdOnlyLong = true;
+let cdMax = {};        // the longest wait seen per "Name|Ability" - tells which abilities have long recasts (kept in this browser)
+try { cdMax = JSON.parse(localStorage.getItem("vg_cdmax") || "{}") || {}; } catch (e) {}
+let cdLast = "", cdSaved = "";
+function fmtLeft(s) { s = Math.max(0, Math.round(s)); return s >= 3600 ? `${Math.floor(s / 3600)}:${String(Math.floor(s / 60) % 60).padStart(2, "0")}h` : `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`; }
+function renderCooldowns() {
+  const box = $("cdbox"); if (!box) return;
+  const names = Object.keys(chars).sort().filter(n => chars[n].online && arr((chars[n].snapshot || {}).cd).length);
+  box.style.display = names.length ? "" : "none";
+  if (!names.length) return;
+  if (document.activeElement && box.contains(document.activeElement) && document.activeElement.tagName === "SELECT") return;
+  const rows = names.map(n => {
+    let list = arr(chars[n].snapshot.cd);
+    for (const c of list) { const k = n + "|" + c.n; cdMax[k] = Math.max(cdMax[k] || 0, c.s); }
+    if (cdOnlyLong) list = list.filter(c => c.sp || (cdMax[n + "|" + c.n] || 0) >= 60);
+    const chips = list.map(c => c.s > 0
+      ? `<span class="btag" title="${esc(c.n)}: ready in ${fmtLeft(c.s)}">${esc(c.n)} ${fmtLeft(c.s)}</span>`
+      : `<span class="btag landed" style="cursor:pointer" title="Click: ${esc(n)} uses ${esc(c.n)}${c.t === "bt" ? " on its target" : ""}" onclick="post('${esc(n)}', 'act ja ${c.t} ${esc(c.n)}')">${esc(c.n)}</span>`).join("");
+    return `<tr><td><b>${esc(n)}</b></td><td style="text-align:left">${chips || `<span class="hint">${cdOnlyLong ? "no long cooldowns used yet" : "none"}</span>`}</td></tr>`;
+  }).join("");
+  const html = `<h3>Cooldowns</h3>
+    <table class="grid board"><thead><tr><th>Character</th><th style="text-align:left">Job abilities (green = ready: click to use it, grey = time left)</th></tr></thead><tbody>${rows}</tbody></table>
+    <div class="row" style="margin-top:6px"><label class="chk"><input type="checkbox" ${cdOnlyLong ? "checked" : ""} onchange="cdOnlyLong=this.checked;renderCooldowns()"> Only the long ones (1-hour abilities, and any that waited a minute or more once used)</label></div>`;
+  if (html !== cdLast || !box.innerHTML) { cdLast = html; box.innerHTML = html; }
+  const saved = JSON.stringify(cdMax);
+  if (saved !== cdSaved) { cdSaved = saved; try { localStorage.setItem("vg_cdmax", saved); } catch (e) {} }
+}
+
 // ---------- Go home: everyone warps with the best way it has (vg_warp) ----------
 let warpArm = "", warpArmT = 0;
 function homeBox() {
@@ -1267,33 +1300,119 @@ function rxAdd() {
   send("triggers on");
 }
 
-// Farming: mob lists filled by clicking what's around (MMOMinion's grind whitelist / blacklist), and the route.
-function farmBox(p) {
-  const x = (p.config || {}).extra || {}, mods = (p.config || {}).modules || {};
+// ---------- Finishing weapon skill: the killing blow is a set weapon skill (trials like "kill it with Atonement") ----------
+function finishBox(p) {
+  const x = (p.config || {}).extra || {}, wl = arr(p.ws_list), f = x.ws_finish || "";
+  const pct = [5, 10, 15, 20, 25, 30, 40, 50].map(v => ({v, l: v + "%"}));
+  return `<div class="box"><h3>Finish mobs with a weapon skill</h3>
+    <div class="row" style="align-items:flex-end">
+      <label class="field">Finish with ${sel("finish ", [{v: "none", l: "Off"}].concat(wl.map(w => ({v: w, l: w}))), f || "none")}</label>
+      ${f ? `<label class="field">when its HP is at or under ${sel("set ws.finish_at ", pct, x.ws_finish_at ?? 25)}</label>` : ""}
+    </div>
+    ${f ? `<div class="row" style="margin-top:8px;flex-wrap:wrap;gap:6px 18px">
+      ${chk("Save TP for it (no other weapon skill)", x.ws_finish_save !== false, "set ws.finish_save true", "set ws.finish_save false")}
+      ${chk("The other characters stop attacking it then", x.ws_finish_others !== false, "set ws.finish_others true", "set ws.finish_others false")}
+      ${chk("If it gets low before TP is ready, stop attacking until TP is 1000", !!x.ws_finish_wait, "set ws.finish_wait true", "set ws.finish_wait false")}
+    </div>
+    <div class="hint" style="margin-top:6px">For trials that need a set weapon skill to land the kill (e.g. Atonement). The other characters keep
+      curing and buffing while they wait. "Stop attacking" helps a tank: it still gains TP from being hit, then attacks again and finishes it.</div>`
+    : `<div class="hint" style="margin-top:4px">Pick a weapon skill to make sure it lands the killing blow (e.g. for a weapon skill trial).</div>`}</div>`;
+}
+
+// ---------- Farming tab: EasyFarm-style, in three steps, all clicks ----------
+function farmTab(c, p) {
+  const s = c.snapshot || {}, x = (p.config || {}).extra || {}, mods = (p.config || {}).modules || s.modules || {};
+  const known = (p.config || {}).known || {};
   const tgt = String(x.farm_targets || "").split(",").map(t => t.trim()).filter(Boolean);
   const ign = String(x.farm_ignore || "").split(",").map(t => t.trim()).filter(Boolean);
-  const nb = chars[selected] && chars[selected].nearby, mobs = arr(nb && nb.mobs);
+  const nb = c.nearby, mobs = arr(nb && nb.mobs);
+  const on = (n, list) => list.some(t => lc(t) === lc(n));
+  const farming = !!mods.farm && s.enabled;
+  const f = s.farm || {}, st = s.stats || {};
   const chip = (n, list) => `<span class="btag" style="font-size:12px">${esc(n)} <a href="#" style="color:var(--bad);text-decoration:none" title="Remove"
       onclick="send('farmlist remove ${list} ${esc(n)}');return false">×</a></span>`;
-  const on = (n, list) => list.some(t => lc(t) === lc(n));
-  return `<div class="box"><h3>Farming</h3>
-    <div class="master" style="margin-bottom:8px">${modChk("Farm (find and fight mobs by itself)", mods, "farm")}</div>
-    <div class="row" style="align-items:flex-start;gap:24px">
-      <div><b style="font-size:12px;color:var(--accent)">Fight these</b><div>${tgt.length ? tgt.map(n => chip(n, "targets")).join("") : `<span class="hint">anything (no list)</span>`}</div></div>
-      <div><b style="font-size:12px;color:var(--accent)">Leave alone</b><div>${ign.length ? ign.map(n => chip(n, "ignore")).join("") : `<span class="hint">nothing</span>`}</div></div>
-      <label class="field">Which mobs ${sel("set farm.claim ", [{v: "unclaimed", l: "only unclaimed ones"}, {v: "party", l: "unclaimed or ours"}, {v: "any", l: "any"}], x.farm_claim || "unclaimed")}</label>
-    </div>
-    <div class="row" style="margin-top:10px"><button class="primary" onclick="send('nearby')">Look around</button>
-      <span class="hint">Lists the mobs near ${esc(selected)} - click to add them.${nb ? "" : " Nothing looked at yet."}</span></div>
-    ${mobs.length ? `<table class="grid" style="margin-top:6px"><thead><tr><th>Mob</th><th>How many</th><th>Nearest</th><th>Claimed</th><th></th></tr></thead><tbody>
-      ${mobs.map(m => `<tr><td>${esc(m.n)}</td><td>${m.c}</td><td>${m.d}'</td><td>${m.mine ? `${m.mine} by us` : ""}${m.mine && m.others ? ", " : ""}${m.others ? `${m.others} by others` : ""}${!m.mine && !m.others ? "—" : ""}</td>
-        <td><button ${on(m.n, tgt) ? "disabled" : ""} onclick="send('farmlist add targets ${esc(m.n)}')">Fight these</button>
-            <button ${on(m.n, ign) ? "disabled" : ""} onclick="send('farmlist add ignore ${esc(m.n)}')">Leave alone</button></td></tr>`).join("")}
-    </tbody></table>` : (nb ? `<div class="hint" style="margin-top:6px">No mobs within 50 yalms.</div>` : "")}
-    <div class="row" style="margin-top:10px"><span class="hint">Route:</span>
-      <button onclick="send('route record')">Record route</button>
-      <button onclick="send('route stop')">Stop &amp; save</button>
-      <button onclick="send('route clear')">Clear</button></div>
+  const step = (n, title, body) => `<div class="box"><h3><span class="pill on" style="margin-right:6px">${n}</span>${title}</h3>${body}</div>`;
+  // how to pull: what this character can actually use, the usual pullers first
+  const PULLERS = ["Provoke", "Flash", "Dia", "Dia II", "Bio", "Stone", "Animated Flourish", "Jump", "Sleep", "Foe Lullaby", "Light Shot"];
+  const ab = arr(known.abilities), sp = arr(known.spells);
+  const pullOpts = [{v: "none", l: "Walk up and attack"}, {v: "ra", l: "Ranged attack"}]
+    .concat(PULLERS.filter(n => ab.includes(n)).map(n => ({v: "ja " + n, l: n})))
+    .concat(PULLERS.filter(n => sp.includes(n)).map(n => ({v: "ma " + n, l: n})));
+  const pc = String(x.farm_pull || ""), pm = pc.match(/^input \/(ja|ma) "(.+)" <t>$/);
+  const pullCur = !pc ? "none" : pc === "input /ra <t>" ? "ra" : pm ? pm[1] + " " + pm[2] : "custom";
+  if (pullCur === "custom") pullOpts.push({v: "custom", l: pc});
+  if (pm && !pullOpts.some(o => o.v === pullCur)) pullOpts.push({v: pullCur, l: pm[2]});
+  const route = f.rec != null ? f.rec : (x.farm_route || 0);
+  const nums = (list, unit) => list.map(v => ({v, l: v + unit}));
+
+  return `<div class="stack">
+    <div class="box" style="border-color:${farming ? "var(--good)" : "var(--line)"}">
+      <div class="row" style="align-items:center">
+        ${farming ? `<button class="stop" style="font-size:15px;padding:8px 18px" onclick="send('farming stop')">Stop farming</button>`
+          : `<button class="go" style="font-size:15px;padding:8px 18px" ${tgt.length ? "" : "disabled title='Pick at least one mob in step 1'"} onclick="send('farming start')">Start farming</button>`}
+        <div><b>${farming ? esc(cap(f.status || "starting")) : tgt.length ? "Ready - click Start farming" : "Pick what to fight in step 1"}</b>
+          <div class="hint">${esc(selected)}${st.kills != null ? ` · ${st.kills} kills, ${fmtN(st.exp || 0)} XP this session` : ""}</div></div>
+      </div>
+      <div class="hint" style="margin-top:6px">Start farming turns on everything it needs (fighting, weapon skills, abilities, resting) for ${esc(selected)}.
+        Your other characters keep following and assisting it as usual.</div></div>
+
+    ${step(1, "What to fight", `
+      <div class="row"><button class="primary" onclick="send('nearby')">Look around</button>
+        <span class="hint">Lists the mobs near ${esc(selected)}. Click <b>Fight these</b> on the ones to farm.${nb ? "" : " Nothing looked at yet."}</span></div>
+      ${mobs.length ? `<table class="grid" style="margin-top:6px"><thead><tr><th style="text-align:left">Mob</th><th>How many</th><th>Nearest</th><th>Claimed</th><th></th></tr></thead><tbody>
+        ${mobs.map(m => `<tr><td style="text-align:left">${esc(m.n)}</td><td>${m.c}</td><td>${m.d}'</td><td>${m.mine ? `${m.mine} by us` : ""}${m.mine && m.others ? ", " : ""}${m.others ? `${m.others} by others` : ""}${!m.mine && !m.others ? "—" : ""}</td>
+          <td><button class="${on(m.n, tgt) ? "" : "primary"}" ${on(m.n, tgt) ? "disabled" : ""} onclick="send('farmlist add targets ${esc(m.n)}')">${on(m.n, tgt) ? "Fighting these" : "Fight these"}</button>
+              <button ${on(m.n, ign) ? "disabled" : ""} onclick="send('farmlist add ignore ${esc(m.n)}')">Leave alone</button></td></tr>`).join("")}
+      </tbody></table>` : (nb ? `<div class="hint" style="margin-top:6px">No mobs within 50 yalms. Move closer and look again.</div>` : "")}
+      <div class="row" style="align-items:flex-start;gap:24px;margin-top:10px">
+        <div><b style="font-size:12px;color:var(--accent)">Fight these</b><div>${tgt.length ? tgt.map(n => chip(n, "targets")).join("") : `<span class="hint" style="color:var(--bad)">none picked yet</span>`}</div></div>
+        <div><b style="font-size:12px;color:var(--accent)">Leave alone</b><div>${ign.length ? ign.map(n => chip(n, "ignore")).join("") : `<span class="hint">nothing</span>`}</div></div>
+      </div>
+      <div class="row" style="margin-top:8px">
+        <label class="field">Which ones ${sel("set farm.claim ", [{v: "unclaimed", l: "Only unclaimed ones"}, {v: "party", l: "Only ones we already claimed"}, {v: "any", l: "Any (even other players')"}], x.farm_claim || "unclaimed")}</label>
+        ${chk("Fight mobs that attack us first", x.farm_aggro !== false, "set farm.aggro_first true", "set farm.aggro_first false")}
+      </div>`)}
+
+    ${step(2, "Where", `
+      <div class="row">
+        <label class="field">Look for mobs within ${sel("set farm.range ", nums([10, 15, 20, 25, 30, 40, 50], " yalms"), x.farm_range ?? 20)}</label>
+        <label class="field">Up or down at most ${sel("set farm.height ", nums([3, 5, 8, 12, 20], " yalms"), x.farm_height ?? 5)}</label>
+      </div>
+      <div class="row" style="margin-top:10px;align-items:center">
+        <b style="font-size:12px">Route</b>
+        ${f.rec != null ? `<span class="pill warn">Recording: ${route} points - walk your path</span><button class="primary" onclick="send('route stop')">Stop &amp; save</button>`
+          : `<span class="hint">${route ? `${route} points saved` : "None: it stays where it is and waits for mobs to come near."}</span>
+             <button onclick="send('route record')">${route ? "Record a new route" : "Record a route"}</button>
+             ${route ? `<button onclick="send('route clear')">Clear the route</button>` : ""}`}
+      </div>
+      ${route && f.rec == null ? `<div class="row" style="margin-top:6px">${sel("set farm.loop ", [{v: "true", l: "Go round in a loop"}, {v: "false", l: "Walk there and back"}], x.farm_loop === false ? "false" : "true")}
+        <span class="hint">When nothing is in range it walks the route until it finds something.</span></div>` : ""}
+      <div class="hint" style="margin-top:6px">Recording: click Record a route, walk the path in game, then Stop &amp; save.</div>`)}
+
+    ${step(3, "How", `
+      <div class="row">
+        <label class="field">Pull with ${sel("farmpull ", pullOpts, pullCur)}</label>
+        <label class="field">Rest when HP is under ${sel("set rest.hp_low ", nums([0, 20, 30, 40, 50, 60], "%"), x.rest_hp_low ?? 40)}</label>
+        <label class="field">...or MP is under ${sel("set rest.mp_low ", nums([0, 10, 20, 25, 30, 40, 50], "%"), x.rest_mp_low ?? 25)}</label>
+      </div>
+      <div class="row" style="margin-top:6px">${chk("Walk up to the mob before attacking", x.farm_approach !== false, "set farm.approach true", "set farm.approach false")}</div>
+      <div class="hint" style="margin-top:6px">It rests (/heal) between fights and gets up when it's full again. Weapon skill and abilities come from the
+        Job &amp; abilities tab; food and Reraise from Upkeep on the Team tab.</div>`)}
+
+    ${finishBox(p)}
+    ${step(4, "Trusts (optional)", (() => {
+      const picked = String(x.trusts_list || "").split(",").map(t => t.trim()).filter(Boolean);
+      const avail = arr(known.trusts).filter(t => !picked.some(q => lc(q) === lc(t))).sort();
+      return `<div class="row" style="align-items:flex-start;gap:18px">
+          <div><b style="font-size:12px;color:var(--accent)">Call these</b><div>${picked.length ? picked.map(n => `<span class="btag" style="font-size:12px">${esc(n)}
+            <a href="#" style="color:var(--bad);text-decoration:none" title="Remove" onclick="send('trustlist remove ${esc(n)}');return false">×</a></span>`).join("")
+            : `<span class="hint">none</span>`}</div></div>
+          <label class="field">until the party has ${sel("set trusts.party_size ", nums([2, 3, 4, 5, 6], " members"), x.trusts_size ?? 5)}</label>
+        </div>
+        ${avail.length ? `<div class="row" style="margin-top:8px">${sel("trustlist add ", [{v: "", l: "+ Add a trust..."}].concat(avail.map(n => ({v: n, l: n}))), "")}</div>`
+          : `<div class="hint" style="margin-top:6px">${arr(known.trusts).length ? "All its trusts are picked." : "No trusts known by this character (or Vanguard hasn't listed them yet)."}</div>`}
+        <div class="hint" style="margin-top:6px">Between fights it calls the missing ones; Start farming turns this on when any are picked.</div>`;
+    })())}
   </div>`;
 }
 
@@ -1302,7 +1421,8 @@ function advTab(p) {
   return `<div class="stack">
     <div class="box"><h3>All modules</h3><div class="mods">${MODULES.map(m => modChk(m, mods, m)).join("")}</div></div>
     ${reactBox(p)}
-    ${farmBox(p)}
+    <div class="box"><h3>Farming</h3><div class="row"><span class="hint">Farming has its own tab now.</span>
+      <button onclick="setTab('farm')">Open Farming</button></div></div>
     <div class="box"><h3>Command</h3><div class="row">
       <select id="cmdtarget"><option value="sel">${esc(selected)}</option><option value="*">All characters</option></select>
       <input type="text" id="cmd" placeholder="Same as //vg … e.g. trigger add hpp<35 -> input /ja &quot;Sentinel&quot; <me> | 60" onkeydown="if(event.key==='Enter')sendCmd()">
@@ -1411,13 +1531,14 @@ function renderPanel() {
     (chars[n].snapshot || {}).stats, chars[n].online, (chars[n].snapshot || {}).buffs, (chars[n].snapshot || {}).hpp,
     (chars[n].snapshot || {}).mpp, (chars[n].snapshot || {}).tp, (chars[n].snapshot || {}).status, (chars[n].snapshot || {}).target,
     (chars[n].snapshot || {}).foe]) : 0;
-  const bk = JSON.stringify([tab, p, s.leader, Object.keys(chars), team, tab === "app" ? [addon, crashes] : 0, tab === "strat" ? s.strat : 0, tab === "adv" ? c.nearby : 0,
+  const bk = JSON.stringify([tab, p, s.leader, Object.keys(chars), team, tab === "app" ? [addon, crashes] : 0, tab === "strat" ? s.strat : 0, tab === "adv" || tab === "farm" ? c.nearby : 0,
+    tab === "farm" ? [s.farm, s.enabled, s.stats, s.modules, s.status] : 0,
     tab === "team" ? [warpArm, Object.keys(chars).map(n => ((((chars[n].profile || {}).config || {}).known) || {}).warp), stopTimer.until, Math.floor((stopTimer.left || 0) / 60)] : 0]);
   if (bk === bodyKey) return;
   bodyKey = bk;
   const fn = {job: () => jobTab(c, p), heal: () => healTab(p), buffs: () => buffsTab(p), debuffs: () => debuffsTab(p),
               songs: () => songsTab(p), geo: () => geoTab(p), adv: () => advTab(p), team: () => teamTab(c, p),
-              app: () => appTab(), strat: () => stratTab(c, p), news: () => newsTab()}[tab];
+              app: () => appTab(), strat: () => stratTab(c, p), news: () => newsTab(), farm: () => farmTab(c, p)}[tab];
   $("tabbody").innerHTML = fn();
 }
 
@@ -1426,6 +1547,7 @@ function render() {
   if (names.length && !selected) selected = names[0];
   renderList();
   renderPanel();
+  renderCooldowns();
   const online = names.filter(n => chars[n].online).length;
   const as = $("autostart"), on = names.filter(n => chars[n].online);
   if (as && document.activeElement !== as) {
@@ -1435,9 +1557,12 @@ function render() {
   $("status").textContent = names.length ? `${online} of ${names.length} character(s) online` : "Waiting for characters…";
 }
 
+let pageVersion = "";
 async function poll() {
   try {
     const d = await (await fetch("/api/state?since=" + since)).json();
+    // the app updated itself and restarted behind this window: load the new page
+    if (d.version) { if (pageVersion && d.version !== pageVersion) { location.reload(); return; } pageVersion = d.version; }
     chars = d.chars || {};
     const log = $("log"), atBottom = log.scrollTop + log.clientHeight >= log.scrollHeight - 4;
     for (const l of d.logs) {

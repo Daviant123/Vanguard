@@ -1,6 +1,6 @@
 _addon.name = 'Vanguard'
 _addon.author = 'Daviant'
-_addon.version = '0.33.1'
+_addon.version = '0.35.0'
 _addon.commands = {'vanguard', 'vg'}
 
 --[[
@@ -50,6 +50,7 @@ local bard = require('vg_bard')
 local stats = require('vg_stats')
 local crash = require('vg_crash')
 local warp = require('vg_warp')
+local finish = require('vg_finish')
 crash.init(bridge)
 -- Every event handler below runs guarded: an error becomes a crash report instead of red text (vg_crash).
 do
@@ -106,7 +107,9 @@ local defaults = {
              height = 5, approach = true, pull_cmd = '', route = '', loop = true },
     -- "Spell>target" pairs. target = me or a party member name. "ja:" prefix = job ability.
     buffs = { list = '' },
-    ws = { name = '', tp = 1000, min_mob_hpp = 1, max_range = 6 },
+    -- finish*: the weapon skill that lands the kill (vg_finish): at mob HP% finish_at, saving TP, others stop attacking
+    ws = { name = '', tp = 1000, min_mob_hpp = 1, max_range = 6,
+           finish = '', finish_at = 25, finish_save = true, finish_others = true, finish_wait = false },
     -- Ordered chain steps "Character:Weapon Skill". Each character only fires its own steps.
     sc = { steps = '', open_tp = 1000, window_min = 3, window_max = 8 },
     -- "Element:Spell|Fallback|Fallback" pairs.
@@ -165,7 +168,12 @@ local defaults = {
 
 local settings = config.load(defaults)
 -- Running or not is decided now, not by whatever was saved last time: only Auto start starts it by itself.
+-- Windower's config library re-reads settings.xml right after loading and again at login (bringing back a saved
+-- <enabled>true</enabled> - why CharB kept showing "running" with Auto start off), so it's applied again then.
 settings.enabled = settings.autostart == true
+if type(config.register) == 'function' then
+    config.register(settings, function() settings.enabled = settings.autostart == true end)
+end
 
 ------------------------------------------------------------------------
 -- Runtime state
@@ -663,14 +671,17 @@ local function do_skillchain(player)
 end
 
 local function do_ws(player)
-    if not settings.modules.ws or settings.ws.name == '' or player.status ~= 1 or amnesia(player) then return false end
+    if not settings.modules.ws or player.status ~= 1 or amnesia(player) then return false end
+    local t = windower.ffxi.get_mob_by_target('t')
+    local fin = finish.ws(player, t)                                  -- the finishing weapon skill comes first
+    if fin == 'used' then return true elseif fin == 'block' then return false end
+    if settings.ws.name == '' then return false end
     if settings.modules.sc then
         for _, s in ipairs(sc_steps()) do
             if s.who == player.name:lower() then return false end   -- chain owns our TP
         end
     end
     if player.vitals.tp < settings.ws.tp or recently('ws:' .. settings.ws.name, 3) then return false end
-    local t = windower.ffxi.get_mob_by_target('t')
     if not ws_in_range(t) then return false end
     return use_ws(settings.ws.name)
 end
@@ -979,22 +990,37 @@ local function do_pull(player)
     return false
 end
 
+-- What farming is doing right now, in plain words for the app's Farming tab.
+local function farm_status(s) state.farm_status = s end
+
 local function do_farm(player)
-    if not settings.modules.farm then return false end
+    if not settings.modules.farm then state.farm_status = nil return false end
     state.route_moving = false
-    if player.status == 1 then return false end
-    if player.status ~= 0 or state.resting or party_engaged(player) then return false end
+    if player.status == 1 then
+        local t = windower.ffxi.get_mob_by_target('t')
+        farm_status('fighting ' .. (t and t.name or 'a mob'))
+        return false
+    end
+    if not settings.enabled then farm_status('stopped') return false end
+    if state.resting or player.status == 33 then farm_status('resting') return false end
+    if player.status ~= 0 then farm_status('waiting') return false end
+    if party_engaged(player) then farm_status('helping the party fight') return false end
+    if #util.split(settings.farm.targets, ',') == 0 then farm_status('no mobs picked yet: pick what to fight') return false end
 
     local me = windower.ffxi.get_mob_by_target('me')
     if not me then return false end
     local mob = find_farm_target(me)
-    if mob then return farm_engage(me, mob) end
+    if mob then
+        farm_status(('going for %s (%d yalms)'):format(mob.name, math.floor(util.dist(mob) + 0.5)))
+        return farm_engage(me, mob)
+    end
     state.farm_try, state.farm_close = nil, nil
 
     -- Nothing in range: walk the route.
     state.route = state.route or parse_route()
     local pts = state.route
-    if #pts == 0 then return false end
+    if #pts == 0 then farm_status('waiting for a mob to come within ' .. settings.farm.range .. ' yalms') return false end
+    farm_status(('walking the route, looking for mobs (point %d of %d)'):format(math.min(state.wp, #pts), #pts))
     if state.wp > #pts or state.wp < 1 then state.wp = 1 end
     local wp = pts[state.wp]
     local dx, dy = wp.x - me.x, wp.y - me.y
@@ -1217,6 +1243,7 @@ local function ja_ready(name)
 end
 quick.init(settings, state, { log = log })
 warp.init(settings, state, { log = log })
+finish.init(settings, state, { log = log, use_ws = use_ws, ws_in_range = ws_in_range, recently = recently, mark = mark })
 bard.init(settings, state, {
     log = log, recently = recently, mark = mark, try_cast = try_cast, use_ja = use_ja, amnesia = amnesia,
     party_members = party_members, ja_ready = ja_ready,
@@ -1297,6 +1324,19 @@ local function tick()
     local ctx = make_ctx(player)
     local pr = state.profile
 
+    if settings.modules.farm and player.status == 1 then   -- (abilities run first in a fight, so say it here)
+        local t = windower.ffxi.get_mob_by_target('t')
+        farm_status('fighting ' .. (t and t.name or 'a mob'))
+    elseif settings.modules.farm then
+        farm_status('getting ready first (cures, buffs, abilities)')   -- do_farm says more once it gets its turn
+    end
+    -- A mob being finished with a set weapon skill (vg_finish): the others leave it alone, the finisher waits for TP.
+    -- Only curing, buffing and songs then.
+    if finish.held(player) or finish.waiting(player) then
+        local _ = do_raise(player) or do_heal(player) or do_status(player) or do_geo(player) or do_songs(player)
+            or do_buffs(player)
+        return
+    end
     local _ = do_raise(player) or do_heal(player) or do_status(player) or strat.arts(player) or mages.crowd(player)
         or do_assist(player) or do_pull(player) or support.double_up(ctx, engine) or mages.bar(player)
         or engine.run(ctx, pr, pre_ws_filter) or do_skillchain(player) or do_ws(player)
@@ -1467,6 +1507,8 @@ windower.register_event('ipc message', function(msg)
     if not player then return end
     local to, from, text = msg:match('^vg_alert (%S+) ([^|]+)|(.+)$')
     if to then alts.on_alert(player, to, from, text) return end
+    local fmob, ffrom = msg:match('^vg_finish (%d+) (%S+)$')
+    if fmob then finish.on_ipc(fmob, ffrom) return end
     local dmob, dspell, dwhat = msg:match('^vg_debuff (%d+) (.+) (%a+)$')
     if dmob then share.on_debuff(tonumber(dmob), dspell, dwhat) return end
     local cfrom, ctarget, csecs = msg:match('^vg_cure (%S+) (%S+) (%d+)$')
@@ -1904,6 +1946,48 @@ windower.register_event('addon command', function(cmd, ...)
     elseif cmd == 'autosetup' or cmd == 'reset' then
         load_profile(nil, cmd == 'reset')
         save_profile()
+    elseif cmd == 'farming' then
+        -- The app's Start / Stop farming: everything farming needs in one click.
+        local sub = (args[1] or ''):lower()
+        if sub == 'start' then
+            for _, m in ipairs({ 'farm', 'ws', 'rest', 'actions' }) do settings.modules[m] = true end
+            if settings.trusts.list ~= '' then settings.modules.trusts = true end
+            settings.enabled = true
+            if #util.split(settings.farm.targets, ',') == 0 then log('Farming on, but no mobs are picked yet: pick what to fight') else log('Farming started') end
+        elseif sub == 'stop' then
+            settings.modules.farm, settings.enabled = false, false
+            stop_running()
+            log('Farming stopped')
+        end
+        store.save(settings) send_profile()
+    elseif cmd == 'finish' then
+        -- the app's "Finish the mob with" menu: //vg finish <weapon skill> | none
+        local name = table.concat(args, ' ')
+        local ws = util.wskill(name)
+        settings.ws.finish = ws and ws.en or ''
+        log(settings.ws.finish ~= '' and ('Finish mobs with %s under %d%% HP'):format(settings.ws.finish, settings.ws.finish_at) or 'No finishing weapon skill')
+        store.save(settings) send_profile()
+    elseif cmd == 'trustlist' then
+        -- the Farming tab's trust picker: //vg trustlist add|remove <trust> | clear
+        local sub, name = (args[1] or ''):lower(), table.concat(args, ' ', 2)
+        local list = util.split(settings.trusts.list, ',')
+        local keep = {}
+        for _, n in ipairs(list) do if n:lower() ~= name:lower() then keep[#keep + 1] = n end end
+        if sub == 'add' and util.spell(name) and util.spell(name).type == 'Trust' then keep[#keep + 1] = util.spell(name).en end
+        if sub == 'clear' then keep = {} end
+        settings.trusts.list = table.concat(keep, ',')
+        settings.modules.trusts = settings.trusts.list ~= '' and (settings.modules.trusts or settings.modules.farm)
+        log('Trusts: ' .. (settings.trusts.list ~= '' and settings.trusts.list or 'none'))
+        store.save(settings) send_profile()
+    elseif cmd == 'farmpull' then
+        -- How to pull, picked from a menu: //vg farmpull none | ra | ja <ability> | ma <spell>
+        local kind, name = (args[1] or 'none'):lower(), table.concat(args, ' ', 2)
+        if kind == 'ra' then settings.farm.pull_cmd = 'input /ra <t>'
+        elseif kind == 'ja' and util.ability(name) then settings.farm.pull_cmd = ('input /ja "%s" <t>'):format(util.ability(name).en)
+        elseif kind == 'ma' and util.spell(name) then settings.farm.pull_cmd = ('input /ma "%s" <t>'):format(util.spell(name).en)
+        else settings.farm.pull_cmd = '' end
+        log('Pull with: ' .. (settings.farm.pull_cmd ~= '' and settings.farm.pull_cmd or 'walk up and attack'))
+        store.save(settings) send_profile()
     elseif cmd == 'route' then
         local sub = (args[1] or 'show'):lower()
         if sub == 'record' then
@@ -1917,9 +2001,11 @@ windower.register_event('addon command', function(cmd, ...)
             end
             settings.farm.route = table.concat(parts, ';')
             state.route, state.wp = nil, 1
-            log(('Route saved with %d waypoints (//vg save to keep it)'):format(#parts))
+            store.save(settings) send_profile()
+            log(('Route saved with %d points'):format(#parts))
         elseif sub == 'clear' then
             settings.farm.route, state.route, state.wp = '', nil, 1
+            store.save(settings) send_profile()
             log('Route cleared')
         else
             local n = #util.split(settings.farm.route, ';')

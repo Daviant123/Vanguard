@@ -225,11 +225,29 @@ Settings are now saved safely with several characters running (one character's s
 Healing & MP (or Recovery) tab: **Keep MP for cures**. Below that MP the character stops casting buffs, songs,
 enfeebles and nukes and saves the rest for Cures, Raise and status removal. 0 = off.
 
+## Cooldowns (new in 0.35.0 / Vanguard Control 1.25.0)
+
+Team tab > Cooldowns: every character's job abilities in one place. Green = ready (click it and that character uses it,
+on its target or itself), grey = time left. "Only the long ones" shows the 1-hour abilities and the ones with long
+recasts, so the list stays short.
+
 ## Go home (new in 0.33.0 / Vanguard Control 1.23.0)
 
 Team tab > Go home: shows how each character gets home (Warp spell, Instant Warp scroll or Warp Ring) and warps one
 character, everyone, or just the alts (click twice). A Warp Ring is put on, used when it's ready, and GearSwap is kept
 off the ring until the character zones. `//vg warp` does the same in game.
+
+## Farming (redesigned in 0.34.0 / Vanguard Control 1.24.0)
+
+Farming tab, three steps, all clicks: **1 What to fight** (Look around, then Fight these on the mobs you want),
+**2 Where** (how far to look; optionally Record a route and walk it), **3 How** (pull with Provoke / Flash / a ranged
+attack or just walk up; rest under an HP / MP %), **4 Trusts** (click the ones to call). Then **Start farming**. The top line tells you what it's doing.
+
+## Finish mobs with a weapon skill (new in 0.34.0)
+
+Job & abilities (or Farming) > **Finish with** a weapon skill **when its HP is at or under** a %. The character saves TP
+for it and lands it as the killing blow (weapon skill trials, e.g. Atonement). The other characters stop attacking that
+mob when it gets low; **stop attacking until TP is 1000** helps a tank that's short on TP.
 
 ## Alarms (new in Vanguard Control 1.22.0)
 

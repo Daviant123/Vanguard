@@ -17,9 +17,13 @@ local S, state, h
 
 -- Lists for the button builder (only what this character can use right now).
 function quick.known(player)
-    local out = { spells = {}, abilities = {}, ws = {}, items = {} }
+    local out = { spells = {}, abilities = {}, ws = {}, items = {}, trusts = {} }
     local seen = {}
+    local known_spells = windower.ffxi.get_spells() or {}
     for _, sp in pairs(res.spells) do
+        if sp.en and sp.type == 'Trust' and known_spells[sp.id] and not seen['t:' .. sp.en] then
+            seen['t:' .. sp.en] = true out.trusts[#out.trusts + 1] = sp.en
+        end
         -- (Trust spells have their own module, so they aren't offered as buttons)
         if sp.en and sp.type ~= 'Trust' and not seen[sp.en] and util.can_cast(sp, player) then seen[sp.en] = true out.spells[#out.spells + 1] = sp.en end
     end

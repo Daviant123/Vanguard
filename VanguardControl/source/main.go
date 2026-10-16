@@ -229,7 +229,7 @@ func (h *hub) handleState(w http.ResponseWriter, r *http.Request) {
 			logs = append(logs, l)
 		}
 	}
-	body, _ := json.Marshal(map[string]any{"chars": chars, "logs": logs})
+	body, _ := json.Marshal(map[string]any{"chars": chars, "logs": logs, "version": panelVersion})
 	h.mu.Unlock()
 	w.Header().Set("Content-Type", "application/json")
 	w.Write(body)

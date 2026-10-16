@@ -82,6 +82,32 @@ function bridge.foe(settings, state)
              move = require('vg_triggers').last_move(6) }
 end
 
+-- Cooldowns (series 3 round 7): every job ability this character has, with the seconds until it's ready (0 = ready)
+-- and where it's aimed (bt = the enemy, me = itself or the party), for the app's Cooldowns box. Click bars in paid
+-- multibox suites (ISBoxer) show cooldowns per window; this shows the whole team on one screen.
+function bridge.cooldowns()
+    local ab = windower.ffxi.get_abilities() or {}
+    local rc = windower.ffxi.get_ability_recasts() or {}
+    local out, seen = {}, {}
+    local player = windower.ffxi.get_player()
+    -- Stratagems share one timer but have charges: ready while a charge is left
+    local ok, charges = pcall(function() return player and require('vg_strat').charges(player) end)
+    charges = ok and tonumber(charges) or nil
+    for _, id in pairs(ab.job_abilities or {}) do
+        local ja = res.job_abilities[id]
+        if ja and ja.en and ja.type ~= 'Monster' and not seen[ja.en] then
+            seen[ja.en] = true
+            local left = ja.recast_id and rc[ja.recast_id] or 0
+            if ja.recast_id == 231 and charges and charges > 0 then left = 0 end
+            local tg = ja.targets or 1
+            out[#out + 1] = { n = ja.en, s = math.floor((left or 0) + 0.5), t = (math.floor(tg / 32) % 2 == 1) and 'bt' or 'me',
+                                 sp = (ja.recast_id == 0 or ja.recast_id == 254) or nil }   -- SP abilities (1-hour)
+        end
+    end
+    table.sort(out, function(a, b) return a.n < b.n end)
+    return out
+end
+
 local function snapshot(settings, state)
     local p = windower.ffxi.get_player()
     if not p then return nil end
@@ -105,12 +131,15 @@ local function snapshot(settings, state)
         stats = require('vg_stats').get(),
         buffs = util.buff_list(p.buffs),
         foe = bridge.foe(settings, state),
+        cd = bridge.cooldowns(),
         hold = state and state.hold or false,
         camp = state and state.camp ~= nil or false,
         retreat = state and state.retreat or false,
         away = state and state.away or false,
         defense = state and state.defense or 'off',
         strat = state and state.strat_now or nil,
+        farm = state and settings.modules.farm and { status = settings.enabled and (state.farm_status or 'starting') or 'stopped',
+            rec = state.recording and #(state.recording_pts or {}) or nil } or (state and state.recording and { rec = #(state.recording_pts or {}) }) or nil,
     }
 end
 

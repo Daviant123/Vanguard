@@ -20,7 +20,7 @@ import (
 	"time"
 )
 
-var panelVersion = "1.23.1" // set by -X for tests; the published version
+var panelVersion = "1.25.0" // set by -X for tests; the published version
 
 var updateBase = "https://raw.githubusercontent.com/Daviant123/Vanguard/main/VanguardControl/" // tests point it elsewhere
 
@@ -55,10 +55,13 @@ func fetch(url string, limit int64) ([]byte, error) {
 	return io.ReadAll(io.LimitReader(resp.Body, limit))
 }
 
-// cleanupOld removes the previous exe left behind by the last update.
+// cleanupOld removes the exes left behind by earlier updates (any still running stay until next time).
 func cleanupOld() {
 	if exe, err := os.Executable(); err == nil {
-		os.Remove(oldPath(exe))
+		olds, _ := filepath.Glob(strings.TrimSuffix(exe, filepath.Ext(exe)) + ".old*.exe")
+		for _, f := range olds {
+			os.Remove(f)
+		}
 	}
 }
 
@@ -92,21 +95,36 @@ func installUpdate(version string) (string, error) {
 	if len(data) < 1<<20 || !bytes.HasPrefix(data, []byte("MZ")) {
 		return "", fmt.Errorf("the download doesn't look like a program (%d bytes)", len(data))
 	}
-	tmp := exe + ".new"
-	if err := os.WriteFile(tmp, data, 0o755); err != nil {
-		return "", err
-	}
-	old := oldPath(exe)
-	os.Remove(old)
-	if err := os.Rename(exe, old); err != nil {
-		os.Remove(tmp)
-		return "", err
-	}
-	if err := os.Rename(tmp, exe); err != nil {
-		os.Rename(old, exe) // put the working one back
+	if err := swapIn(exe, data); err != nil {
 		return "", err
 	}
 	return exe, nil
+}
+
+// swapIn puts the new exe in place of the running one: the running one is renamed out of the way (Windows lets a
+// running exe be renamed, not replaced). The usual name for it is "<exe>.old.exe"; when that file can't be removed
+// - it's the program that's running now, left there by the last update (the bug that kept 1.7.4 from ever
+// updating: "Access is denied") - a fresh name is used instead.
+func swapIn(exe string, data []byte) error {
+	tmp := exe + ".new"
+	if err := os.WriteFile(tmp, data, 0o755); err != nil {
+		return err
+	}
+	old := oldPath(exe)
+	if os.Remove(old) != nil {
+		if _, err := os.Stat(old); err == nil {
+			old = strings.TrimSuffix(exe, filepath.Ext(exe)) + fmt.Sprintf(".old-%d.exe", time.Now().UnixNano())
+		}
+	}
+	if err := os.Rename(exe, old); err != nil {
+		os.Remove(tmp)
+		return err
+	}
+	if err := os.Rename(tmp, exe); err != nil {
+		os.Rename(old, exe) // put the working one back
+		return err
+	}
+	return nil
 }
 
 func updatesDisabled() bool {

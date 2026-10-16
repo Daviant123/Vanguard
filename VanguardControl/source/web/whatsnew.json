@@ -1,5 +1,26 @@
 [
   {
+    "version": "1.25.0",
+    "date": "2026-10-16",
+    "items": [
+      "New: Cooldowns on the Team tab. Every character's job abilities on one screen: green ones are ready - click one and that character uses it - grey ones show the time left.",
+      "\"Only the long ones\" keeps it short: 1-hour abilities and the ones with long recasts (Sentinel, Convert, Elemental Seal...)."
+    ]
+  },
+  {
+    "version": "1.24.0",
+    "date": "2026-10-16",
+    "items": [
+      "Farming redesigned, EasyFarm-easy: it has its own Farming tab now. 1) What to fight - Look around and click Fight these. 2) Where - how far to look, and an optional route you record by walking it. 3) How - pull with Provoke, Flash, a ranged attack or just walk up, and when to rest. Then one Start farming button.",
+      "The top of the Farming tab says what it's doing right now: going for a mob, fighting, resting, walking the route - or that you still need to pick what to fight.",
+      "Farming also has 4) Trusts - click the trusts to call between fights - and \"Walk up to the mob before attacking\".",
+      "New: Finish mobs with a weapon skill (Job & abilities and Farming tabs). Pick e.g. Atonement and the HP% - the character saves its TP and lands that weapon skill as the killing blow. The other characters stop attacking that mob when it gets low, and a tank can wait for TP if the mob gets low too early.",
+      "Fixed: automatic updates could get stuck on an old version (\"Access is denied\"). The window also refreshes by itself after an update.",
+      "Fixed: a character could show \"running\" right after loading even with Auto start off. Now only Auto start starts it by itself.",
+      "Fixed: deleting a saved team setup could bring it back later."
+    ]
+  },
+  {
     "version": "1.23.1",
     "date": "2026-10-16",
     "items": [

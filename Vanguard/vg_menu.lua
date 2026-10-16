@@ -221,7 +221,13 @@ function menu.extra(settings)
         setups = setups,
         strat = settings.strat,
         farm_targets = settings.farm.targets, farm_ignore = settings.farm.ignore,
-        farm_claim = settings.farm.claim,
+        farm_claim = settings.farm.claim, farm_range = settings.farm.range, farm_height = settings.farm.height,
+        farm_pull = settings.farm.pull_cmd, farm_loop = settings.farm.loop, farm_aggro = settings.farm.aggro_first,
+        farm_route = #util.split(settings.farm.route or '', ';'),
+        rest_hp_low = settings.rest.hp_low, rest_mp_low = settings.rest.mp_low,
+        ws_finish = settings.ws.finish, ws_finish_at = settings.ws.finish_at, ws_finish_save = settings.ws.finish_save,
+        ws_finish_others = settings.ws.finish_others, ws_finish_wait = settings.ws.finish_wait,
+        farm_approach = settings.farm.approach, trusts_list = settings.trusts.list, trusts_size = settings.trusts.party_size,
         triggers = (function()
             local out = {}
             for k, v in pairs(settings.triggers or {}) do
