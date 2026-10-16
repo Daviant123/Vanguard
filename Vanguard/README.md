@@ -218,6 +218,12 @@ Settings are now saved safely with several characters running (one character's s
   Got a Terpander / Daurdabla? Just put 3 or 4 songs in the song list.
 - **Horde Lullaby.** With `//vg sleep on`, two or more extra mobs get Horde Lullaby (or Sleepga) at once.
 
+## Quick buttons (new in 0.20.0 / Vanguard Control 1.9.0)
+
+On the Team tab, build a button from menus: **who** (a character or everyone), **does** (a spell, ability, weapon
+skill, item, attack, follow or stop), **which** one (only what that character can use) and **on** whom. Buttons sit
+in a bar under the top buttons on every tab; one click makes that character do it.
+
 ## Session stats and What's new (new in 0.19.0 / Vanguard Control 1.8.0)
 
 - **Session** box on the Team tab: for every character, experience, Capacity Points and limit points per hour,

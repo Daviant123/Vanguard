@@ -1,6 +1,6 @@
 _addon.name = 'Vanguard'
 _addon.author = 'Daviant'
-_addon.version = '0.19.0'
+_addon.version = '0.20.0'
 _addon.commands = {'vanguard', 'vg'}
 
 --[[
@@ -48,6 +48,7 @@ local link = require('vg_link')
 local strat = require('vg_strat')
 local bard = require('vg_bard')
 local stats = require('vg_stats')
+local quick = require('vg_quick')
 
 ------------------------------------------------------------------------
 -- Settings
@@ -1102,6 +1103,7 @@ local function send_profile(player)
             local c = menu.config(settings)
             c.strat_info = strat.info(player)
             if player.main_job == 'BRD' then c.bard_info = bard.info(player) end
+            c.known = quick.known(player)                -- for the app's quick buttons
             return c
         end)(),
         party = menu.party(),
@@ -1181,6 +1183,7 @@ local function ja_ready(name)
     for _, id in pairs(ab and ab.job_abilities or {}) do if id == ja.id then return ja end end
     return nil
 end
+quick.init(settings, state, { log = log })
 bard.init(settings, state, {
     log = log, recently = recently, mark = mark, try_cast = try_cast, use_ja = use_ja, amnesia = amnesia,
     party_members = party_members, ja_ready = ja_ready,
@@ -1641,6 +1644,11 @@ windower.register_event('addon command', function(cmd, ...)
             save_profile()
             send_profile()
         end
+    elseif cmd == 'act' then
+        -- a quick button from the app: //vg act <ma|ja|ws|item|attack|follow|stop> <bt|t|me|leader|Name> [name]
+        local player = windower.ffxi.get_player()
+        local done, why = quick.act(player, args[1], args[2], table.concat(args, ' ', 3))
+        if not done then log('Quick button: ' .. tostring(why)) end
     elseif cmd == 'stats' then
         if (args[1] or ''):lower() == 'reset' then stats.reset() log('Session stats reset') end
         local t = stats.get()

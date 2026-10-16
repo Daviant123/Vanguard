@@ -10,6 +10,7 @@ vg_link.lua
 vg_mages.lua
 vg_menu.lua
 vg_party.lua
+vg_quick.lua
 vg_safety.lua
 vg_share.lua
 vg_stats.lua

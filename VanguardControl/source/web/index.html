@@ -85,6 +85,10 @@ label.field select { min-width: 190px; color: var(--text); font-size: 13px; }
 .empty { color: var(--muted); padding: 10px 2px; }
 .steps { color: var(--muted); margin: 6px 0 0; padding-left: 18px; }
 .steps b { color: var(--text); }
+#quickbar { display: none; padding: 6px 14px; border-bottom: 1px solid var(--line); background: var(--panel-2); gap: 6px; flex-wrap: wrap; align-items: center; }
+#quickbar.show { display: flex; }
+#quickbar button { padding: 4px 10px; }
+#quickbar button small { color: var(--muted); margin-left: 4px; }
 #addonbar { display: none; padding: 8px 14px; border-bottom: 1px solid var(--line); background: #2b2618; gap: 8px; align-items: center; flex-wrap: wrap; }
 #addonbar.show { display: flex; }
 #addonbar.ok { background: rgba(76,175,122,.08); }
@@ -140,6 +144,7 @@ table.sgrid .na { color: var(--line); }
   <button onclick="quitApp()" title="Close Vanguard Control">Quit</button>
 </header>
 <div id="addonbar"></div>
+<div id="quickbar"></div>
 <div class="layout">
   <aside id="chars">
     <div class="empty">No characters yet.
@@ -338,6 +343,7 @@ function teamTab(c, p) {
   return `<div class="stack">
     <div class="hint">Orders go to the leader (<b>${esc(L || "nobody yet")}</b>), who passes them to everyone. Switches marked "everyone" are set on every character.</div>
     ${statsBox()}
+    ${quickBox()}
     <div class="cols">
       <div class="box"><h3>Party</h3><div class="btns">
         <button class="primary" onclick="setupParty()">Set up party (${esc(selected || "")} leads)</button>
@@ -491,6 +497,53 @@ function stratTab(c, p) {
     ${missing.length ? `<div class="hint">Not on this job / level: ${missing.map(esc).join(", ")}.</div>` : ""}
     <div class="hint">Each stratagem works on the next spell of its kind and uses one charge. The reserve is only spent on emergencies (Raise with Celerity, emergency cures).</div>
   </div>`;
+}
+
+// ---------- Quick buttons (ISBoxer-style click bar) ----------
+let quick = [], quickKey = "", qb = {who: "", kind: "ma", name: "", target: "bt"};
+async function quickDo(q) { try { quick = await (await fetch("/api/quick?" + q)).json(); } catch (e) {} quickKey = ""; bodyKey = ""; render(); renderQuickBar(); }
+const KIND_LABEL = {ma: "Spell", ja: "Ability", ws: "Weapon skill", item: "Item", attack: "Attack", follow: "Follow", stop: "Stop attacking"};
+const TARGET_LABEL = {bt: "the enemy", t: "its target", me: "itself", leader: "the leader"};
+function renderQuickBar() {
+  const bar = $("quickbar"); if (!bar) return;
+  const key = JSON.stringify(quick);
+  if (key === quickKey) return;
+  quickKey = key;
+  bar.className = quick.length ? "show" : "";
+  bar.innerHTML = quick.length ? `<span class="hint">Quick:</span>` + quick.map((b, i) =>
+    `<button onclick="quickDo('do=press&i=${i}')" title="${esc(b.who === "*" ? "Everyone" : b.who)}: ${esc(KIND_LABEL[b.kind] || b.kind)} ${esc(b.name)} on ${esc(TARGET_LABEL[b.target] || b.target)}">${esc(b.label || b.name || KIND_LABEL[b.kind])}<small>${esc(b.who === "*" ? "all" : b.who)}</small></button>`).join("") : "";
+}
+function quickKnown(who) {
+  const lists = who === "*" ? Object.keys(chars).map(n => ((chars[n].profile || {}).config || {}).known || {}) : [((chars[who] || {}).profile || {}).config?.known || {}];
+  const pick = k => [...new Set(lists.flatMap(l => arr(l[k])))].sort();
+  return {ma: pick("spells"), ja: pick("abilities"), ws: pick("ws"), item: pick("items")};
+}
+function quickBox() {
+  const names = Object.keys(chars).sort();
+  if (!qb.who || (qb.who !== "*" && !chars[qb.who])) qb.who = selected || names[0] || "*";
+  const known = quickKnown(qb.who), list = known[qb.kind] || [];
+  const needsName = ["ma", "ja", "ws", "item"].includes(qb.kind);
+  if (needsName && !list.includes(qb.name)) qb.name = list[0] || "";
+  const party = arr(((chars[qb.who] || chars[selected] || {}).profile || {}).party).slice(1);
+  const targets = [["bt", "the enemy (battle target)"], ["me", "itself"], ["leader", "the leader"], ["t", "its current target"]].concat(party.map(n => [n, n]));
+  const o = (v, l, cur) => `<option value="${esc(v)}" ${v === cur ? "selected" : ""}>${esc(l)}</option>`;
+  return `<div class="box"><h3>Quick buttons: one click makes a character do something</h3>
+    <div class="row" style="align-items:flex-end">
+      <label class="field">Who <select id="qbwho">${o("*", "Everyone", qb.who)}${names.map(n => o(n, n, qb.who)).join("")}</select></label>
+      <label class="field">Does <select id="qbkind">${Object.keys(KIND_LABEL).map(k => o(k, KIND_LABEL[k], qb.kind)).join("")}</select></label>
+      ${needsName ? `<label class="field">Which <select id="qbname">${list.length ? list.map(n => o(n, n, qb.name)).join("") : `<option value="">— nothing known —</option>`}</select></label>` : ""}
+      ${qb.kind !== "stop" ? `<label class="field">On <select id="qbtarget">${targets.map(([v, l]) => o(v, l, qb.target)).join("")}</select></label>` : ""}
+      <button class="primary" onclick="quickAdd()" ${needsName && !qb.name ? "disabled" : ""}>Add button</button>
+    </div>
+    ${quick.length ? `<div class="btns" style="margin-top:8px">${quick.map((b, i) => `<span class="pill off" style="padding:3px 6px">${esc(b.label || KIND_LABEL[b.kind])} <small>(${esc(b.who === "*" ? "everyone" : b.who)})</small>
+        <button title="Move left" onclick="quickDo('do=left&i=${i}')">‹</button><button title="Move right" onclick="quickDo('do=right&i=${i}')">›</button><button title="Remove" onclick="quickDo('do=delete&i=${i}')">×</button></span>`).join("")}</div>`
+      : `<div class="hint" style="margin-top:6px">Your buttons appear in a bar under the top buttons, on every tab. E.g. "Healer: Curaga III on itself", "Everyone: Echo Drops", "Tank: Provoke on the enemy".</div>`}
+  </div>`;
+}
+function quickAdd() {
+  const label = ["attack", "follow", "stop"].includes(qb.kind) ? KIND_LABEL[qb.kind] : qb.name;
+  const t = qb.kind === "stop" ? "me" : qb.target;
+  quickDo(`do=add&who=${encodeURIComponent(qb.who)}&kind=${qb.kind}&name=${encodeURIComponent(["attack", "follow", "stop"].includes(qb.kind) ? "" : qb.name)}&target=${encodeURIComponent(t)}&label=${encodeURIComponent(label)}`);
 }
 
 // ---------- What's new (whatsnew.json, built into the app) ----------
@@ -834,6 +887,10 @@ document.addEventListener("change", e => {
     return;
   }
   if (el.id === "profsel") return;
+  if (["qbwho", "qbkind", "qbname", "qbtarget"].includes(el.id)) {
+    qb[el.id.slice(2)] = el.value; if (el.id !== "qbname" && el.id !== "qbtarget") qb.name = "";
+    bodyKey = ""; render(); return;
+  }
   if (el.id === "pianadd") { if (el.value) { pianAdded.add(el.value); bodyKey = ""; render(); } return; }
   if (el.dataset.tiers !== undefined) { send("set heal.tiers " + tierString()); return; }
   if (el.id === "entSpell" || el.id === "entWho") {
@@ -940,6 +997,7 @@ async function poll() {
 }
 poll();
 pollAddon();
+quickDo("");
 profDo("");
 </script>
 </body>

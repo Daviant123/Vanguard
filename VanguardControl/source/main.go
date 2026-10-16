@@ -349,6 +349,7 @@ func main() {
 	mux.HandleFunc("/api/open-settings", handleOpenSettings)
 	mux.HandleFunc("/api/addon", h.handleAddon)
 	mux.HandleFunc("/api/profiles", h.handleProfiles)
+	mux.HandleFunc("/api/quick", h.handleQuick)
 	mux.HandleFunc("/api/quit", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNoContent)
 		go func() { time.Sleep(200 * time.Millisecond); os.Exit(0) }()
