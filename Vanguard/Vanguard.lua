@@ -1,6 +1,6 @@
 _addon.name = 'Vanguard'
 _addon.author = 'Daviant'
-_addon.version = '0.28.0'
+_addon.version = '0.29.0'
 _addon.commands = {'vanguard', 'vg'}
 
 --[[
@@ -48,6 +48,13 @@ local link = require('vg_link')
 local strat = require('vg_strat')
 local bard = require('vg_bard')
 local stats = require('vg_stats')
+local crash = require('vg_crash')
+crash.init(bridge)
+-- Every event handler below runs guarded: an error becomes a crash report instead of red text (vg_crash).
+do
+    local raw_register = windower.register_event
+    windower.register_event = function(ev, fn) return raw_register(ev, crash.guard('event ' .. ev, fn)) end
+end
 local quick = require('vg_quick')
 
 ------------------------------------------------------------------------
@@ -1279,9 +1286,8 @@ windower.register_event('prerender', function()
     local t = now()
     if t - state.last_tick < settings.tick then return end
     state.last_tick = t
-    local ok, err = pcall(tick)
-    if not ok then log('error: ' .. tostring(err)) end
-    if state.profile and t - state.profile_sent > 15 then pcall(send_profile) end
+    crash.guard('main loop', tick)()
+    if state.profile and t - state.profile_sent > 15 then crash.guard('sending the setup to the app', send_profile)() end
     local bok, berr = pcall(bridge.poll, settings, state)
     if not bok then windower.add_to_chat(167, '[Vanguard] bridge error: ' .. tostring(berr)) end
 end)

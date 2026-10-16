@@ -153,7 +153,7 @@ func (h *hub) listen() {
 			}
 			h.mu.Unlock()
 			if changed {
-				go h.autoProfile(name, job)
+				h.safeGo("loading a profile by itself", func() { h.autoProfile(name, job) })
 			}
 		case "nearby":
 			h.mu.Lock()
@@ -162,6 +162,11 @@ func (h *hub) listen() {
 				c.addr = addr
 			}
 			h.mu.Unlock()
+		case "crash":
+			// vg_crash.lua caught an error in the addon
+			str := func(k string) string { v, _ := msg[k].(string); return v }
+			h.addCrash(crashReport{Source: "addon", Who: name, Job: str("job"), Version: str("version"),
+				Where: str("where"), Error: str("err"), Trace: str("trace")})
 		case "dump":
 			raw, _ := json.Marshal(msg["data"])
 			h.mu.Lock()
@@ -339,15 +344,22 @@ func main() {
 	h := &hub{conn: conn, chars: map[string]*character{}, updateNow: make(chan string, 1),
 		dumps: map[string]chan json.RawMessage{}, jobs: map[string]string{}}
 	h.addLog("Vanguard Control %s. Listening on %s. Load the addon in game with //lua load vanguard", panelVersion, udpAddr)
-	go h.listen()
-	go h.timerLoop()
+	// A crash in the app itself is kept as a report (crashes.go); background jobs restart after one.
+	defer func() {
+		if r := recover(); r != nil {
+			h.recordPanic("main", r)
+			panic(r)
+		}
+	}()
+	h.safeGo("listening to the characters", h.listen)
+	h.safeGo("stop timer", h.timerLoop)
 	// The addon: find Windower, install / update the one built into this exe, reload old copies.
-	go func() {
+	h.safeGo("addon install / reload", func() {
 		if msg := h.ensureAddon(false); msg != "" && msg != "ok" {
 			h.addLog("%s", msg)
 		}
 		h.reloadWatch()
-	}()
+	})
 
 	web, _ := fs.Sub(webFS, "web")
 	mux := http.NewServeMux()
@@ -361,6 +373,7 @@ func main() {
 	mux.HandleFunc("/api/profiles", h.handleProfiles)
 	mux.HandleFunc("/api/quick", h.handleQuick)
 	mux.HandleFunc("/api/timer", h.handleTimer)
+	mux.HandleFunc("/api/crashes", h.handleCrashes)
 	mux.HandleFunc("/api/quit", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNoContent)
 		go func() { time.Sleep(200 * time.Millisecond); os.Exit(0) }()
@@ -374,7 +387,7 @@ func main() {
 	if err != nil {
 		os.Exit(1)
 	}
-	go h.autoUpdate(func(exe string) {
+	h.safeGo("self-update", func() { h.autoUpdate(func(exe string) {
 		// Start the new one first (it waits for the ports), then step aside.
 		if err := startDetached(exe); err != nil {
 			h.addLog("Couldn't restart (%v): close and reopen Vanguard Control to use the new version.", err)
@@ -383,9 +396,9 @@ func main() {
 		ln.Close()
 		conn.Close()
 		os.Exit(0)
-	})
+	}) })
 	if !restarted {
 		go openWindow()
 	}
-	http.Serve(ln, mux)
+	http.Serve(ln, h.guardHTTP(mux))
 }

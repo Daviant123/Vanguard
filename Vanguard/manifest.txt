@@ -4,6 +4,7 @@ vg_alts.lua
 vg_bard.lua
 vg_bridge.lua
 vg_combat.lua
+vg_crash.lua
 vg_hud.lua
 vg_jobs.lua
 vg_link.lua

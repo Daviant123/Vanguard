@@ -147,6 +147,7 @@ table.sgrid .na { color: var(--line); }
   <label class="chk" id="autostartbox" title="On: characters start by themselves when they log in or Vanguard reloads. Off: they wait for Start.">
     <input type="checkbox" id="autostart"><span>Auto start</span></label>
   <span id="timerbadge" class="pill on" style="display:none;cursor:pointer" title="Stop timer (Team tab)" onclick="setTab('team')"></span>
+  <span id="crashbadge" class="pill warn" style="display:none;cursor:pointer" title="Problems were caught - click to send a report" onclick="setTab('app')"></span>
   <div class="status" id="status">Waiting for characters…</div>
   <button onclick="quitApp()" title="Close Vanguard Control">Quit</button>
 </header>
@@ -688,10 +689,35 @@ function statsBox() {
       <span class="hint">Counted from each character's own game messages. Per-hour numbers show after 5 minutes.</span></div></div>`;
 }
 
+// ---------- Problems: crash reports (crashes.go / vg_crash.lua) ----------
+let crashes = [];
+async function crashDo(q) { try { crashes = await (await fetch("/api/crashes?" + q)).json(); } catch (e) {} renderCrashBadge(); bodyKey = ""; render(); }
+function renderCrashBadge() {
+  const b = $("crashbadge"); if (!b) return;
+  const unsent = arr(crashes).filter(c => !c.sent).length;
+  b.style.display = unsent ? "" : "none";
+  b.textContent = `${unsent} problem${unsent === 1 ? "" : "s"} - send report`;
+}
+setInterval(() => crashDo(""), 20000);
+function problemsBox() {
+  const list = arr(crashes).map((c, i) => ({c, i})).reverse();
+  return `<div class="box"><h3>Problems</h3>
+    ${list.length ? `<table class="grid"><thead><tr><th style="text-align:left">What broke</th><th>Where</th><th>When</th><th>Times</th><th></th></tr></thead><tbody>
+      ${list.map(({c, i}) => `<tr><td style="text-align:left"><b>${esc(c.where)}</b><div class="hint">${esc(String(c.error).split("\n")[0].slice(0, 140))}</div></td>
+        <td>${c.source === "app" ? "the app" : esc(c.who || "a character")}</td><td>${esc(c.time)}</td><td>${c.count}</td>
+        <td><button class="${c.sent ? "" : "primary"}" onclick="crashDo('do=report&i=${i}')">${c.sent ? "Send again" : "Send report"}</button>
+            <button title="Remove" onclick="crashDo('do=dismiss&i=${i}')">×</button></td></tr>`).join("")}
+    </tbody></table>` : `<div class="hint">No problems caught. If something misbehaves without an error, use Report a problem.</div>`}
+    <div class="row" style="margin-top:8px"><button onclick="crashDo('do=problem')">Report a problem</button>
+      ${list.length ? `<button onclick="crashDo('do=clear')">Clear the list</button>` : ""}</div>
+    <div class="hint" style="margin-top:6px">Send report opens a ready-made report on the Vanguard GitHub page in your browser - click Submit there to send it.
+      Character names and your Windows user name are replaced first; nothing is sent until you click Submit.</div></div>`;
+}
+
 // ---------- App & updates tab ----------
 function appTab() {
   const a = addon || {};
-  return `<div class="stack"><div class="box"><h3>Vanguard Control</h3><div class="kv">
+  return `<div class="stack">${problemsBox()}<div class="box"><h3>Vanguard Control</h3><div class="kv">
       <span>App version</span><span>${esc(a.panel || "?")}</span>
       <span>Addon in this app</span><span>${esc(a.bundled || "?")}</span>
       <span>Windower folder</span><span>${a.found ? esc(a.windower) : "not found"}</span>
@@ -1189,7 +1215,7 @@ function renderPanel() {
     (chars[n].snapshot || {}).retreat, (chars[n].snapshot || {}).defense, (chars[n].snapshot || {}).leader,
     (chars[n].snapshot || {}).stats, chars[n].online, (chars[n].snapshot || {}).buffs, (chars[n].snapshot || {}).hpp,
     (chars[n].snapshot || {}).mpp, (chars[n].snapshot || {}).tp, (chars[n].snapshot || {}).status, (chars[n].snapshot || {}).target]) : 0;
-  const bk = JSON.stringify([tab, p, s.leader, Object.keys(chars), team, tab === "app" ? addon : 0, tab === "strat" ? s.strat : 0, tab === "adv" ? c.nearby : 0,
+  const bk = JSON.stringify([tab, p, s.leader, Object.keys(chars), team, tab === "app" ? [addon, crashes] : 0, tab === "strat" ? s.strat : 0, tab === "adv" ? c.nearby : 0,
     tab === "team" ? [stopTimer.until, Math.floor((stopTimer.left || 0) / 60)] : 0]);
   if (bk === bodyKey) return;
   bodyKey = bk;
@@ -1235,6 +1261,7 @@ poll();
 pollAddon();
 quickDo("");
 timerDo("");
+crashDo("");
 profDo("");
 </script>
 </body>

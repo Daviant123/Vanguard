@@ -1,5 +1,13 @@
 [
   {
+    "version": "1.18.0",
+    "date": "2026-10-16",
+    "items": [
+      "New: crash reports. Errors in the addon (on any character) and in the app are now caught instead of breaking things, with exactly where they happened. A \"problem\" badge appears at the top; App & updates > Problems > Send report opens a ready-made report on the Vanguard GitHub page - click Submit and it reaches the developer so it can be fixed.",
+      "Character names and your Windows user name are replaced before anything is shown or sent, and nothing is sent without your click. \"Report a problem\" works for things that go wrong without an error."
+    ]
+  },
+  {
     "version": "1.17.0",
     "date": "2026-10-16",
     "items": [

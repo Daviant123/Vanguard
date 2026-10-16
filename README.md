@@ -218,6 +218,13 @@ Settings are now saved safely with several characters running (one character's s
   Got a Terpander / Daurdabla? Just put 3 or 4 songs in the song list.
 - **Horde Lullaby.** With `//vg sleep on`, two or more extra mobs get Horde Lullaby (or Sleepga) at once.
 
+## Crash reports (new in 0.29.0 / Vanguard Control 1.18.0)
+
+Errors in the addon (on any character) and in the app are caught instead of breaking things. A "problem" badge shows
+at the top; App & updates > Problems > **Send report** opens a ready-made report on the Vanguard GitHub page in your
+browser - click Submit and it reaches the developer. Character names and your Windows user name are replaced first,
+and nothing is sent without your click. **Report a problem** is for things that go wrong without an error.
+
 ## Upkeep menus (new in 0.28.0 / Vanguard Control 1.17.0)
 
 Team tab > Upkeep: for every character, the food to keep up, how to keep Reraise up and which mount to ride, chosen
