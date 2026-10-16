@@ -259,12 +259,12 @@ func (h *hub) handleSend(w http.ResponseWriter, r *http.Request) {
 				sent++
 			}
 		}
-		if cmd != "profile" {
+		if cmd != "profile" && cmd != "radar" { // (the Farming tab asks for the radar every few seconds)
 			h.addLog("-> all: %s", cmd)
 		}
 	} else if h.send(req.Target, cmd) {
 		sent = 1
-		if cmd != "profile" {
+		if cmd != "profile" && cmd != "radar" { // (the Farming tab asks for the radar every few seconds)
 			h.addLog("-> %s: %s", req.Target, cmd)
 		}
 	}

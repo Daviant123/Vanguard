@@ -107,6 +107,24 @@ function bridge.cooldowns()
     return out
 end
 
+-- Farming for the app: what it's doing, the run's numbers, the route being recorded and (while the Farming tab is
+-- open, or while farming) the radar.
+function bridge.farm(settings, state)
+    if not state then return nil end
+    local f = require('vg_farm')
+    local on = settings.modules.farm
+    local out = {}
+    if on then out.status = settings.enabled and (state.farm_status or 'starting') or 'stopped'
+    elseif state.farm_status and state.farm_status:find('^stopped: ') then out.status = state.farm_status end
+    if state.recording then out.rec = #(state.recording_pts or {}) end
+    if on then out.run = f.run_stats() end
+    if on or (state.radar_until and os.clock() < state.radar_until) then
+        local ok, radar = pcall(f.radar)
+        if ok then out.radar = radar end
+    end
+    return next(out) and out or nil
+end
+
 local function snapshot(settings, state)
     local p = windower.ffxi.get_player()
     if not p then return nil end
@@ -137,8 +155,7 @@ local function snapshot(settings, state)
         away = state and state.away or false,
         defense = state and state.defense or 'off',
         strat = state and state.strat_now or nil,
-        farm = state and settings.modules.farm and { status = settings.enabled and (state.farm_status or 'starting') or 'stopped',
-            rec = state.recording and #(state.recording_pts or {}) or nil } or (state and state.recording and { rec = #(state.recording_pts or {}) }) or nil,
+        farm = bridge.farm(settings, state),
     }
 end
 

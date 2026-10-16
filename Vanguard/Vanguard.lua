@@ -1,6 +1,6 @@
 _addon.name = 'Vanguard'
 _addon.author = 'Daviant'
-_addon.version = '0.35.1'
+_addon.version = '0.37.0'
 _addon.commands = {'vanguard', 'vg'}
 
 --[[
@@ -51,6 +51,7 @@ local stats = require('vg_stats')
 local crash = require('vg_crash')
 local warp = require('vg_warp')
 local finish = require('vg_finish')
+local farm = require('vg_farm')
 crash.init(bridge)
 -- Every event handler below runs guarded: an error becomes a crash report instead of red text (vg_crash).
 do
@@ -103,8 +104,14 @@ local defaults = {
     trusts = { list = '', party_size = 5 },
     -- Farming: target names (partial match), ignore list, claim filter (unclaimed|party|any),
     -- detection range/height, pull command after engaging, and a recorded route.
+    -- farming (vg_farm): mode list|aggro|any; area camp|route; camp "x:y:z" in camp_zone; wait for the party before
+    -- pulling (HP / MP %, within yalms); stop when the inventory is full / after stop_kills kills (0 = never)
     farm = { targets = '', ignore = '', claim = 'unclaimed', aggro_first = true, range = 20,
-             height = 5, approach = true, pull_cmd = '', route = '', loop = true },
+             height = 5, approach = true, pull_cmd = '', route = '', loop = true,
+             mode = 'list', area = 'camp', camp = '', camp_zone = 0, back_to_camp = true,
+             wait_party = true, wait_hp = 70, wait_mp = 40, wait_near = 20, stop_full = true, stop_kills = 0,
+             packs = true, pack_range = 8, pack_strict = false },
+    farmspots = { s0 = '' },      -- saved farm spots (vg_farm): s1, s2, ... = "name|zone|field=value|..." 
     -- "Spell>target" pairs. target = me or a party member name. "ja:" prefix = job ability.
     buffs = { list = '' },
     -- finish*: the weapon skill that lands the kill (vg_finish): at mob HP% finish_at, saving TP, others stop attacking
@@ -883,161 +890,8 @@ local function do_trusts(player)
 end
 
 ------------------------------------------------------------------------
--- Farming: targeting, pulling, routes (EasyFarm style)
+-- Farming lives in vg_farm.lua (camp / route, give-up list, wait for the party, stop conditions, stats, spots)
 ------------------------------------------------------------------------
-local function parse_route()
-    local pts = {}
-    for _, p in ipairs(util.split(settings.farm.route, ';')) do
-        local x, y, z = p:match('^(%-?[%d%.]+):(%-?[%d%.]+):(%-?[%d%.]+)$')
-        if x then pts[#pts + 1] = {x = tonumber(x), y = tonumber(y), z = tonumber(z)} end
-    end
-    return pts
-end
-
-local function party_ids()
-    local ids = {}
-    for _, m in ipairs(party_members()) do
-        if m.mob then ids[m.mob.id] = true end
-    end
-    return ids
-end
-
-local function name_matches(name, list)
-    name = name:lower()
-    for _, entry in ipairs(list) do
-        if name:find(entry:lower(), 1, true) then return true end
-    end
-    return false
-end
-
--- Is this mob something we're allowed to fight? Returns ok, aggro (already on the party).
-local function farm_candidate(mob, me, ids, targets, ignore)
-    if not mob or mob.spawn_type ~= 16 or mob.hpp == 0 or not mob.valid_target then return false end
-    if util.dist(mob) > settings.farm.range or math.abs((mob.z or 0) - (me.z or 0)) > settings.farm.height then
-        return false
-    end
-    local claimed_by_party = mob.claim_id ~= 0 and ids[mob.claim_id]
-    local claim_ok = settings.farm.claim == 'any' or mob.claim_id == 0 or claimed_by_party
-    if settings.farm.claim == 'party' then claim_ok = claimed_by_party end
-    local wanted = name_matches(mob.name, targets) and not name_matches(mob.name, ignore)
-    local aggro = settings.farm.aggro_first and claimed_by_party
-    return claim_ok and (wanted or aggro) and true or false, aggro
-end
-
-local function find_farm_target(me)
-    local targets = util.split(settings.farm.targets, ',')
-    local ignore = util.split(settings.farm.ignore, ',')
-    if #targets == 0 then return nil end
-    local ids = party_ids()
-    local best, best_score
-    for _, mob in pairs(windower.ffxi.get_mob_array()) do
-        local ok, aggro = farm_candidate(mob, me, ids, targets, ignore)
-        if ok then
-            -- Mobs already fighting the party first, then nearest.
-            local score = util.dist(mob) - (aggro and 1000 or 0)
-            if not best or score < best_score then best, best_score = mob, score end
-        end
-    end
-    return best
-end
-
--- Engage the way a player does: face the mob, /targetbnpc, then /attack <t>.
--- Returns true if a command was sent this tick.
-local function farm_engage(me, mob)
-    local t = windower.ffxi.get_mob_by_target('t')
-    local ok = t and farm_candidate(t, me, party_ids(), util.split(settings.farm.targets, ','),
-                                    util.split(settings.farm.ignore, ','))
-    if ok then
-        if recently('farm:attack', 3) then return false end
-        mark('farm:attack')
-        stop_running()
-        face(me, t)
-        windower.send_command('input /attack <t>')
-        log(('Engaging %s (%.1f yalms)'):format(t.name, util.dist(t)))
-        state.busy_until = now() + 1.5
-        return true
-    end
-    -- /targetbnpc picks the nearest enemy. If it picked the wrong one last time, walk closer first.
-    if state.farm_try == mob.id and not recently('farm:target', 2.5) and recently('farm:target', 6) then
-        state.farm_close = mob.id
-    end
-    if state.farm_close == mob.id and util.dist(mob) > 4 then
-        run_toward(me, mob)
-        state.route_moving = true
-        return false
-    end
-    if recently('farm:target', 2.5) then return false end
-    mark('farm:target')
-    state.farm_try = mob.id
-    stop_running()
-    face(me, mob)
-    windower.send_command('input /targetbnpc')
-    state.busy_until = now() + 0.8
-    return true
-end
-
--- Pull command once per mob (e.g. "input /ra <t>"), first thing after engaging at range, before any
--- job abilities (a puller shouldn't buff while the mob is still far away).
-local function do_pull(player)
-    if not settings.modules.farm or player.status ~= 1 or settings.farm.pull_cmd == '' then return false end
-    local t = windower.ffxi.get_mob_by_target('t')
-    if t and not state.farm_pulled[t.id] and util.dist(t) > 5 then
-        state.farm_pulled[t.id] = true
-        windower.send_command(settings.farm.pull_cmd)
-        state.busy_until = now() + 3
-        return true
-    end
-    return false
-end
-
--- What farming is doing right now, in plain words for the app's Farming tab.
-local function farm_status(s) state.farm_status = s end
-
-local function do_farm(player)
-    if not settings.modules.farm then state.farm_status = nil return false end
-    state.route_moving = false
-    if player.status == 1 then
-        local t = windower.ffxi.get_mob_by_target('t')
-        farm_status('fighting ' .. (t and t.name or 'a mob'))
-        return false
-    end
-    if not settings.enabled then farm_status('stopped') return false end
-    if state.resting or player.status == 33 then farm_status('resting') return false end
-    if player.status ~= 0 then farm_status('waiting') return false end
-    if party_engaged(player) then farm_status('helping the party fight') return false end
-    if #util.split(settings.farm.targets, ',') == 0 then farm_status('no mobs picked yet: pick what to fight') return false end
-
-    local me = windower.ffxi.get_mob_by_target('me')
-    if not me then return false end
-    local mob = find_farm_target(me)
-    if mob then
-        farm_status(('going for %s (%d yalms)'):format(mob.name, math.floor(util.dist(mob) + 0.5)))
-        return farm_engage(me, mob)
-    end
-    state.farm_try, state.farm_close = nil, nil
-
-    -- Nothing in range: walk the route.
-    state.route = state.route or parse_route()
-    local pts = state.route
-    if #pts == 0 then farm_status('waiting for a mob to come within ' .. settings.farm.range .. ' yalms') return false end
-    farm_status(('walking the route, looking for mobs (point %d of %d)'):format(math.min(state.wp, #pts), #pts))
-    if state.wp > #pts or state.wp < 1 then state.wp = 1 end
-    local wp = pts[state.wp]
-    local dx, dy = wp.x - me.x, wp.y - me.y
-    if math.sqrt(dx * dx + dy * dy) < 2 then
-        if settings.farm.loop then
-            state.wp = state.wp % #pts + 1
-        else
-            if state.wp + state.wp_dir > #pts or state.wp + state.wp_dir < 1 then state.wp_dir = -state.wp_dir end
-            state.wp = state.wp + state.wp_dir
-        end
-        wp = pts[state.wp]
-    end
-    run_toward(me, wp)
-    state.route_moving = true
-    return false
-end
-
 local function record_route()
     if not state.recording then return end
     local me = windower.ffxi.get_mob_by_target('me')
@@ -1243,6 +1097,8 @@ local function ja_ready(name)
 end
 quick.init(settings, state, { log = log })
 warp.init(settings, state, { log = log })
+farm.init(settings, state, { log = log, run_toward = run_toward, stop_running = stop_running, face = face,
+    party_engaged = party_engaged, recently = recently, mark = mark, save = function() store.save(settings) send_profile() end })
 finish.init(settings, state, { log = log, use_ws = use_ws, ws_in_range = ws_in_range, recently = recently, mark = mark })
 bard.init(settings, state, {
     log = log, recently = recently, mark = mark, try_cast = try_cast, use_ja = use_ja, amnesia = amnesia,
@@ -1280,6 +1136,7 @@ local function tick()
     if not player then return end
     record_route()
     stats.tick(player)
+    farm.check_stop(player)
     warp.tick(player)
     alts.broadcast_mount(player)
     party.hello(player)
@@ -1326,9 +1183,9 @@ local function tick()
 
     if settings.modules.farm and player.status == 1 then   -- (abilities run first in a fight, so say it here)
         local t = windower.ffxi.get_mob_by_target('t')
-        farm_status('fighting ' .. (t and t.name or 'a mob'))
+        farm.status('fighting ' .. (t and t.name or 'a mob'))
     elseif settings.modules.farm then
-        farm_status('getting ready first (cures, buffs, abilities)')   -- do_farm says more once it gets its turn
+        farm.status('getting ready first (cures, buffs, abilities)')   -- farm.tick says more once it gets its turn
     end
     -- A mob being finished with a set weapon skill (vg_finish): the others leave it alone, the finisher waits for TP.
     -- Only curing, buffing and songs then.
@@ -1338,12 +1195,12 @@ local function tick()
         return
     end
     local _ = do_raise(player) or do_heal(player) or do_status(player) or strat.arts(player) or mages.crowd(player)
-        or do_assist(player) or do_pull(player) or support.double_up(ctx, engine) or mages.bar(player)
+        or do_assist(player) or farm.pull(player) or support.double_up(ctx, engine) or mages.bar(player)
         or engine.run(ctx, pr, pre_ws_filter) or do_skillchain(player) or do_ws(player)
         or do_burst(player) or mages.sch(player) or engine.run(ctx, pr, normal_filter) or do_mana(player)
         or do_dispel(player) or do_debuff(player)
         or support.radial(player) or do_geo(player) or do_songs(player) or support.pianissimo(player) or do_buffs(player) or alts.upkeep(player)
-        or do_rest(player) or do_trusts(player) or do_farm(player)
+        or do_rest(player) or do_trusts(player) or farm.tick(player)
 end
 
 windower.register_event('prerender', function()
@@ -1388,6 +1245,7 @@ local buffed_msgs = S{230, 266, 280, 319}
 
 windower.register_event('action message', function(actor_id, target_id, actor_index, target_index, message_id, p1, p2)
     stats.on_message(actor_id, target_id, message_id, p1, p2)
+    farm.on_message(actor_id, target_id, message_id)
 end)
 
 windower.register_event('action', function(act)
@@ -1507,6 +1365,8 @@ windower.register_event('ipc message', function(msg)
     if not player then return end
     local to, from, text = msg:match('^vg_alert (%S+) ([^|]+)|(.+)$')
     if to then alts.on_alert(player, to, from, text) return end
+    local frest = msg:match('^vg_farmrest (%S+)$')
+    if frest then farm.on_rest_call(player, frest) return end
     local fmob, ffrom = msg:match('^vg_finish (%d+) (%S+)$')
     if fmob then finish.on_ipc(fmob, ffrom) return end
     local dmob, dspell, dwhat = msg:match('^vg_debuff (%d+) (.+) (%a+)$')
@@ -1953,13 +1813,28 @@ windower.register_event('addon command', function(cmd, ...)
             for _, m in ipairs({ 'farm', 'ws', 'rest', 'actions' }) do settings.modules[m] = true end
             if settings.trusts.list ~= '' then settings.modules.trusts = true end
             settings.enabled = true
-            if #util.split(settings.farm.targets, ',') == 0 then log('Farming on, but no mobs are picked yet: pick what to fight') else log('Farming started') end
+            farm.start(windower.ffxi.get_player(), windower.ffxi.get_mob_by_target('me'))
+            if settings.farm.mode == 'list' and #util.split(settings.farm.targets, ',') == 0 then log('Farming on, but no mobs are picked yet: pick what to fight') else log('Farming started') end
         elseif sub == 'stop' then
             settings.modules.farm, settings.enabled = false, false
             stop_running()
             log('Farming stopped')
+        elseif sub == 'camp' then
+            -- "Set camp here"
+            local me = windower.ffxi.get_mob_by_target('me')
+            if me then farm.set_camp(me) settings.farm.area = 'camp' log('Camp set here') end
         end
         store.save(settings) send_profile()
+    elseif cmd == 'farmspot' then
+        -- the Farming tab's spots: //vg farmspot save | load <s1> | del <s1>
+        local sub, key = (args[1] or ''):lower(), args[2] or ''
+        if sub == 'save' then farm.save_spot()
+        elseif sub == 'load' then farm.load_spot(key)
+        elseif sub == 'del' then farm.delete_spot(key) end
+        store.save(settings) send_profile()
+    elseif cmd == 'radar' then
+        -- the Farming tab is open: send the radar for a few seconds
+        state.radar_until = os.clock() + 6
     elseif cmd == 'finish' then
         -- the app's "Finish the mob with" menu: //vg finish <weapon skill> | none
         local name = table.concat(args, ' ')

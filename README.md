@@ -237,11 +237,19 @@ Team tab > Go home: shows how each character gets home (Warp spell, Instant Warp
 character, everyone, or just the alts (click twice). A Warp Ring is put on, used when it's ready, and GearSwap is kept
 off the ring until the character zones. `//vg warp` does the same in game.
 
-## Farming (redesigned in 0.34.0 / Vanguard Control 1.24.0)
+## Farming: avoiding packs (new in 0.37.0 / Vanguard Control 1.27.0)
 
-Farming tab, three steps, all clicks: **1 What to fight** (Look around, then Fight these on the mobs you want),
-**2 Where** (how far to look; optionally Record a route and walk it), **3 How** (pull with Provoke / Flash / a ranged
-attack or just walk up; rest under an HP / MP %), **4 Trusts** (click the ones to call). Then **Start farming**. The top line tells you what it's doing.
+Farming tab > How to fight: **Pick mobs on their own first** (on) - a mob with others standing within 8 yalms can bring
+them along, so lone mobs are pulled first. **Never pull one with others next to it** waits until one is alone (purple
+on the radar). Mobs attacking you are always fought.
+
+## Farming (rebuilt in 0.36.0 / Vanguard Control 1.26.0)
+
+Farming tab: a live radar and the run's numbers on top, then **What to fight** (mobs you pick with Look around / only
+what attacks you / anything nearby), **Where** (a camp it returns to, or a recorded route), **How to fight** (pull with,
+rest at), **The team** (others follow and help in one click; wait for the party's HP / MP before each pull), **Finish
+mobs with a weapon skill**, **Stop when** (inventory full, after N kills) and **Trusts**. Then **Start farming**.
+Mobs it can't reach are skipped. **Save this farm** keeps it all as a farm spot for next time.
 
 ## Finish mobs with a weapon skill (new in 0.34.0)
 

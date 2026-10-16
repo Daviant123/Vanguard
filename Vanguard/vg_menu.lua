@@ -219,7 +219,12 @@ function menu.extra(settings)
         rest_hp_low = settings.rest.hp_low, rest_mp_low = settings.rest.mp_low,
         ws_finish = settings.ws.finish, ws_finish_at = settings.ws.finish_at, ws_finish_save = settings.ws.finish_save,
         ws_finish_others = settings.ws.finish_others, ws_finish_wait = settings.ws.finish_wait,
-        farm_approach = settings.farm.approach, trusts_list = settings.trusts.list, trusts_size = settings.trusts.party_size,
+        farm_approach = settings.farm.approach, farm_mode = settings.farm.mode, farm_area = settings.farm.area,
+        farm_camp = settings.farm.camp ~= '' and require('vg_farm').camp() ~= nil, farm_back = settings.farm.back_to_camp,
+        farm_wait = settings.farm.wait_party, farm_wait_hp = settings.farm.wait_hp, farm_wait_mp = settings.farm.wait_mp,
+        farm_wait_near = settings.farm.wait_near, farm_packs = settings.farm.packs, farm_pack_range = settings.farm.pack_range,
+        farm_pack_strict = settings.farm.pack_strict, farm_stop_full = settings.farm.stop_full, farm_stop_kills = settings.farm.stop_kills,
+        farm_spots = require('vg_farm').spots(), trusts_list = settings.trusts.list, trusts_size = settings.trusts.party_size,
         triggers = (function()
             local out = {}
             for k, v in pairs(settings.triggers or {}) do

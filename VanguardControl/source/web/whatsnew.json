@@ -1,5 +1,23 @@
 [
   {
+    "version": "1.27.0",
+    "date": "2026-10-16",
+    "items": [
+      "Farming: avoid packs. A mob with others standing next to it can bring them along, so the farmer now picks mobs on their own first. Farming tab > How to fight (on by default, pick how close counts as \"next to it\").",
+      "\"Never pull one with others next to it\" makes it wait until a mob is alone; those show purple on the radar. Mobs already attacking you are always fought."
+    ]
+  },
+  {
+    "version": "1.26.0",
+    "date": "2026-10-16",
+    "items": [
+      "Farming rebuilt from the ground up. The Farming tab now opens with a live radar (your camp, the mobs coloured by what farming will do with them, your party) and the run's numbers: time, kills, kills per hour, a kill every N seconds, XP per hour.",
+      "It stays in one place: a camp it returns to after each kill (or a route you record). Mobs it can't reach (can't see them, can't get closer) are skipped instead of chased forever.",
+      "It waits for the party before each pull - the healer's MP, everyone's HP, everyone close - and tells whoever is low to rest. \"Others follow and help\" sets the whole team up in one click.",
+      "Three ways to farm: mobs you pick, only what attacks you, or anything nearby. Stop when the inventory is full or after a number of kills. Save the whole farm as a spot and load it next time with one click."
+    ]
+  },
+  {
     "version": "1.25.2",
     "date": "2026-10-16",
     "items": [
