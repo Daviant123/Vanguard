@@ -36,7 +36,7 @@ local fired = {}
 local function now() return os.clock() end
 
 function triggers.note_mob(kind, name, actor)
-    recent[kind][#recent[kind] + 1] = { name = name:lower(), t = now() }
+    recent[kind][#recent[kind] + 1] = { name = name:lower(), orig = name, t = now() }
     if #recent[kind] > 20 then table.remove(recent[kind], 1) end
     local list = names_seen[kind]
     if list then
@@ -44,6 +44,16 @@ function triggers.note_mob(kind, name, actor)
         list[#list + 1] = name
         if #list > 30 then table.remove(list, 1) end
     end
+end
+
+-- The app's Enemy watch: the last TP move / spell a mob readied, if it was in the last few seconds.
+function triggers.last_move(secs)
+    local best
+    for _, kind in ipairs({ 'readies', 'casts' }) do
+        local e = recent[kind][#recent[kind]]
+        if e and now() - e.t <= (secs or 6) and (not best or e.t > best.t) then best = { n = e.orig or e.name, k = kind, t = e.t } end
+    end
+    return best and { n = best.n, k = best.k } or nil
 end
 
 -- The app's Reactions builder: moves / spells seen lately (newest last).

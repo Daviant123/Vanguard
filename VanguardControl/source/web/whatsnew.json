@@ -1,5 +1,13 @@
 [
   {
+    "version": "1.21.0",
+    "date": "2026-10-16",
+    "items": [
+      "New: Enemy watch on the Team tab. See what your characters are fighting: its HP, distance, the TP move it readies, and every enfeeble - green landed, yellow being cast, red resisted, grey not tried yet.",
+      "When two characters fight the same enemy it shows once, with everything both of them know."
+    ]
+  },
+  {
     "version": "1.20.0",
     "date": "2026-10-16",
     "items": [

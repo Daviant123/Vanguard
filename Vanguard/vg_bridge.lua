@@ -58,6 +58,30 @@ function bridge.log(text)
     send({ type = 'log', name = p and p.name or '?', text = text })
 end
 
+-- Enemy watch (series 3 round 4): the battle target and how the team's enfeebles stand on it - landed, resisted,
+-- being cast (shared between characters, vg_share), or not tried yet - plus its last TP move.
+function bridge.foe(settings, state)
+    local bt = windower.ffxi.get_mob_by_target('bt')
+    if not bt or (bt.hpp or 0) <= 0 then return nil end
+    local rec = state and state.debuffs and state.debuffs[bt.id] or {}
+    local effects, seen = {}, {}
+    local function add(name, r)
+        if seen[name] then return end
+        seen[name] = true
+        local st = 'wanted'
+        if r then
+            if r.landed then st = 'landed'
+            elseif r.other_until and os.clock() < r.other_until then st = 'casting'
+            elseif r.resisted or (r.tries or 0) > 0 then st = 'resisted' end
+        end
+        effects[#effects + 1] = { n = name, s = st }
+    end
+    for _, name in ipairs(settings.modules.debuff and util.split(settings.debuff.list, ',') or {}) do add(name, rec[name]) end
+    for name, r in pairs(rec) do if type(r) == 'table' then add(name, r) end end
+    return { id = bt.id, name = bt.name, hpp = bt.hpp, d = math.floor(util.dist(bt) + 0.5), effects = effects,
+             move = require('vg_triggers').last_move(6) }
+end
+
 local function snapshot(settings, state)
     local p = windower.ffxi.get_player()
     if not p then return nil end
@@ -80,6 +104,7 @@ local function snapshot(settings, state)
         autostart = settings.autostart,
         stats = require('vg_stats').get(),
         buffs = util.buff_list(p.buffs),
+        foe = bridge.foe(settings, state),
         hold = state and state.hold or false,
         camp = state and state.camp ~= nil or false,
         retreat = state and state.retreat or false,

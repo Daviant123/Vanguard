@@ -34,7 +34,7 @@ function share.on_debuff(mob_id, spell, what)
     state.debuffs[mob_id][spell] = r
     if what == 'landed' then r.landed = true
     elseif what == 'cast' then r.other_until = clock() + 8
-    elseif what == 'resisted' then r.other_until = nil end
+    elseif what == 'resisted' then r.other_until, r.resisted = nil, true end
 end
 
 -- Someone else is casting it right now / it already landed.

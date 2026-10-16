@@ -1,6 +1,6 @@
 _addon.name = 'Vanguard'
 _addon.author = 'Daviant'
-_addon.version = '0.31.0'
+_addon.version = '0.32.0'
 _addon.commands = {'vanguard', 'vg'}
 
 --[[
@@ -1375,7 +1375,7 @@ windower.register_event('action', function(act)
                     local rec = state.debuffs[first.id][spell.en]
                     if rec then
                         if landed_msgs:contains(first_action.message) then rec.landed = true share.debuff(first.id, spell.en, 'landed') end
-                        if resist_msgs:contains(first_action.message) then log(spell.en .. ' resisted') share.debuff(first.id, spell.en, 'resisted') end
+                        if resist_msgs:contains(first_action.message) then log(spell.en .. ' resisted') rec.resisted, rec.other_until = true, nil share.debuff(first.id, spell.en, 'resisted') end
                     end
                 end
             end

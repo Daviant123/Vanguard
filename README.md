@@ -225,6 +225,11 @@ Settings are now saved safely with several characters running (one character's s
 Healing & MP (or Recovery) tab: **Keep MP for cures**. Below that MP the character stops casting buffs, songs,
 enfeebles and nukes and saves the rest for Cures, Raise and status removal. 0 = off.
 
+## Enemy watch (new in 0.32.0 / Vanguard Control 1.21.0)
+
+Team tab > Enemy: what your characters are fighting, its HP and distance, its TP move as it readies it, and each
+enfeeble: green landed, yellow being cast, red resisted, grey not tried yet.
+
 ## Skillchain builder (new in 0.30.0 / Vanguard Control 1.19.0)
 
 Team tab > Skillchain: pick each step's character and weapon skill from menus. The app shows the properties, what each

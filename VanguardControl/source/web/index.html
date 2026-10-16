@@ -88,6 +88,11 @@ label.field select { min-width: 190px; color: var(--text); font-size: 13px; }
 .btag { display: inline-block; padding: 1px 7px; margin: 2px 3px 0 0; border-radius: 9px; font-size: 11px; background: rgba(139,146,163,.14); color: var(--muted); }
 .btag.bad { background: rgba(224,96,90,.18); color: var(--bad); font-weight: 600; cursor: pointer; }
 .btag.bad:hover { outline: 1px solid var(--bad); }
+.btag.landed { background: rgba(76,175,122,.18); color: var(--good); }
+.btag.resisted { background: rgba(224,96,90,.18); color: var(--bad); }
+.btag.casting { background: rgba(212,165,74,.2); color: var(--tp); }
+.hpbar { height: 6px; border-radius: 3px; background: rgba(139,146,163,.15); overflow: hidden; margin-top: 3px; }
+.hpbar div { height: 100%; background: var(--hp); }
 .card .ail { margin-top: 4px; }
 .card .ail .btag { font-size: 10px; padding: 0 5px; }
 table.board td { vertical-align: top; }
@@ -355,6 +360,7 @@ function teamTab(c, p) {
   const setups = arr(x.setups);
   return `<div class="stack">
     <div class="hint">Orders go to the leader (<b>${esc(L || "nobody yet")}</b>), who passes them to everyone. Switches marked "everyone" are set on every character.</div>
+    ${foeBox()}
     ${boardBox()}
     ${timerBox()}
     ${statsBox()}
@@ -578,6 +584,38 @@ function boardBox() {
         <td style="text-align:left">${bl.length ? bl.map(b => b.b
           ? `<span class="btag bad" title="Click: ${esc(cureSpellFor(b.n) ? (curerFor(cureSpellFor(b.n), n) || "nobody") + " casts " + cureSpellFor(b.n) : "no spell removes this")}" onclick="cureAilment('${esc(n)}', '${esc(b.n)}')">${esc(b.n)}</span>`
           : `<span class="btag">${esc(b.n)}</span>`).join("") : `<span class="hint">none</span>`}</td></tr>`; }).join("")}
+    </tbody></table></div>`;
+}
+
+// ---------- Enemy watch: what the team is fighting, which enfeebles stuck, its last TP move ----------
+// Every character reports its battle target (snapshot.foe); the same mob seen by several is merged (best state wins).
+function foes() {
+  const rank = {landed: 3, casting: 2, resisted: 1, wanted: 0}, by = {};
+  for (const n of Object.keys(chars).sort()) {
+    const f = chars[n].online && (chars[n].snapshot || {}).foe;
+    if (!f || !f.id) continue;
+    const m = by[f.id] || (by[f.id] = {id: f.id, name: f.name, hpp: f.hpp, d: f.d, who: [], eff: {}, order: [], move: null});
+    m.who.push(n); m.hpp = Math.min(m.hpp, f.hpp); m.d = Math.min(m.d, f.d);
+    for (const e of arr(f.effects)) {
+      if (!(e.n in m.eff)) m.order.push(e.n);
+      if (!(e.n in m.eff) || rank[e.s] > rank[m.eff[e.n]]) m.eff[e.n] = e.s;
+    }
+    if (f.move && !m.move) m.move = f.move;
+  }
+  return Object.values(by);
+}
+function foeBox() {
+  const list = foes();
+  if (!list.length) return "";
+  const word = {landed: "landed", resisted: "resisted", casting: "being cast", wanted: "not yet"};
+  return `<div class="box"><h3>Enemy</h3>
+    <table class="grid board"><thead><tr><th style="text-align:left">Enemy</th><th>HP</th><th>Distance</th><th style="text-align:left">Enfeebles (green landed, yellow being cast, red resisted, grey not yet)</th></tr></thead><tbody>
+    ${list.map(m => `<tr><td style="text-align:left"><b>${esc(m.name)}</b><div class="hint">fighting: ${esc(m.who.join(", "))}</div>
+        ${m.move ? `<div style="color:var(--bad);font-weight:600">${m.move.k === "casts" ? "casting" : "readies"} ${esc(m.move.n)}</div>` : ""}</td>
+      <td style="min-width:90px">${m.hpp}%<div class="hpbar"><div style="width:${Math.max(0, Math.min(100, m.hpp))}%"></div></div></td>
+      <td>${m.d} y</td>
+      <td style="text-align:left">${m.order.length ? m.order.map(n => `<span class="btag ${m.eff[n]}" title="${esc(word[m.eff[n]] || "")}">${esc(n)}</span>`).join("")
+        : `<span class="hint">no enfeebles set (Enfeebles tab)</span>`}</td></tr>`).join("")}
     </tbody></table></div>`;
 }
 
@@ -1290,7 +1328,8 @@ function renderPanel() {
   const team = tab === "team" ? Object.keys(chars).map(n => [n, (chars[n].snapshot || {}).hold, (chars[n].snapshot || {}).camp,
     (chars[n].snapshot || {}).retreat, (chars[n].snapshot || {}).defense, (chars[n].snapshot || {}).leader,
     (chars[n].snapshot || {}).stats, chars[n].online, (chars[n].snapshot || {}).buffs, (chars[n].snapshot || {}).hpp,
-    (chars[n].snapshot || {}).mpp, (chars[n].snapshot || {}).tp, (chars[n].snapshot || {}).status, (chars[n].snapshot || {}).target]) : 0;
+    (chars[n].snapshot || {}).mpp, (chars[n].snapshot || {}).tp, (chars[n].snapshot || {}).status, (chars[n].snapshot || {}).target,
+    (chars[n].snapshot || {}).foe]) : 0;
   const bk = JSON.stringify([tab, p, s.leader, Object.keys(chars), team, tab === "app" ? [addon, crashes] : 0, tab === "strat" ? s.strat : 0, tab === "adv" ? c.nearby : 0,
     tab === "team" ? [stopTimer.until, Math.floor((stopTimer.left || 0) / 60)] : 0]);
   if (bk === bodyKey) return;
