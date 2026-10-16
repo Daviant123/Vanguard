@@ -1,5 +1,12 @@
 [
   {
+    "version": "1.27.3",
+    "date": "2026-10-16",
+    "items": [
+      "Fixed: picking a weapon skill (like Atonement) on Job & abilities turned weapon skills off and the menu jumped back. It sets the weapon skill now."
+    ]
+  },
+  {
     "version": "1.27.2",
     "date": "2026-10-16",
     "items": [

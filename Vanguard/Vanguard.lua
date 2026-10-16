@@ -1,6 +1,6 @@
 _addon.name = 'Vanguard'
 _addon.author = 'Daviant'
-_addon.version = '0.37.1'
+_addon.version = '0.37.2'
 _addon.commands = {'vanguard', 'vg'}
 
 --[[
@@ -1503,7 +1503,10 @@ windower.register_event('addon command', function(cmd, ...)
         store.save(settings)
         log('leader: ' .. (settings.leader ~= '' and settings.leader or 'none'))
         send_profile()
-    elseif settings.modules[cmd] ~= nil then
+    -- "ws <weapon skill>" (the app's Weapon skill menu) sets the weapon skill; only "ws on|off|toggle" is the module
+    -- switch. (It used to land here and switch weapon skills OFF: "ws Atonement" -> "ws: off".)
+    elseif settings.modules[cmd] ~= nil and not (cmd == 'ws'
+            and not (args[1] and ({ on = 1, off = 1, toggle = 1, ['true'] = 1, ['false'] = 1 })[args[1]:lower()])) then
         local v = (args[1] or 'toggle'):lower()
         if v == 'toggle' then settings.modules[cmd] = not settings.modules[cmd]
         else settings.modules[cmd] = (v == 'on' or v == 'true') end
@@ -1785,6 +1788,9 @@ windower.register_event('addon command', function(cmd, ...)
         end
     elseif cmd == 'ws' then
         local name = table.concat(args, ' ')
+        if name:lower() == 'none' then name = '' end
+        local w = name ~= '' and util.wskill(name)
+        if w then name = w.en end
         settings.ws.name = name
         if state.profile then state.profile.ws = name end
         settings.modules.ws = name ~= ''
