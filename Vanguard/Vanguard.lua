@@ -1,6 +1,6 @@
 _addon.name = 'Vanguard'
 _addon.author = 'Daviant'
-_addon.version = '0.23.0'
+_addon.version = '0.24.0'
 _addon.commands = {'vanguard', 'vg'}
 
 --[[
@@ -55,7 +55,8 @@ local quick = require('vg_quick')
 ------------------------------------------------------------------------
 local defaults = {
     enabled = false,
-    autostart = false,       -- start by itself when Vanguard loads (login / reload); off = wait for Start
+    autostart = false,
+    hotkeys = '',            -- quick-button hotkeys bound in this game window (vg_quick, set from the app)       -- start by itself when Vanguard loads (login / reload); off = wait for Start
     leader = '',
     tick = 0.25,
     modules = {
@@ -1105,6 +1106,7 @@ local function send_profile(player)
             c.strat_info = strat.info(player)
             if player.main_job == 'BRD' then c.bard_info = bard.info(player) end
             c.known = quick.known(player)                -- for the app's quick buttons
+            c.hotkeys = settings.hotkeys
             return c
         end)(),
         party = menu.party(),
@@ -1477,6 +1479,7 @@ end)
 windower.register_event('load', function()
     bridge.start(settings)
     if settings.keys then bind_keys(true) end
+    quick.hk_bind_all(true)
     if windower.ffxi.get_info().logged_in then load_profile() end
     update.on_load()
 end)
@@ -1487,6 +1490,7 @@ end)
 windower.register_event('unload', function()
     stop_running() bridge.stop() hud.destroy()
     if settings.keys then bind_keys(false) end
+    quick.hk_bind_all(false)
 end)
 
 ------------------------------------------------------------------------
@@ -1654,6 +1658,16 @@ windower.register_event('addon command', function(cmd, ...)
             save_profile()
             send_profile()
         end
+    elseif cmd == 'hotkey' then
+        -- from the app: //vg hotkey set <key> <who> <kind> <target> [name]  |  //vg hotkey clear <key>
+        local sub, key = (args[1] or ''):lower(), args[2]
+        local ok = false
+        if sub == 'set' then ok = quick.hk_set(key, args[3], args[4], args[5], table.concat(args, ' ', 6))
+        elseif sub == 'clear' then ok = quick.hk_clear(key) end
+        if ok then store.save(settings) send_profile() log(('Hotkey %s %s'):format(key, sub == 'set' and 'set' or 'cleared'))
+        else log('Hotkey: not changed') end
+    elseif cmd == 'hk' then
+        quick.hk_press(windower.ffxi.get_player(), args[1])
     elseif cmd == 'logout' then
         -- the app's stop timer: the normal /logout (the game counts down and can be cancelled by moving)
         stop_running()

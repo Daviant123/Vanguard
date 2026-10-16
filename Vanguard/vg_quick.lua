@@ -89,6 +89,80 @@ function quick.act(player, kind, target, name)
     return cmd
 end
 
+------------------------------------------------------------------------
+-- Hotkeys for quick buttons (series 2 round 6; ISBoxer's key maps): pressed in this game window, they make the
+-- chosen character act. Kept in settings.hotkeys ("^1=Name|ma|me|Cure IV;!2=*|item|me|Echo Drops"), bound with
+-- Windower's own bind on load. Ctrl / Alt + 1-0 only, so they never clash with the game's keys or //vg keys (Ctrl+F1-F7).
+------------------------------------------------------------------------
+quick.KEYS = {}
+for _, mod in ipairs({ '^', '!' }) do for d = 0, 9 do quick.KEYS[mod .. d] = true end end
+
+local function hk_map()
+    local map, order = {}, {}
+    for _, entry in ipairs(util.split(S.hotkeys or '', ';')) do
+        local key, who, kind, target, name = entry:match('^([%^!]%d)=([^|]*)|([^|]*)|([^|]*)|(.*)$')
+        if key and quick.KEYS[key] then
+            if not map[key] then order[#order + 1] = key end
+            map[key] = { who = who, kind = kind, target = target, name = name }
+        end
+    end
+    return map, order
+end
+quick.hk_map = hk_map
+
+local function hk_save(map, order)
+    local parts = {}
+    for _, k in ipairs(order) do
+        local m = map[k]
+        if m then parts[#parts + 1] = ('%s=%s|%s|%s|%s'):format(k, m.who, m.kind, m.target, m.name or '') end
+    end
+    S.hotkeys = table.concat(parts, ';')
+end
+
+function quick.hk_set(key, who, kind, target, name)
+    if not quick.KEYS[key or ''] or not (who or ''):match('^[%a*]+$') or not (target or ''):match('^%a+$')
+        or not ({ ma = 1, ja = 1, ws = 1, item = 1, attack = 1, follow = 1, stop = 1 })[kind or ''] then return false end
+    if name and name:find('[;|]') then return false end
+    local map, order = hk_map()
+    if not map[key] then order[#order + 1] = key end
+    map[key] = { who = who, kind = kind, target = target, name = name or '' }
+    hk_save(map, order)
+    windower.send_command(('bind %s vg hk %s'):format(key, key))
+    return true
+end
+
+function quick.hk_clear(key)
+    local map, order = hk_map()
+    if not map[key or ''] then return false end
+    map[key] = nil
+    hk_save(map, order)
+    windower.send_command('unbind ' .. key)
+    return true
+end
+
+function quick.hk_bind_all(on)
+    local _, order = hk_map()
+    for _, k in ipairs(order) do
+        windower.send_command(on and ('bind %s vg hk %s'):format(k, k) or ('unbind ' .. k))
+    end
+end
+
+-- The key was pressed here: this character acts, or the order goes to the one it's for (or everyone).
+function quick.hk_press(player, key)
+    local m = hk_map()[key or '']
+    if not m then return false end
+    local cmd = ('act %s %s %s'):format(m.kind, m.target, m.name or ''):gsub('%s+$', '')
+    if m.who == '*' then
+        windower.send_ipc_message('vg_all ' .. cmd)
+        quick.act(player, m.kind, m.target, m.name)
+    elseif m.who:lower() == player.name:lower() then
+        quick.act(player, m.kind, m.target, m.name)
+    else
+        windower.send_ipc_message(('vg_to %s %s'):format(m.who, cmd))
+    end
+    return true
+end
+
 function quick.init(settings, runtime_state, helpers)
     S, state, h = settings, runtime_state, helpers
 end

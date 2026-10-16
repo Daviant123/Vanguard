@@ -576,7 +576,9 @@ function boardBox() {
 }
 
 // ---------- Quick buttons (ISBoxer-style click bar) ----------
-let quick = [], quickKey = "", qb = {who: "", kind: "ma", name: "", target: "bt"};
+let quick = [], quickKey = "", qb = {who: "", kind: "ma", name: "", target: "bt"}, hkHost = "";
+const HOTKEYS = [["none", "no hotkey"]].concat([1, 2, 3, 4, 5, 6, 7, 8, 9, 0].map(d => ["^" + d, "Ctrl+" + d]), [1, 2, 3, 4, 5, 6, 7, 8, 9, 0].map(d => ["!" + d, "Alt+" + d]));
+const keyLabel = k => k ? (k[0] === "^" ? "Ctrl+" : "Alt+") + k.slice(1) : "";
 async function quickDo(q) { try { quick = await (await fetch("/api/quick?" + q)).json(); } catch (e) {} quickKey = ""; bodyKey = ""; render(); renderQuickBar(); }
 const KIND_LABEL = {ma: "Spell", ja: "Ability", ws: "Weapon skill", item: "Item", attack: "Attack", follow: "Follow", stop: "Stop attacking"};
 const TARGET_LABEL = {bt: "the enemy", t: "its target", me: "itself", leader: "the leader"};
@@ -587,7 +589,7 @@ function renderQuickBar() {
   quickKey = key;
   bar.className = quick.length ? "show" : "";
   bar.innerHTML = quick.length ? `<span class="hint">Quick:</span>` + quick.map((b, i) =>
-    `<button onclick="quickDo('do=press&i=${i}')" title="${esc(b.who === "*" ? "Everyone" : b.who)}: ${esc(KIND_LABEL[b.kind] || b.kind)} ${esc(b.name)} on ${esc(TARGET_LABEL[b.target] || b.target)}">${esc(b.label || b.name || KIND_LABEL[b.kind])}<small>${esc(b.who === "*" ? "all" : b.who)}</small></button>`).join("") : "";
+    `<button onclick="quickDo('do=press&i=${i}')" title="${esc(b.who === "*" ? "Everyone" : b.who)}: ${esc(KIND_LABEL[b.kind] || b.kind)} ${esc(b.name)} on ${esc(TARGET_LABEL[b.target] || b.target)}${b.key ? " (" + keyLabel(b.key) + " in " + esc(b.host) + "'s game)" : ""}">${esc(b.label || b.name || KIND_LABEL[b.kind])}<small>${esc(b.who === "*" ? "all" : b.who)}${b.key ? " · " + keyLabel(b.key) : ""}</small></button>`).join("") : "";
 }
 function quickKnown(who) {
   const lists = who === "*" ? Object.keys(chars).map(n => ((chars[n].profile || {}).config || {}).known || {}) : [((chars[who] || {}).profile || {}).config?.known || {}];
@@ -611,7 +613,10 @@ function quickBox() {
       ${qb.kind !== "stop" ? `<label class="field">On <select id="qbtarget">${targets.map(([v, l]) => o(v, l, qb.target)).join("")}</select></label>` : ""}
       <button class="primary" onclick="quickAdd()" ${needsName && !qb.name ? "disabled" : ""}>Add button</button>
     </div>
-    ${quick.length ? `<div class="btns" style="margin-top:8px">${quick.map((b, i) => `<span class="pill off" style="padding:3px 6px">${esc(b.label || KIND_LABEL[b.kind])} <small>(${esc(b.who === "*" ? "everyone" : b.who)})</small>
+    ${quick.length ? `<div class="row" style="margin-top:8px"><label class="field">Hotkeys work in this game window <select id="hkhost">${names.map(n => o(n, n, hkHost || leaderName())).join("")}</select></label>
+        <span class="hint">Press the key in that window (Ctrl or Alt + a number) and the button's character acts.</span></div>
+      <div class="btns" style="margin-top:6px">${quick.map((b, i) => `<span class="pill off" style="padding:3px 6px">${esc(b.label || KIND_LABEL[b.kind])} <small>(${esc(b.who === "*" ? "everyone" : b.who)})</small>
+        <select data-hk="${i}" title="In-game hotkey">${HOTKEYS.map(([v, l]) => o(v, l, b.key || "none")).join("")}</select>
         <button title="Move left" onclick="quickDo('do=left&i=${i}')">‹</button><button title="Move right" onclick="quickDo('do=right&i=${i}')">›</button><button title="Remove" onclick="quickDo('do=delete&i=${i}')">×</button></span>`).join("")}</div>`
       : `<div class="hint" style="margin-top:6px">Your buttons appear in a bar under the top buttons, on every tab. E.g. "Healer: Curaga III on itself", "Everyone: Echo Drops", "Tank: Provoke on the enemy".</div>`}
   </div>`;
@@ -964,6 +969,8 @@ document.addEventListener("change", e => {
   }
   if (el.id === "profsel") return;
   if (["tmmode", "tmmins", "tmhour", "tmminute", "tmaction", "tmwho"].includes(el.id)) { tm[el.id.slice(2)] = el.value; bodyKey = ""; render(); return; }
+  if (el.id === "hkhost") { hkHost = el.value; return; }
+  if (el.dataset.hk !== undefined) { quickDo(`do=key&i=${el.dataset.hk}&key=${encodeURIComponent(el.value)}&host=${encodeURIComponent(hkHost || leaderName() || selected)}`); return; }
   if (["qbwho", "qbkind", "qbname", "qbtarget"].includes(el.id)) {
     qb[el.id.slice(2)] = el.value; if (el.id !== "qbname" && el.id !== "qbtarget") qb.name = "";
     bodyKey = ""; render(); return;

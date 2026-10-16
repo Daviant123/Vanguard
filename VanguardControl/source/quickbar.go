@@ -20,6 +20,15 @@ type quickButton struct {
 	Kind   string `json:"kind"`   // ma ja ws item attack follow stop
 	Name   string `json:"name"`   // spell / ability / weapon skill / item
 	Target string `json:"target"` // bt t me leader or a party member's name
+	Key    string `json:"key,omitempty"`  // in-game hotkey, ^1..^0 (Ctrl) / !1..!0 (Alt)
+	Host   string `json:"host,omitempty"` // the character whose game window has the hotkey (the one you play)
+}
+
+var hotkeyRe = regexp.MustCompile(`^[\^!][0-9]$`)
+
+// hotkeyCommand / clear: what the host character is told (vg_quick.lua binds it with Windower's bind).
+func (b quickButton) hotkeyCommand() string {
+	return strings.TrimSpace("hotkey set " + b.Key + " " + b.Who + " " + b.Kind + " " + b.Target + " " + b.Name)
 }
 
 var quickMu sync.Mutex
@@ -59,6 +68,13 @@ func (b quickButton) command() string {
 	return strings.TrimSpace("act " + b.Kind + " " + b.Target + " " + b.Name)
 }
 
+func keyName(k string) string {
+	if strings.HasPrefix(k, "^") {
+		return "Ctrl+" + k[1:]
+	}
+	return "Alt+" + k[1:]
+}
+
 func (h *hub) handleQuick(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
 	quickMu.Lock()
@@ -76,11 +92,42 @@ func (h *hub) handleQuick(w http.ResponseWriter, r *http.Request) {
 		} else {
 			h.addLog("That quick button couldn't be added.")
 		}
+	case "key":
+		// give button i a hotkey (key=none removes it), bound in host's game window
+		i, err := strconv.Atoi(q.Get("i"))
+		key, host := q.Get("key"), q.Get("host")
+		if err != nil || i < 0 || i >= len(list) || (key != "none" && !hotkeyRe.MatchString(key)) || !safeWord.MatchString(host) {
+			break
+		}
+		b := &list[i]
+		if b.Key != "" {
+			h.send(b.Host, "hotkey clear "+b.Key)
+		}
+		b.Key, b.Host = "", ""
+		if key != "none" {
+			for j := range list { // one button per key
+				if list[j].Key == key {
+					h.send(list[j].Host, "hotkey clear "+key)
+					list[j].Key, list[j].Host = "", ""
+				}
+			}
+			b.Key, b.Host = key, host
+			if !h.send(host, b.hotkeyCommand()) {
+				b.Key, b.Host = "", ""
+				h.addLog("%s isn't connected: the hotkey wasn't set. Try again when it is.", host)
+			} else {
+				h.addLog("Hotkey %s in %s's game window: %s.", keyName(key), host, b.Label)
+			}
+		}
+		saveQuick(list)
 	case "delete", "left", "right":
 		i, err := strconv.Atoi(q.Get("i"))
 		if err == nil && i >= 0 && i < len(list) {
 			switch q.Get("do") {
 			case "delete":
+				if list[i].Key != "" {
+					h.send(list[i].Host, "hotkey clear "+list[i].Key)
+				}
 				list = append(list[:i], list[i+1:]...)
 			case "left":
 				if i > 0 {

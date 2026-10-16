@@ -218,6 +218,11 @@ Settings are now saved safely with several characters running (one character's s
   Got a Terpander / Daurdabla? Just put 3 or 4 songs in the song list.
 - **Horde Lullaby.** With `//vg sleep on`, two or more extra mobs get Horde Lullaby (or Sleepga) at once.
 
+## Quick-button hotkeys (new in 0.24.0 / Vanguard Control 1.13.0)
+
+Give any quick button a hotkey (Ctrl or Alt + a number) from its menu on the Team tab. Press it in the game window you
+play (the leader's, or pick another) and the button's character acts - no need to click the app.
+
 ## Ability priority (new in 0.23.0 / Vanguard Control 1.12.0)
 
 The Job tab lists a character's abilities in the order they're tried, top first (like MMOMinion's Skill Manager).

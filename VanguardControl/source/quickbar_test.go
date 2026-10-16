@@ -53,7 +53,34 @@ func TestQuickButtons(t *testing.T) {
 			t.Errorf("a bad button is refused: %s", bad)
 		}
 	}
-	if list = call("do=delete&i=0"); len(list) != 1 || list[0].Label != "Curaga" {
+	// hotkeys: Ctrl+1 on the Curaga button, set in CharC's game window
+	collect(got, 100*time.Millisecond)
+	collect(got2, 100*time.Millisecond)
+	list = call("do=key&i=1&key=^1&host=CharC")
+	if list[1].Key != "^1" || list[1].Host != "CharC" {
+		t.Fatalf("the hotkey should be saved on the button, got %+v", list[1])
+	}
+	if m := collect(got2, 300*time.Millisecond); len(m) == 0 || m[len(m)-1] != "cmd hotkey set ^1 CharB ma me Curaga III" {
+		t.Errorf("the host character is told to bind it, got %v", m)
+	}
+	list = call("do=key&i=0&key=^1&host=CharC") // same key on another button: moves
+	if list[0].Key != "^1" || list[1].Key != "" {
+		t.Error("one button per key")
+	}
+	if m := strings.Join(collect(got2, 300*time.Millisecond), ","); !strings.Contains(m, "hotkey clear ^1") || !strings.Contains(m, "hotkey set ^1 * ja bt Provoke") {
+		t.Errorf("moving a key clears the old binding and sets the new one, got %s", m)
+	}
+	for _, bad := range []string{"do=key&i=0&key=f12&host=CharC", "do=key&i=0&key=^1;quit&host=CharC", "do=key&i=0&key=^1&host=x;y"} {
+		if call(bad)[0].Key != "^1" {
+			t.Errorf("bad hotkey request changed something: %s", bad)
+		}
+	}
+	collect(got2, 100*time.Millisecond)
+	if list = call("do=delete&i=0"); len(collect(got2, 300*time.Millisecond)) == 0 {
+		t.Error("deleting a button with a hotkey unbinds it")
+	}
+	list = call("do=left&i=0")
+	if list = call("do=delete&i=0"); len(list) != 0 {
 		t.Error("delete removes a button")
 	}
 }
