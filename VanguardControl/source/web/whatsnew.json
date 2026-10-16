@@ -1,5 +1,12 @@
 [
   {
+    "version": "1.25.2",
+    "date": "2026-10-16",
+    "items": [
+      "Fixed: drop-down menus (like \"Finish with\") closed by themselves before you could pick something. They stay open now."
+    ]
+  },
+  {
     "version": "1.25.1",
     "date": "2026-10-16",
     "items": [

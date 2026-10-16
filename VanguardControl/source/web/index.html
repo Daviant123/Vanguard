@@ -1439,6 +1439,7 @@ function sendCmd() {
 // ---------- events (one listener for every control) ----------
 document.addEventListener("change", e => {
   const el = e.target;
+  if (el.tagName === "SELECT") el.blur();   // picked: let the page redraw again
   if (el.id === "autostart") { post("*", `set autostart ${el.checked ? "true" : "false"}`); return; }
   if (el.id === "profauto") {
     const job = (chars[selected].profile || {}).job;
@@ -1525,7 +1526,8 @@ function renderPanel() {
   renderProfBar(p);
   // Don't redraw under the user's hand while a slider, number or text box is in use.
   const a = document.activeElement;
-  if (a && $("tabbody").contains(a) && (a.type === "range" || a.type === "text" || a.type === "number")) return;
+  // (a drop-down menu too: redrawing while it's open closed it before you could pick anything)
+  if (a && $("tabbody").contains(a) && (a.type === "range" || a.type === "text" || a.type === "number" || a.tagName === "SELECT")) return;
   const team = tab === "team" ? Object.keys(chars).map(n => [n, (chars[n].snapshot || {}).hold, (chars[n].snapshot || {}).camp,
     (chars[n].snapshot || {}).retreat, (chars[n].snapshot || {}).defense, (chars[n].snapshot || {}).leader,
     (chars[n].snapshot || {}).stats, chars[n].online, (chars[n].snapshot || {}).buffs, (chars[n].snapshot || {}).hpp,

@@ -20,7 +20,7 @@ import (
 	"time"
 )
 
-var panelVersion = "1.25.1" // set by -X for tests; the published version
+var panelVersion = "1.25.2" // set by -X for tests; the published version
 
 var updateBase = "https://raw.githubusercontent.com/Daviant123/Vanguard/main/VanguardControl/" // tests point it elsewhere
 
