@@ -1,5 +1,13 @@
 [
   {
+    "version": "1.16.0",
+    "date": "2026-10-16",
+    "items": [
+      "New: share profiles with friends (paid tools like MMOMinion have profile downloads). On the profile bar, Export… saves a profile as a file with the normal Windows Save window; Import… adds a file a friend sent you.",
+      "Exported files leave out which character they came from and who the leader is; an imported profile never overwrites one of yours (it becomes \"Name (2)\")."
+    ]
+  },
+  {
     "version": "1.15.0",
     "date": "2026-10-16",
     "items": [

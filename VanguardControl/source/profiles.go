@@ -212,6 +212,28 @@ func (h *hub) handleProfiles(w http.ResponseWriter, r *http.Request) {
 			h.addLog("%s on %s: profile \"%s\" loads by itself.", char, job, name)
 		}
 		writeAuto(m)
+	case "export":
+		dest := saveDialog(shareDefaultName(job, name))
+		if dest == "" {
+			break // cancelled
+		}
+		if err := exportProfile(job, name, dest); err != nil {
+			fail("Couldn't export: %v", err)
+			break
+		}
+		h.addLog("Exported profile \"%s\" (%s) to %s - send that file to a friend.", name, job, dest)
+	case "import":
+		src := openDialog()
+		if src == "" {
+			break
+		}
+		p, err := importProfile(src)
+		if err != nil {
+			fail("Couldn't import: %v", err)
+			break
+		}
+		reply["imported"] = map[string]string{"job": p.Job, "name": p.Name}
+		h.addLog("Imported %s profile \"%s\". Load it on a character that's on %s.", p.Job, p.Name, p.Job)
 	case "folder":
 		os.MkdirAll(profilesDir(), 0o755)
 		openFolder(profilesDir())

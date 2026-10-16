@@ -218,6 +218,12 @@ Settings are now saved safely with several characters running (one character's s
   Got a Terpander / Daurdabla? Just put 3 or 4 songs in the song list.
 - **Horde Lullaby.** With `//vg sleep on`, two or more extra mobs get Horde Lullaby (or Sleepga) at once.
 
+## Sharing profiles (new in 0.27.0 / Vanguard Control 1.16.0)
+
+On the profile bar, **Export...** saves the chosen profile as a file (normal Windows Save window) to send a friend;
+**Import...** adds a profile file you were sent. Exported files leave out which character they came from and the
+leader's name; an import never overwrites one of yours.
+
 ## Reactions (new in 0.26.0 / Vanguard Control 1.15.0)
 
 Advanced tab > Reactions: pick **When** (my HP / MP below, TP at least, someone's HP below, the enemy's HP below, the

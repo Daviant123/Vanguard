@@ -286,6 +286,8 @@ function renderProfBar(p) {
     <button onclick="profLoad()" ${mine.length ? "" : "disabled"}>Load</button>
     <button onclick="profSave()">Save as…</button>
     <button onclick="profDelete()" ${mine.length ? "" : "disabled"}>Delete</button>
+    <button onclick="profExport()" ${mine.length ? "" : "disabled"} title="Save this profile as a file to send a friend">Export…</button>
+    <button onclick="profDo('do=import')" title="Add a profile file a friend sent you">Import…</button>
     <label class="chk ${auto ? "" : "off"}" title="Loads by itself whenever ${esc(selected)} is on ${esc(job)}">
       <input type="checkbox" id="profauto" ${auto ? "checked" : ""}><span>Load by itself on ${esc(job)}</span></label>
     <span class="hint" style="margin-left:auto">Saved on this PC; load any profile onto any character.</span>`;
@@ -297,6 +299,7 @@ function profSave() {
   const n = prompt(`Save ${selected}'s ${job} setup as profile:`, profPick() || `${selected} ${job}`);
   if (n && n.trim()) profDo(`do=save&char=${encodeURIComponent(selected)}&name=${encodeURIComponent(n.trim())}`);
 }
+function profExport() { const n = profPick(), job = (chars[selected].profile || {}).job; if (n) profDo(`do=export&job=${job}&name=${encodeURIComponent(n)}`); }
 function profDelete() {
   const n = profPick(), job = (chars[selected].profile || {}).job;
   if (n && confirm(`Delete the ${job} profile "${n}"?`)) profDo(`do=delete&job=${job}&name=${encodeURIComponent(n)}`);
