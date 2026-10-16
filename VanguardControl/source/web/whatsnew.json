@@ -1,5 +1,13 @@
 [
   {
+    "version": "1.10.0",
+    "date": "2026-10-16",
+    "items": [
+      "New: Party board on the Team tab - every character's HP, MP, TP, what it's doing and all its buffs in one place, so you don't need to look at the other game windows (the job ISBoxer's window views do).",
+      "Ailments show in red, also on the character cards on the left. Click one and a character who can cure it casts the right spell (Paralyna, Cursna for Doom, Erase, ...)."
+    ]
+  },
+  {
     "version": "1.9.0",
     "date": "2026-10-15",
     "items": [

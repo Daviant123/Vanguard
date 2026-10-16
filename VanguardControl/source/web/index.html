@@ -85,6 +85,12 @@ label.field select { min-width: 190px; color: var(--text); font-size: 13px; }
 .empty { color: var(--muted); padding: 10px 2px; }
 .steps { color: var(--muted); margin: 6px 0 0; padding-left: 18px; }
 .steps b { color: var(--text); }
+.btag { display: inline-block; padding: 1px 7px; margin: 2px 3px 0 0; border-radius: 9px; font-size: 11px; background: rgba(139,146,163,.14); color: var(--muted); }
+.btag.bad { background: rgba(224,96,90,.18); color: var(--bad); font-weight: 600; cursor: pointer; }
+.btag.bad:hover { outline: 1px solid var(--bad); }
+.card .ail { margin-top: 4px; }
+.card .ail .btag { font-size: 10px; padding: 0 5px; }
+table.board td { vertical-align: top; }
 #quickbar { display: none; padding: 6px 14px; border-bottom: 1px solid var(--line); background: var(--panel-2); gap: 6px; flex-wrap: wrap; align-items: center; }
 #quickbar.show { display: flex; }
 #quickbar button { padding: 4px 10px; }
@@ -342,6 +348,7 @@ function teamTab(c, p) {
   const setups = arr(x.setups);
   return `<div class="stack">
     <div class="hint">Orders go to the leader (<b>${esc(L || "nobody yet")}</b>), who passes them to everyone. Switches marked "everyone" are set on every character.</div>
+    ${boardBox()}
     ${statsBox()}
     ${quickBox()}
     <div class="cols">
@@ -497,6 +504,38 @@ function stratTab(c, p) {
     ${missing.length ? `<div class="hint">Not on this job / level: ${missing.map(esc).join(", ")}.</div>` : ""}
     <div class="hint">Each stratagem works on the next spell of its kind and uses one charge. The reserve is only spent on emergencies (Raise with Celerity, emergency cures).</div>
   </div>`;
+}
+
+// ---------- Party board: everyone's buffs and ailments in one place ----------
+// The spell that removes each ailment (Erase for the rest that Erase can take off).
+const CURE_FOR = {poison: "Poisona", paralysis: "Paralyna", blindness: "Blindna", silence: "Silena", petrification: "Stona",
+  disease: "Viruna", plague: "Viruna", curse: "Cursna", doom: "Cursna", sleep: "Cure", lullaby: "Cure"};
+const NO_CURE = new Set(["stun", "terror", "charm", "amnesia", "mute", "impairment", "encumbrance"]);
+function cureSpellFor(ail) { const a = lc(ail); return CURE_FOR[a] || (NO_CURE.has(a) ? "" : "Erase"); }
+function curerFor(spell, target) {
+  // someone online who can cast it right now; the target itself last (Erase can't be cast on yourself)
+  const can = n => chars[n].online && arr((((chars[n].profile || {}).config || {}).known || {}).spells).includes(spell);
+  const names = Object.keys(chars).filter(can).sort((a, b) => (a === target) - (b === target));
+  return names.find(n => !(n === target && spell === "Erase")) || "";
+}
+function cureAilment(target, ail) {
+  const spell = cureSpellFor(ail), who = spell ? curerFor(spell, target) : "";
+  if (!who) { alert(spell ? `Nobody here can cast ${spell} right now.` : `${ail} can't be removed with a spell.`); return; }
+  post(who, `act ma ${who === target ? "me" : target} ${spell}`);
+}
+function boardBox() {
+  const names = Object.keys(chars).sort().filter(n => chars[n].online);
+  if (!names.length) return "";
+  return `<div class="box"><h3>Party board</h3>
+    <table class="grid board"><thead><tr><th>Character</th><th>HP</th><th>MP</th><th>TP</th><th>Doing</th><th style="text-align:left">Buffs (red = ailment: click to cure it)</th></tr></thead><tbody>
+    ${names.map(n => { const s = chars[n].snapshot || {}, bl = arr(s.buffs);
+      return `<tr><td><b>${esc(n)}</b><div class="hint">${esc(s.job || "")}</div></td>
+        <td>${s.hpp ?? "?"}%</td><td>${s.mpp ?? "?"}%</td><td>${s.tp ?? 0}</td>
+        <td>${esc(s.status || "")}${s.target ? `<div class="hint">${esc(s.target)} ${s.target_hpp}%</div>` : ""}</td>
+        <td style="text-align:left">${bl.length ? bl.map(b => b.b
+          ? `<span class="btag bad" title="Click: ${esc(cureSpellFor(b.n) ? (curerFor(cureSpellFor(b.n), n) || "nobody") + " casts " + cureSpellFor(b.n) : "no spell removes this")}" onclick="cureAilment('${esc(n)}', '${esc(b.n)}')">${esc(b.n)}</span>`
+          : `<span class="btag">${esc(b.n)}</span>`).join("") : `<span class="hint">none</span>`}</td></tr>`; }).join("")}
+    </tbody></table></div>`;
 }
 
 // ---------- Quick buttons (ISBoxer-style click bar) ----------
@@ -924,6 +963,7 @@ function renderList() {
         <span class="pill ${s.enabled ? "on" : "off"}">${s.enabled ? "ON" : "OFF"}</span></div>
       <div class="sub">${esc(sub)}</div>
       <div class="bars">${bar(s.hpp, "var(--hp)", 100, "HP")}${bar(s.mpp, "var(--mp)", 100, "MP")}${bar(s.tp, "var(--tp)", 3000, "TP")}</div>
+      ${c.online && arr(s.buffs).some(b => b.b) ? `<div class="ail">${arr(s.buffs).filter(b => b.b).map(b => `<span class="btag bad">${esc(b.n)}</span>`).join("")}</div>` : ""}
     </div>`;
   }).join("");
 }
@@ -953,7 +993,8 @@ function renderPanel() {
   if (a && $("tabbody").contains(a) && (a.type === "range" || a.type === "text" || a.type === "number")) return;
   const team = tab === "team" ? Object.keys(chars).map(n => [n, (chars[n].snapshot || {}).hold, (chars[n].snapshot || {}).camp,
     (chars[n].snapshot || {}).retreat, (chars[n].snapshot || {}).defense, (chars[n].snapshot || {}).leader,
-    (chars[n].snapshot || {}).stats, chars[n].online]) : 0;
+    (chars[n].snapshot || {}).stats, chars[n].online, (chars[n].snapshot || {}).buffs, (chars[n].snapshot || {}).hpp,
+    (chars[n].snapshot || {}).mpp, (chars[n].snapshot || {}).tp, (chars[n].snapshot || {}).status, (chars[n].snapshot || {}).target]) : 0;
   const bk = JSON.stringify([tab, p, s.leader, Object.keys(chars), team, tab === "app" ? addon : 0, tab === "strat" ? s.strat : 0]);
   if (bk === bodyKey) return;
   bodyKey = bk;

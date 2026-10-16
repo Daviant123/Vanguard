@@ -79,6 +79,7 @@ local function snapshot(settings, state)
         version = _addon.version,
         autostart = settings.autostart,
         stats = require('vg_stats').get(),
+        buffs = util.buff_list(p.buffs),
         hold = state and state.hold or false,
         camp = state and state.camp ~= nil or false,
         retreat = state and state.retreat or false,

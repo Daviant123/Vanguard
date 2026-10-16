@@ -238,6 +238,32 @@ function util.json_decode(str)
 end
 
 ------------------------------------------------------------------------
+-- Buffs for the app's Party board: name + whether it's an ailment (red, clickable to cure)
+------------------------------------------------------------------------
+local BAD = {}
+for _, n in ipairs({ 'poison', 'paralysis', 'blindness', 'silence', 'petrification', 'disease', 'plague', 'curse',
+    'doom', 'sleep', 'stun', 'terror', 'charm', 'amnesia', 'weight', 'bind', 'slow', 'addle', 'weakness', 'impairment',
+    'encumbrance', 'mute', 'elegy', 'requiem', 'threnody', 'helix', 'bio', 'dia', 'flash', 'burn', 'frost', 'choke',
+    'rasp', 'shock', 'drown', 'max hp down', 'max mp down', 'attack down', 'defense down', 'accuracy down',
+    'evasion down', 'magic atk. down', 'magic acc. down', 'magic def. down', 'str down', 'dex down', 'vit down',
+    'agi down', 'int down', 'mnd down', 'chr down', 'lullaby', 'gravity' }) do BAD[n] = true end
+util.AILMENT = BAD
+
+function util.buff_list(ids)
+    local out, seen = {}, {}
+    for _, id in pairs(ids or {}) do
+        local b = res.buffs[id]
+        local name = b and b.en
+        if name and not seen[name:lower()] then
+            seen[name:lower()] = true
+            out[#out + 1] = { n = name, b = BAD[name:lower()] or nil }
+        end
+    end
+    table.sort(out, function(x, y) if (x.b or false) ~= (y.b or false) then return x.b == true end return x.n < y.n end)
+    return out
+end
+
+------------------------------------------------------------------------
 -- Skillchain message ids -> property name, and burst elements
 ------------------------------------------------------------------------
 local sc_names = {'Light','Darkness','Gravitation','Fragmentation','Distortion','Fusion',

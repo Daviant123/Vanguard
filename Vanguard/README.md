@@ -218,6 +218,11 @@ Settings are now saved safely with several characters running (one character's s
   Got a Terpander / Daurdabla? Just put 3 or 4 songs in the song list.
 - **Horde Lullaby.** With `//vg sleep on`, two or more extra mobs get Horde Lullaby (or Sleepga) at once.
 
+## Party board (new in 0.21.0 / Vanguard Control 1.10.0)
+
+The Team tab shows every character's HP, MP, TP, what it's doing and all its buffs in one table. Ailments are red
+(also on the character cards); click one and a character who can cure it casts the right spell.
+
 ## Quick buttons (new in 0.20.0 / Vanguard Control 1.9.0)
 
 On the Team tab, build a button from menus: **who** (a character or everyone), **does** (a spell, ability, weapon
