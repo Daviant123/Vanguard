@@ -1,5 +1,13 @@
 [
   {
+    "version": "1.11.0",
+    "date": "2026-10-16",
+    "items": [
+      "New: Stop timer on the Team tab (paid script programs call it \"stop after run time\"). Pick \"after 2 hours\" or \"at 3 AM\", then whether to just stop or stop and log out, for everyone or only the alts. A countdown shows at the top.",
+      "It runs in the app, so it works with the window minimized; logging out uses the normal /logout."
+    ]
+  },
+  {
     "version": "1.10.0",
     "date": "2026-10-16",
     "items": [

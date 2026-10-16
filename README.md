@@ -218,6 +218,11 @@ Settings are now saved safely with several characters running (one character's s
   Got a Terpander / Daurdabla? Just put 3 or 4 songs in the song list.
 - **Horde Lullaby.** With `//vg sleep on`, two or more extra mobs get Horde Lullaby (or Sleepga) at once.
 
+## Stop timer (new in 0.22.0 / Vanguard Control 1.11.0)
+
+On the Team tab: stop **after** a time (30 minutes to 10 hours) or **at** a clock time, then **stop** or **stop and log
+out** (the normal /logout), for **everyone** or **only the alts**. A countdown shows at the top; Cancel any time.
+
 ## Party board (new in 0.21.0 / Vanguard Control 1.10.0)
 
 The Team tab shows every character's HP, MP, TP, what it's doing and all its buffs in one table. Ailments are red

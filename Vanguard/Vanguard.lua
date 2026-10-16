@@ -1,6 +1,6 @@
 _addon.name = 'Vanguard'
 _addon.author = 'Daviant'
-_addon.version = '0.21.0'
+_addon.version = '0.22.0'
 _addon.commands = {'vanguard', 'vg'}
 
 --[[
@@ -1644,6 +1644,11 @@ windower.register_event('addon command', function(cmd, ...)
             save_profile()
             send_profile()
         end
+    elseif cmd == 'logout' then
+        -- the app's stop timer: the normal /logout (the game counts down and can be cancelled by moving)
+        stop_running()
+        log('Logging out (stop timer)')
+        windower.send_command('input /logout')
     elseif cmd == 'act' then
         -- a quick button from the app: //vg act <ma|ja|ws|item|attack|follow|stop> <bt|t|me|leader|Name> [name]
         local player = windower.ffxi.get_player()

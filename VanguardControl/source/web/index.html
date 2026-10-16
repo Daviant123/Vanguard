@@ -146,6 +146,7 @@ table.sgrid .na { color: var(--line); }
   <button class="stop" onclick="post('*','off')">Stop all</button>
   <label class="chk" id="autostartbox" title="On: characters start by themselves when they log in or Vanguard reloads. Off: they wait for Start.">
     <input type="checkbox" id="autostart"><span>Auto start</span></label>
+  <span id="timerbadge" class="pill on" style="display:none;cursor:pointer" title="Stop timer (Team tab)" onclick="setTab('team')"></span>
   <div class="status" id="status">Waiting for characters…</div>
   <button onclick="quitApp()" title="Close Vanguard Control">Quit</button>
 </header>
@@ -349,6 +350,7 @@ function teamTab(c, p) {
   return `<div class="stack">
     <div class="hint">Orders go to the leader (<b>${esc(L || "nobody yet")}</b>), who passes them to everyone. Switches marked "everyone" are set on every character.</div>
     ${boardBox()}
+    ${timerBox()}
     ${statsBox()}
     ${quickBox()}
     <div class="cols">
@@ -504,6 +506,39 @@ function stratTab(c, p) {
     ${missing.length ? `<div class="hint">Not on this job / level: ${missing.map(esc).join(", ")}.</div>` : ""}
     <div class="hint">Each stratagem works on the next spell of its kind and uses one charge. The reserve is only spent on emergencies (Raise with Celerity, emergency cures).</div>
   </div>`;
+}
+
+// ---------- Stop timer (Team tab; runs in the app) ----------
+let stopTimer = {}, tm = {mode: "mins", mins: "120", hour: "2", minute: "0", action: "stop", who: "all"};
+async function timerDo(q) { try { stopTimer = await (await fetch("/api/timer?" + q)).json(); } catch (e) {} renderTimer(); bodyKey = ""; render(); }
+function fmtLeft(s) { s = Math.max(0, s | 0); const h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60); return h ? `${h}h ${String(m).padStart(2, "0")}m` : `${m}m ${String(s % 60).padStart(2, "0")}s`; }
+function renderTimer() {
+  const b = $("timerbadge"); if (!b) return;
+  const on = stopTimer.until > 0;
+  b.style.display = on ? "" : "none";
+  if (on) b.textContent = `${stopTimer.action === "logout" ? "Log out" : "Stop"} in ${fmtLeft(stopTimer.left)}`;
+}
+setInterval(() => { if (stopTimer.until > 0) { stopTimer.left--; renderTimer(); } }, 1000);
+setInterval(() => timerDo(""), 15000);
+function timerBox() {
+  const o = (v, l, cur) => `<option value="${v}" ${String(v) === String(cur) ? "selected" : ""}>${l}</option>`;
+  const on = stopTimer.until > 0;
+  const mins = [[30, "30 minutes"], [60, "1 hour"], [90, "1½ hours"], [120, "2 hours"], [180, "3 hours"], [240, "4 hours"], [360, "6 hours"], [480, "8 hours"], [600, "10 hours"]];
+  const hours = Array.from({length: 24}, (_, h) => [h, `${(h % 12) || 12} ${h < 12 ? "AM" : "PM"}`]);
+  return `<div class="box"><h3>Stop timer</h3>
+    ${on ? `<div class="row"><b>${stopTimer.action === "logout" ? "Stop and log out" : "Stop"} ${stopTimer.who === "alts" ? "the alts" : "everyone"} in ${fmtLeft(stopTimer.left)}</b>
+        (at ${new Date(stopTimer.until * 1000).toLocaleTimeString([], {hour: "2-digit", minute: "2-digit"})})
+        <button class="stop" onclick="timerDo('do=clear')">Cancel</button></div>`
+    : `<div class="row" style="align-items:flex-end">
+      <label class="field">When <select id="tmmode">${o("mins", "after", tm.mode)}${o("at", "at", tm.mode)}</select></label>
+      ${tm.mode === "mins" ? `<label class="field">How long <select id="tmmins">${mins.map(([v, l]) => o(v, l, tm.mins)).join("")}</select></label>`
+        : `<label class="field">Time <select id="tmhour">${hours.map(([v, l]) => o(v, l, tm.hour)).join("")}</select></label>
+           <label class="field">&nbsp;<select id="tmminute">${[0, 15, 30, 45].map(m => o(m, ":" + String(m).padStart(2, "0"), tm.minute)).join("")}</select></label>`}
+      <label class="field">Then <select id="tmaction">${o("stop", "stop", tm.action)}${o("logout", "stop and log out", tm.action)}</select></label>
+      <label class="field">Who <select id="tmwho">${o("all", "everyone", tm.who)}${o("alts", "only the alts (not the leader)", tm.who)}</select></label>
+      <button class="primary" onclick="timerDo('do=set&action=' + tm.action + '&who=' + tm.who + (tm.mode === 'mins' ? '&mins=' + tm.mins : '&hour=' + tm.hour + '&minute=' + tm.minute))">Start timer</button>
+    </div>`}
+    <div class="hint" style="margin-top:6px">Runs in the app, so it works with this window minimized. "Log out" uses the normal /logout.</div></div>`;
 }
 
 // ---------- Party board: everyone's buffs and ailments in one place ----------
@@ -926,6 +961,7 @@ document.addEventListener("change", e => {
     return;
   }
   if (el.id === "profsel") return;
+  if (["tmmode", "tmmins", "tmhour", "tmminute", "tmaction", "tmwho"].includes(el.id)) { tm[el.id.slice(2)] = el.value; bodyKey = ""; render(); return; }
   if (["qbwho", "qbkind", "qbname", "qbtarget"].includes(el.id)) {
     qb[el.id.slice(2)] = el.value; if (el.id !== "qbname" && el.id !== "qbtarget") qb.name = "";
     bodyKey = ""; render(); return;
@@ -995,7 +1031,8 @@ function renderPanel() {
     (chars[n].snapshot || {}).retreat, (chars[n].snapshot || {}).defense, (chars[n].snapshot || {}).leader,
     (chars[n].snapshot || {}).stats, chars[n].online, (chars[n].snapshot || {}).buffs, (chars[n].snapshot || {}).hpp,
     (chars[n].snapshot || {}).mpp, (chars[n].snapshot || {}).tp, (chars[n].snapshot || {}).status, (chars[n].snapshot || {}).target]) : 0;
-  const bk = JSON.stringify([tab, p, s.leader, Object.keys(chars), team, tab === "app" ? addon : 0, tab === "strat" ? s.strat : 0]);
+  const bk = JSON.stringify([tab, p, s.leader, Object.keys(chars), team, tab === "app" ? addon : 0, tab === "strat" ? s.strat : 0,
+    tab === "team" ? [stopTimer.until, Math.floor((stopTimer.left || 0) / 60)] : 0]);
   if (bk === bodyKey) return;
   bodyKey = bk;
   const fn = {job: () => jobTab(c, p), heal: () => healTab(p), buffs: () => buffsTab(p), debuffs: () => debuffsTab(p),
@@ -1039,6 +1076,7 @@ async function poll() {
 poll();
 pollAddon();
 quickDo("");
+timerDo("");
 profDo("");
 </script>
 </body>

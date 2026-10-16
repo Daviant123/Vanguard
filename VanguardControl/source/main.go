@@ -59,6 +59,7 @@ type hub struct {
 	updateNow chan string
 	dumps     map[string]chan json.RawMessage // characters asked for their setup (profiles)
 	jobs      map[string]string               // last job seen per character (auto-load profiles)
+	timer     stopTimer                       // the stop timer (timer.go)
 	mu     sync.Mutex
 	conn   *net.UDPConn
 	chars  map[string]*character
@@ -331,6 +332,7 @@ func main() {
 		dumps: map[string]chan json.RawMessage{}, jobs: map[string]string{}}
 	h.addLog("Vanguard Control %s. Listening on %s. Load the addon in game with //lua load vanguard", panelVersion, udpAddr)
 	go h.listen()
+	go h.timerLoop()
 	// The addon: find Windower, install / update the one built into this exe, reload old copies.
 	go func() {
 		if msg := h.ensureAddon(false); msg != "" && msg != "ok" {
@@ -350,6 +352,7 @@ func main() {
 	mux.HandleFunc("/api/addon", h.handleAddon)
 	mux.HandleFunc("/api/profiles", h.handleProfiles)
 	mux.HandleFunc("/api/quick", h.handleQuick)
+	mux.HandleFunc("/api/timer", h.handleTimer)
 	mux.HandleFunc("/api/quit", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNoContent)
 		go func() { time.Sleep(200 * time.Millisecond); os.Exit(0) }()
