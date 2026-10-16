@@ -1,5 +1,13 @@
 [
   {
+    "version": "1.28.0",
+    "date": "2026-10-16",
+    "items": [
+      "Farming: see what dropped. The Farming tab now shows \"Loot this run\" - everything that came into your bags while farming.",
+      "Farm for an item: under Stop when, pick an item (from your bags or what dropped) and how many - e.g. 12 Beastmen's Seals. A progress bar shows how close you are, and farming stops by itself when you have them."
+    ]
+  },
+  {
     "version": "1.27.3",
     "date": "2026-10-16",
     "items": [

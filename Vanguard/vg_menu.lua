@@ -224,7 +224,8 @@ function menu.extra(settings)
         farm_wait = settings.farm.wait_party, farm_wait_hp = settings.farm.wait_hp, farm_wait_mp = settings.farm.wait_mp,
         farm_wait_near = settings.farm.wait_near, farm_packs = settings.farm.packs, farm_pack_range = settings.farm.pack_range,
         farm_pack_strict = settings.farm.pack_strict, farm_stop_full = settings.farm.stop_full, farm_stop_kills = settings.farm.stop_kills,
-        farm_spots = require('vg_farm').spots(), trusts_list = settings.trusts.list, trusts_size = settings.trusts.party_size,
+        farm_spots = require('vg_farm').spots(),
+        farm_item = settings.farm.item, farm_item_goal = settings.farm.item_goal, inv_items = require('vg_farm').inventory_names(), trusts_list = settings.trusts.list, trusts_size = settings.trusts.party_size,
         triggers = (function()
             local out = {}
             for k, v in pairs(settings.triggers or {}) do

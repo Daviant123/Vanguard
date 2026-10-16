@@ -1,6 +1,6 @@
 _addon.name = 'Vanguard'
 _addon.author = 'Daviant'
-_addon.version = '0.37.2'
+_addon.version = '0.38.0'
 _addon.commands = {'vanguard', 'vg'}
 
 --[[
@@ -110,6 +110,7 @@ local defaults = {
              height = 5, approach = true, pull_cmd = '', route = '', loop = true,
              mode = 'list', area = 'camp', camp = '', camp_zone = 0, back_to_camp = true,
              wait_party = true, wait_hp = 70, wait_mp = 40, wait_near = 20, stop_full = true, stop_kills = 0,
+             item = '', item_goal = 0,     -- farming for an item: stop when item_goal of it are in the inventory
              packs = true, pack_range = 8, pack_strict = false },
     farmspots = { s0 = '' },      -- saved farm spots (vg_farm): s1, s2, ... = "name|zone|field=value|..." 
     -- "Spell>target" pairs. target = me or a party member name. "ja:" prefix = job ability.
@@ -1137,6 +1138,7 @@ local function tick()
     if not player then return end
     record_route()
     stats.tick(player)
+    farm.loot_tick()
     farm.check_stop(player)
     warp.tick(player)
     alts.broadcast_mount(player)
@@ -1831,6 +1833,15 @@ windower.register_event('addon command', function(cmd, ...)
             local me = windower.ffxi.get_mob_by_target('me')
             if me then farm.set_camp(me) settings.farm.area = 'camp' log('Camp set here') end
         end
+        store.save(settings) send_profile()
+    elseif cmd == 'farmitem' then
+        -- the Farming tab's "Farm for": //vg farmitem <item name> | none
+        local name = table.concat(args, ' ')
+        local id = farm.item_id(name)
+        settings.farm.item = id and require('resources').items[id].en or ''
+        if settings.farm.item == '' then settings.farm.item_goal = 0
+        elseif settings.farm.item_goal <= 0 then settings.farm.item_goal = 12 end
+        log(settings.farm.item ~= '' and ('Farming for %d %s'):format(settings.farm.item_goal, settings.farm.item) or 'Not farming for an item')
         store.save(settings) send_profile()
     elseif cmd == 'farmspot' then
         -- the Farming tab's spots: //vg farmspot save | load <s1> | del <s1>

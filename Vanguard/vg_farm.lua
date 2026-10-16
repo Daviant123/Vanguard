@@ -321,8 +321,79 @@ end
 ------------------------------------------------------------------------
 local function kills_now() return (require('vg_stats').get() or {}).kills or 0 end
 
+------------------------------------------------------------------------
+-- loot (round 9, farming 2/5): what came into the bags this run, and farming for an item ("until I have 12 of X") -
+-- DreamBot / OSBot combat scripts show loot gained and stop at an item count; EasyFarm can't
+------------------------------------------------------------------------
+local function inv_counts()
+    local out = {}
+    local inv = windower.ffxi.get_items('inventory') or {}
+    for _, it in ipairs(inv) do
+        if type(it) == 'table' and it.id and it.id > 0 then out[it.id] = (out[it.id] or 0) + (it.count or 1) end
+    end
+    return out
+end
+
+local item_ids                                   -- lower-case name -> id (built once)
+local function item_id(name)
+    if not name or name == '' then return nil end
+    if not item_ids then
+        item_ids = {}
+        for id, it in pairs(res.items) do
+            if type(it) == 'table' and it.en then item_ids[it.en:lower()] = id end
+        end
+    end
+    return item_ids[name:lower()]
+end
+farm.item_id = item_id
+
+local function item_name(id) local it = res.items[id] return it and it.en or ('item ' .. tostring(id)) end
+
+-- every couple of seconds while farming: anything new in the bags counts as loot
+function farm.loot_tick()
+    if not S.modules.farm or not state.farm_run then return end
+    if state.farm_inv_t and now() - state.farm_inv_t < 2 then return end
+    state.farm_inv_t = now()
+    local cur = inv_counts()
+    local before = state.farm_inv or cur
+    state.farm_loot = state.farm_loot or {}
+    for id, n in pairs(cur) do
+        local gained = n - (before[id] or 0)
+        if gained > 0 then state.farm_loot[id] = (state.farm_loot[id] or 0) + gained end
+    end
+    state.farm_inv = cur
+end
+
+-- how many of the item it's farming for are in the inventory now
+function farm.item_have()
+    local id = item_id(S.farm.item)
+    if not id then return nil end
+    return inv_counts()[id] or 0
+end
+
+function farm.loot_list()
+    local out = {}
+    for id, n in pairs(state.farm_loot or {}) do out[#out + 1] = { n = item_name(id), c = n } end
+    table.sort(out, function(a, b) if a.c ~= b.c then return a.c > b.c end return a.n < b.n end)
+    while #out > 8 do table.remove(out) end
+    return out
+end
+
+-- names of what's in the inventory, for the app's item picker
+function farm.inventory_names()
+    local seen, out = {}, {}
+    for id in pairs(inv_counts()) do
+        local it = res.items[id]
+        if it and it.en and not seen[it.en] then seen[it.en] = true out[#out + 1] = it.en end
+    end
+    table.sort(out)
+    while #out > 80 do table.remove(out) end
+    return out
+end
+
 function farm.start(player, me)
     state.farm_run = { t = now(), kills0 = kills_now() }
+    state.farm_inv, state.farm_inv_t, state.farm_loot = inv_counts(), now(), {}
     state.farm_bl, state.farm_skipped, state.farm_go, state.farm_fails = {}, 0, nil, {}
     if me and (S.farm.area ~= 'route') and not farm.camp() then farm.set_camp(me) end
 end
@@ -332,8 +403,11 @@ function farm.run_stats()
     if not r then return nil end
     local secs = math.max(1, math.floor(now() - r.t))
     local kills = math.max(0, kills_now() - r.kills0)
+    local have = farm.item_have()
     return { secs = secs, kills = kills, kph = secs >= 120 and math.floor(kills * 3600 / secs + 0.5) or nil,
-             every = kills > 0 and math.floor(secs / kills + 0.5) or nil, skipped = state.farm_skipped or 0 }
+             every = kills > 0 and math.floor(secs / kills + 0.5) or nil, skipped = state.farm_skipped or 0,
+             loot = farm.loot_list(),
+             item = have and { n = S.farm.item, have = have, goal = S.farm.item_goal } or nil }
 end
 
 -- a reason to stop farming now, or nil
@@ -341,6 +415,8 @@ local function stop_reason(player)
     if player.status == 2 or player.status == 3 then return "KO'd" end
     local r = farm.run_stats()
     if r and S.farm.stop_kills > 0 and r.kills >= S.farm.stop_kills then return r.kills .. ' kills done' end
+    local have = farm.item_have()
+    if have and S.farm.item_goal > 0 and have >= S.farm.item_goal then return ('%d %s in the bags'):format(have, S.farm.item) end
     if S.farm.stop_full then
         local inv = windower.ffxi.get_items('inventory')
         if inv and inv.max and inv.max > 0 and (inv.count or 0) >= inv.max then return 'the inventory is full' end
@@ -473,7 +549,7 @@ end
 ------------------------------------------------------------------------
 local SPOT_FIELDS = { 'targets', 'ignore', 'claim', 'mode', 'range', 'height', 'pull_cmd', 'loop', 'aggro_first',
     'approach', 'route', 'area', 'camp', 'camp_zone', 'back_to_camp', 'wait_party', 'wait_hp', 'wait_mp', 'wait_near',
-    'packs', 'pack_range', 'pack_strict' }
+    'packs', 'pack_range', 'pack_strict', 'item', 'item_goal' }
 
 local function spot_keys()
     local keys = {}
