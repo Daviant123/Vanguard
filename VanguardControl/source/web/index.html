@@ -1484,7 +1484,7 @@ function farmTab(c, p) {
         </div>
         ${route && f.rec == null ? `<div class="row" style="margin-top:6px">${sel("set farm.loop ", [{v: "true", l: "Go round in a loop"}, {v: "false", l: "Walk there and back"}], x.farm_loop === false ? "false" : "true")}</div>` : ""}`}
       <div class="row" style="margin-top:8px">
-        <label class="field">${area === "camp" ? "Fight mobs within (of camp)" : "Look for mobs within"} ${sel("set farm.range ", nums([10, 15, 20, 25, 30, 40, 50], " yalms"), x.farm_range ?? 20)}</label>
+        <label class="field">${area === "camp" ? "Fight mobs within (of camp)" : "Look for mobs within"} ${sel("set farm.range ", nums([10, 15, 20, 25, 30, 40, 50, 100, 150, 200, 250, 300, 350, 400, 450, 500], " yalms"), x.farm_range ?? 20)}</label>
         <label class="field">Up or down at most ${sel("set farm.height ", nums([3, 5, 8, 12, 20], " yalms"), x.farm_height ?? 5)}</label>
       </div>
       <div class="hint" style="margin-top:6px">The radar shows the camp area (dashed ring) or the route (blue line).</div>`)}

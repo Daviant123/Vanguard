@@ -1,5 +1,12 @@
 [
   {
+    "version": "1.27.2",
+    "date": "2026-10-16",
+    "items": [
+      "Farming: \"Fight mobs within\" now goes up to 500 yalms (in steps of 50 after 50)."
+    ]
+  },
+  {
     "version": "1.27.1",
     "date": "2026-10-16",
     "items": [
