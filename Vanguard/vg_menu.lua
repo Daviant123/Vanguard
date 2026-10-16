@@ -231,6 +231,7 @@ function menu.extra(settings)
             return out
         end)(),
         seen = require('vg_triggers').seen_names(),
+        sc_steps = settings.sc.steps, sc_open_tp = settings.sc.open_tp,
     }
 end
 

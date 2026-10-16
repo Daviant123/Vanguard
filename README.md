@@ -218,6 +218,11 @@ Settings are now saved safely with several characters running (one character's s
   Got a Terpander / Daurdabla? Just put 3 or 4 songs in the song list.
 - **Horde Lullaby.** With `//vg sleep on`, two or more extra mobs get Horde Lullaby (or Sleepga) at once.
 
+## Skillchain builder (new in 0.30.0 / Vanguard Control 1.19.0)
+
+Team tab > Skillchain: pick each step's character and weapon skill from menus. The app shows the properties, what each
+step makes (or "no skillchain") and which magic bursts the result opens. **Use this skillchain** sets it on everyone.
+
 ## Crash reports (new in 0.29.0 / Vanguard Control 1.18.0)
 
 Errors in the addon (on any character) and in the app are caught instead of breaking things. A "problem" badge shows

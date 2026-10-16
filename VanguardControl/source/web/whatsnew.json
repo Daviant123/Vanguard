@@ -1,5 +1,13 @@
 [
   {
+    "version": "1.19.0",
+    "date": "2026-10-16",
+    "items": [
+      "New: Skillchain builder on the Team tab. Pick each step's character and weapon skill from menus (only weapon skills that character has); the app shows each one's properties, what every step makes (e.g. Gravitation, then Darkness) or \"no skillchain\", and which magic bursts it opens. \"Use this skillchain\" sets it on everyone.",
+      "No more typing \"Character:Weapon Skill\" lines."
+    ]
+  },
+  {
     "version": "1.18.0",
     "date": "2026-10-16",
     "items": [

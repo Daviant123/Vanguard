@@ -28,9 +28,17 @@ function quick.known(player)
         local ja = res.job_abilities[id]
         if ja and ja.en and ja.type ~= 'Monster' then out.abilities[#out.abilities + 1] = ja.en end
     end
+    out.wsprops = {}                                   -- skillchain properties, for the app's Skillchain builder
     for _, id in pairs(ab.weapon_skills or {}) do
         local ws = res.weapon_skills[id]
-        if ws and ws.en then out.ws[#out.ws + 1] = ws.en end
+        if ws and ws.en then
+            out.ws[#out.ws + 1] = ws.en
+            local props = {}
+            for _, k in ipairs({ 'skillchain_a', 'skillchain_b', 'skillchain_c' }) do
+                if ws[k] and ws[k] ~= '' then props[#props + 1] = ws[k] end
+            end
+            out.wsprops[ws.en] = props
+        end
     end
     local inv = (windower.ffxi.get_items() or {}).inventory
     seen = {}
@@ -57,7 +65,7 @@ function quick.known(player)
     for _, m in pairs(res.mounts or {}) do
         if m.en and owned[('\226\153\170' .. m.en .. ' companion'):lower()] then out.mounts[#out.mounts + 1] = m.en end   -- key item "♪Raptor companion"
     end
-    for _, t in pairs(out) do table.sort(t) end
+    for k, t in pairs(out) do if k ~= 'wsprops' then table.sort(t) end end
     return out
 end
 

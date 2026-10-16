@@ -358,6 +358,7 @@ function teamTab(c, p) {
     ${boardBox()}
     ${timerBox()}
     ${statsBox()}
+    ${scBox()}
     ${upkeepBox()}
     ${quickBox()}
     <div class="cols">
@@ -578,6 +579,78 @@ function boardBox() {
           ? `<span class="btag bad" title="Click: ${esc(cureSpellFor(b.n) ? (curerFor(cureSpellFor(b.n), n) || "nobody") + " casts " + cureSpellFor(b.n) : "no spell removes this")}" onclick="cureAilment('${esc(n)}', '${esc(b.n)}')">${esc(b.n)}</span>`
           : `<span class="btag">${esc(b.n)}</span>`).join("") : `<span class="hint">none</span>`}</td></tr>`; }).join("")}
     </tbody></table></div>`;
+}
+
+// ---------- Skillchain builder: pick who uses which weapon skill, see what it makes ----------
+// opener property -> closer property -> skillchain (the standard FFXI table)
+const SC_TABLE = {
+  Transfixion: {Compression: "Compression", Scission: "Distortion", Reverberation: "Reverberation"},
+  Compression: {Transfixion: "Transfixion", Detonation: "Detonation"},
+  Liquefaction: {Scission: "Scission", Impaction: "Fusion"},
+  Scission: {Liquefaction: "Liquefaction", Reverberation: "Reverberation", Detonation: "Detonation"},
+  Reverberation: {Induration: "Induration", Impaction: "Impaction"},
+  Detonation: {Compression: "Gravitation", Scission: "Scission"},
+  Induration: {Compression: "Compression", Reverberation: "Fragmentation", Impaction: "Impaction"},
+  Impaction: {Liquefaction: "Liquefaction", Detonation: "Detonation"},
+  Gravitation: {Distortion: "Darkness", Fragmentation: "Fragmentation"},
+  Distortion: {Gravitation: "Darkness", Fusion: "Fusion"},
+  Fusion: {Gravitation: "Gravitation", Fragmentation: "Light"},
+  Fragmentation: {Distortion: "Distortion", Fusion: "Light"},
+  Light: {Light: "Light"}, Darkness: {Darkness: "Darkness"},
+};
+const SC_BURST = {Light: "Fire, Wind, Thunder, Light", Darkness: "Earth, Water, Ice, Dark", Gravitation: "Earth, Dark",
+  Fragmentation: "Wind, Thunder", Distortion: "Water, Ice", Fusion: "Fire, Light", Compression: "Dark", Liquefaction: "Fire",
+  Induration: "Ice", Reverberation: "Water", Transfixion: "Light", Scission: "Earth", Detonation: "Wind", Impaction: "Thunder"};
+// What a closer makes on an opener (each a list of properties); the closer's properties are tried in order.
+function scCombine(opener, closer) {
+  for (const c of closer) for (const o of opener) { const r = (SC_TABLE[o] || {})[c]; if (r) return r; }
+  return "";
+}
+// The results along a chain of weapon-skill property lists: [null, result after step 2, after step 3, ...]
+function scResults(propLists) {
+  const out = [null]; let cur = propLists[0] || [];
+  for (let i = 1; i < propLists.length; i++) {
+    const r = scCombine(cur, propLists[i] || []);
+    out.push(r);
+    cur = r ? [r] : (propLists[i] || []);   // a broken chain starts again from this weapon skill
+  }
+  return out;
+}
+let scb = null;
+function scBox() {
+  const names = Object.keys(chars).sort();
+  if (!names.length) return "";
+  const known = n => (((chars[n] || {}).profile || {}).config || {}).known || {};
+  if (!scb) {
+    const saved = String((((chars[selected] || {}).profile || {}).config || {}).extra?.sc_steps || "");
+    scb = saved.split(",").map(x => x.match(/^\s*(.+?)\s*:\s*(.+?)\s*$/)).filter(Boolean).map(m => ({who: m[1], ws: m[2]}));
+    if (!scb.length) scb = [{who: names[0], ws: ""}, {who: names[1] || names[0], ws: ""}];
+  }
+  const props = scb.map(st => arr((known(st.who).wsprops || {})[st.ws]));
+  const res = scResults(props);
+  const o = (v, l, cur) => `<option value="${esc(v)}" ${String(v).toLowerCase() === String(cur).toLowerCase() ? "selected" : ""}>${esc(l)}</option>`;
+  const last = res[res.length - 1];
+  return `<div class="box"><h3>Skillchain</h3>
+    <table class="grid"><thead><tr><th>Step</th><th>Who</th><th>Weapon skill</th><th>Its properties</th><th>Makes</th><th></th></tr></thead><tbody>
+    ${scb.map((st, i) => { const wl = arr(known(st.who).ws);
+      return `<tr><td>${i + 1}</td>
+        <td><select data-scwho="${i}">${names.map(n => o(n, n, st.who)).join("")}</select></td>
+        <td><select data-scws="${i}"><option value="">— pick —</option>${wl.map(w => o(w, w, st.ws)).join("")}</select></td>
+        <td class="hint">${esc(props[i].join(", ") || "—")}</td>
+        <td>${i === 0 ? `<span class="hint">opens</span>` : res[i] ? `<b>${esc(res[i])}</b>` : (st.ws && scb[i - 1].ws ? `<span style="color:var(--bad)">no skillchain</span>` : "")}</td>
+        <td>${scb.length > 2 ? `<button title="Remove step" onclick="scb.splice(${i},1);bodyKey='';render()">×</button>` : ""}</td></tr>`; }).join("")}
+    </tbody></table>
+    <div class="row" style="margin-top:6px">
+      ${scb.length < 4 ? `<button onclick="scb.push({who:'${esc(names[0])}',ws:''});bodyKey='';render()">+ Add a step</button>` : ""}
+      <button class="primary" ${scb.every(st => st.ws) ? "" : "disabled"} onclick="scSave()">Use this skillchain (everyone)</button>
+      <button onclick="post('*','sc off')">Stop skillchaining</button>
+      ${last ? `<span>Magic burst: <b>${esc(SC_BURST[last] || "")}</b></span>` : ""}
+    </div>
+    <div class="hint" style="margin-top:4px">Each character weapon-skills on its step when the step before it lands (TP ${(((chars[selected] || {}).profile || {}).config || {}).extra?.sc_open_tp || 1000}+). Nukers with Magic burst on burst into it.</div></div>`;
+}
+function scSave() {
+  post("*", "set sc.steps " + scb.map(st => `${st.who}:${st.ws}`).join(","));
+  post("*", "sc on");
 }
 
 // ---------- Upkeep: food, Reraise and mount per character, from what each one really has ----------
@@ -1135,6 +1208,8 @@ document.addEventListener("change", e => {
   if (el.id === "profsel") return;
   if (["tmmode", "tmmins", "tmhour", "tmminute", "tmaction", "tmwho"].includes(el.id)) { tm[el.id.slice(2)] = el.value; bodyKey = ""; render(); return; }
   if (el.id === "hkhost") { hkHost = el.value; return; }
+  if (el.dataset.scwho !== undefined) { scb[+el.dataset.scwho].who = el.value; scb[+el.dataset.scwho].ws = ""; bodyKey = ""; render(); return; }
+  if (el.dataset.scws !== undefined) { scb[+el.dataset.scws].ws = el.value; bodyKey = ""; render(); return; }
   if (el.dataset.up !== undefined) {
     const who = el.dataset.who, v = el.value, kind = el.dataset.up;
     post(who, kind === "mount" ? `set mount.name ${v}` : `${kind} ${v}`);
