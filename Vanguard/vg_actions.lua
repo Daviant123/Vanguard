@@ -54,6 +54,42 @@ function engine.available(action, player, ja_set)
 end
 
 -- All actions this character can use, with their on/off state.
+-- The job's actions in this profile's priority order (MMOMinion-style Skill Manager: top first). Actions the
+-- profile hasn't placed keep the job's order after the placed ones.
+function engine.ordered(job, profile)
+    local list = jobs.actions_for(job)
+    local order = profile and profile.order
+    if not order or #order == 0 then return list end
+    local rank = {}
+    for i, id in ipairs(order) do rank[id] = i end
+    local out = {}
+    for i, a in ipairs(list) do out[i] = a end
+    local base = {}
+    for i, a in ipairs(list) do base[a.id] = i end
+    table.sort(out, function(x, y)
+        local rx, ry = rank[x.id] or (1000 + base[x.id]), rank[y.id] or (1000 + base[y.id])
+        return rx < ry
+    end)
+    return out
+end
+
+-- Move an action: up | down | top | bottom, or reset the whole order.
+function engine.move(job, profile, id, how)
+    if how == 'reset' then profile.order = nil return true end
+    local ids = {}
+    for _, a in ipairs(engine.ordered(job, profile)) do ids[#ids + 1] = a.id end
+    local at
+    for i, x in ipairs(ids) do if x == id then at = i end end
+    if not at then return false end
+    local to = ({ up = at - 1, down = at + 1, top = 1, bottom = #ids })[how]
+    if not to then return false end
+    to = math.max(1, math.min(#ids, to))
+    table.remove(ids, at)
+    table.insert(ids, to, id)
+    profile.order = ids
+    return true
+end
+
 -- The action with this profile's threshold changes on top of the job's defaults.
 function engine.effective(a, profile)
     local o = profile and profile.opts and profile.opts[a.id]
@@ -69,7 +105,7 @@ local LIMITS = { 'party_below', 'hpp_below', 'mpp_below', 'mpp_above', 'tp_min',
 function engine.list(profile, player)
     local out = {}
     local ja_set = ability_set()
-    for _, a in ipairs(jobs.actions_for(player.main_job)) do
+    for _, a in ipairs(engine.ordered(player.main_job, profile)) do
         if engine.available(a, player, ja_set) then
             local e = engine.effective(a, profile)
             local limits = {}
@@ -236,7 +272,7 @@ end
 -- filter(a) -> bool selects which actions this pass may run.
 function engine.run(ctx, profile, filter)
     if not ctx.settings.modules.actions or not profile then return false end
-    for _, a in ipairs(jobs.actions_for(ctx.player.main_job)) do
+    for _, a in ipairs(engine.ordered(ctx.player.main_job, profile)) do
         if (not filter or filter(a)) and engine.enabled(a, profile) then
             if try(engine.effective(a, profile), ctx) then return true end
         end

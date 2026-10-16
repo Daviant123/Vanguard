@@ -218,6 +218,12 @@ Settings are now saved safely with several characters running (one character's s
   Got a Terpander / Daurdabla? Just put 3 or 4 songs in the song list.
 - **Horde Lullaby.** With `//vg sleep on`, two or more extra mobs get Horde Lullaby (or Sleepga) at once.
 
+## Ability priority (new in 0.23.0 / Vanguard Control 1.12.0)
+
+The Job tab lists a character's abilities in the order they're tried, top first (like MMOMinion's Skill Manager).
+Use the arrows to move one up, down or to the top; **Reset order** goes back to the job's order. Saved per job and in
+profiles.
+
 ## Stop timer (new in 0.22.0 / Vanguard Control 1.11.0)
 
 On the Team tab: stop **after** a time (30 minutes to 10 hours) or **at** a clock time, then **stop** or **stop and log

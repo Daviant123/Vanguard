@@ -243,9 +243,11 @@ function jobTab(c, p) {
       <label class="field">Weapon skill ${sel("ws ", [{v: "", l: "None"}].concat(arr(p.ws_list).map(w => ({v: w, l: w}))), p.ws)}</label>
       <label class="field">Follow / assist ${sel("leader ", [{v: "", l: "Nobody (I lead)"}].concat(others.map(n => ({v: n, l: n}))), s.leader || "", "none")}</label>
     </div>
-    <div class="cols">${GROUPS.filter(g => by[g]).map(g => `<div class="box"><h3>${g}</h3>` +
-      by[g].map(a => `<div class="act">${chk(a.label, a.on, `action ${a.id} on`, `action ${a.id} off`)}${limits(a)}</div>`).join("") + `</div>`).join("")
-      || `<div class="empty">Waiting for ${esc(selected)}'s job info…</div>`}</div>
+    ${acts.length ? `<div class="box"><h3>Abilities, in priority order: the top one is tried first <button style="float:right;font-size:11px" onclick="send('actmove reset')">Reset order</button></h3>
+      ${acts.map((a, i) => `<div class="act"><span class="hint" style="width:20px;text-align:right">${i + 1}</span>
+        <span style="display:inline-flex;gap:2px"><button title="Move up" ${i ? "" : "disabled"} onclick="send('actmove ${esc(a.id)} up')">▲</button><button title="Move down" ${i < acts.length - 1 ? "" : "disabled"} onclick="send('actmove ${esc(a.id)} down')">▼</button><button title="Move to the top" ${i ? "" : "disabled"} onclick="send('actmove ${esc(a.id)} top')">⤒</button></span>
+        ${chk(a.label, a.on, `action ${a.id} on`, `action ${a.id} off`)}<span class="btag">${esc(a.group)}</span>${limits(a)}</div>`).join("")}</div>`
+      : `<div class="empty">Waiting for ${esc(selected)}'s job info…</div>`}
     ${jobExtras(p)}
     <div class="hint">Only abilities ${esc(selected)} can use right now are listed (sub-job included). Changing the role re-ticks the recommended set.</div>
   </div>`;

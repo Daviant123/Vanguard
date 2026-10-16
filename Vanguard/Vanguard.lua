@@ -1,6 +1,6 @@
 _addon.name = 'Vanguard'
 _addon.author = 'Daviant'
-_addon.version = '0.22.0'
+_addon.version = '0.23.0'
 _addon.commands = {'vanguard', 'vg'}
 
 --[[
@@ -1014,8 +1014,8 @@ local function encode_profile(pr)
         if v then on[#on + 1] = id else off[#off + 1] = id end
     end
     -- '+' separates ids (commas would be split by Windower's config library).
-    return ('role=%s|ws=%s|on=%s|off=%s|o=%s'):format(pr.role, pr.ws or '', table.concat(on, '+'), table.concat(off, '+'),
-        link.encode_opts(pr.opts))
+    return ('role=%s|ws=%s|on=%s|off=%s|o=%s|q=%s'):format(pr.role, pr.ws or '', table.concat(on, '+'), table.concat(off, '+'),
+        link.encode_opts(pr.opts), table.concat(pr.order or {}, '+'))
 end
 
 local function decode_profile(job, str)
@@ -1026,6 +1026,7 @@ local function decode_profile(job, str)
         elseif k == 'on' then for _, id in ipairs(util.split(v, '+')) do pr.toggles[id] = true end
         elseif k == 'off' then for _, id in ipairs(util.split(v, '+')) do pr.toggles[id] = false end
         elseif k == 'o' then pr.opts = link.decode_opts(v)
+        elseif k == 'q' then pr.order = util.split(v, '+')    -- ability priority order
         end
     end
     return pr
@@ -1638,6 +1639,15 @@ windower.register_event('addon command', function(cmd, ...)
             send_profile()
         else
             log('Stratagem list: ' .. tostring(why))
+        end
+    elseif cmd == 'actmove' then
+        -- the app's priority arrows: //vg actmove <id> up|down|top|bottom   |   //vg actmove reset
+        local pr = state.profile
+        local id, how = args[1], (args[2] or ''):lower()
+        if id == 'reset' then id, how = '', 'reset' end
+        if pr and engine.move(pr.job, pr, id, how) then
+            save_profile()
+            send_profile()
         end
     elseif cmd == 'actopt' then
         if link.actopt(state.profile, args[1], args[2], args[3]) then
