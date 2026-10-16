@@ -1,5 +1,13 @@
 [
   {
+    "version": "1.17.0",
+    "date": "2026-10-16",
+    "items": [
+      "New: Upkeep table on the Team tab - for each character, pick the food to keep up, how to keep Reraise up and which mount to ride, from menus of what that character really has (food in its bags, the Reraise spells it can cast and Reraise items it owns, the mounts it owns). No more typing item names.",
+      "This was the last of 10 hourly updates researched from paid tools (ISBoxer, MMOMinion and the paid script programs)."
+    ]
+  },
+  {
     "version": "1.16.0",
     "date": "2026-10-16",
     "items": [

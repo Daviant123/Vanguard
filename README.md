@@ -218,6 +218,11 @@ Settings are now saved safely with several characters running (one character's s
   Got a Terpander / Daurdabla? Just put 3 or 4 songs in the song list.
 - **Horde Lullaby.** With `//vg sleep on`, two or more extra mobs get Horde Lullaby (or Sleepga) at once.
 
+## Upkeep menus (new in 0.28.0 / Vanguard Control 1.17.0)
+
+Team tab > Upkeep: for every character, the food to keep up, how to keep Reraise up and which mount to ride, chosen
+from menus of what that character really has (food in its bags, Reraise spells / items, owned mounts).
+
 ## Sharing profiles (new in 0.27.0 / Vanguard Control 1.16.0)
 
 On the profile bar, **Export...** saves the chosen profile as a file (normal Windows Save window) to send a friend;

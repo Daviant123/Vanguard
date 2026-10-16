@@ -357,6 +357,7 @@ function teamTab(c, p) {
     ${boardBox()}
     ${timerBox()}
     ${statsBox()}
+    ${upkeepBox()}
     ${quickBox()}
     <div class="cols">
       <div class="box"><h3>Party</h3><div class="btns">
@@ -576,6 +577,29 @@ function boardBox() {
           ? `<span class="btag bad" title="Click: ${esc(cureSpellFor(b.n) ? (curerFor(cureSpellFor(b.n), n) || "nobody") + " casts " + cureSpellFor(b.n) : "no spell removes this")}" onclick="cureAilment('${esc(n)}', '${esc(b.n)}')">${esc(b.n)}</span>`
           : `<span class="btag">${esc(b.n)}</span>`).join("") : `<span class="hint">none</span>`}</td></tr>`; }).join("")}
     </tbody></table></div>`;
+}
+
+// ---------- Upkeep: food, Reraise and mount per character, from what each one really has ----------
+function upkeepBox() {
+  const names = Object.keys(chars).sort().filter(n => chars[n].online);
+  if (!names.length) return "";
+  const o = (v, l, cur) => `<option value="${esc(v)}" ${String(v) === String(cur) ? "selected" : ""}>${esc(l)}</option>`;
+  const row = n => {
+    const cfg = (chars[n].profile || {}).config || {}, k = cfg.known || {}, x = cfg.extra || {};
+    const food = arr(k.food), rr = arr(k.reraise), mounts = arr(k.mounts);
+    const curFood = x.food || "", curRR = x.reraise || "", curMount = x.mount || "";
+    const foodOpts = [["off", "no food"]].concat((curFood && !food.includes(curFood) ? [curFood] : []).concat(food).map(f => [f, f + (food.includes(f) ? "" : " (none left)")]));
+    const rrOpts = [["off", "no Reraise"], ["auto", "best one it has"]].concat((curRR && curRR !== "auto" && !rr.includes(curRR) ? [curRR] : []).concat(rr).map(f => [f, f]));
+    const mOpts = (curMount && !mounts.includes(curMount) ? [curMount] : []).concat(mounts);
+    return `<tr><td><b>${esc(n)}</b></td>
+      <td><select data-up="food" data-who="${esc(n)}">${foodOpts.map(([v, l]) => o(v, l, curFood || "off")).join("")}</select></td>
+      <td><select data-up="reraise" data-who="${esc(n)}">${rrOpts.map(([v, l]) => o(v, l, curRR || "off")).join("")}</select></td>
+      <td>${mOpts.length ? `<select data-up="mount" data-who="${esc(n)}">${mOpts.map(m => o(m, m, curMount)).join("")}</select>` : `<span class="hint">no mounts found</span>`}</td></tr>`;
+  };
+  return `<div class="box"><h3>Upkeep: food, Reraise and mount</h3>
+    <table class="grid"><thead><tr><th>Character</th><th>Keep this food up</th><th>Keep Reraise up with</th><th>Mount with the leader on</th></tr></thead>
+    <tbody>${names.map(row).join("")}</tbody></table>
+    <div class="hint" style="margin-top:4px">The menus list what each character has: food in its inventory, the Reraise spells it can cast and Reraise items it owns, the mounts it owns. Food and Reraise are refreshed between fights (Helpers: "Keep food and Reraise up").</div></div>`;
 }
 
 // ---------- Quick buttons (ISBoxer-style click bar) ----------
@@ -1085,6 +1109,11 @@ document.addEventListener("change", e => {
   if (el.id === "profsel") return;
   if (["tmmode", "tmmins", "tmhour", "tmminute", "tmaction", "tmwho"].includes(el.id)) { tm[el.id.slice(2)] = el.value; bodyKey = ""; render(); return; }
   if (el.id === "hkhost") { hkHost = el.value; return; }
+  if (el.dataset.up !== undefined) {
+    const who = el.dataset.who, v = el.value, kind = el.dataset.up;
+    post(who, kind === "mount" ? `set mount.name ${v}` : `${kind} ${v}`);
+    return;
+  }
   if (["rxwhen", "rxval", "rxwho", "rxkind", "rxname", "rxtarget", "rxcd"].includes(el.id)) {
     rx[el.id.slice(2)] = el.value; if (el.id === "rxwhen") rx.val = ""; if (el.id === "rxkind") rx.name = "";
     bodyKey = ""; render(); return;

@@ -1,6 +1,6 @@
 _addon.name = 'Vanguard'
 _addon.author = 'Daviant'
-_addon.version = '0.27.0'
+_addon.version = '0.28.0'
 _addon.commands = {'vanguard', 'vg'}
 
 --[[
@@ -1768,10 +1768,12 @@ windower.register_event('addon command', function(cmd, ...)
         settings.upkeep.food = (rest:lower() == 'off') and '' or rest
         store.save(settings)
         log(settings.upkeep.food ~= '' and ('Food upkeep: ' .. settings.upkeep.food) or 'Food upkeep off')
+        send_profile()
     elseif cmd == 'reraise' then
         settings.upkeep.reraise = (rest:lower() == 'off') and '' or rest
         store.save(settings)
         log(settings.upkeep.reraise ~= '' and ('Reraise upkeep: ' .. settings.upkeep.reraise) or 'Reraise upkeep off')
+        send_profile()
     elseif cmd == 'preset' then
         local p = presets[(args[1] or ''):lower()]
         for k in pairs(settings.modules) do settings.modules[k] = p and p[k] or false end

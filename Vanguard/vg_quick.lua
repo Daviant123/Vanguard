@@ -34,9 +34,28 @@ function quick.known(player)
     end
     local inv = (windower.ffxi.get_items() or {}).inventory
     seen = {}
+    out.food, out.reraise, out.mounts = {}, {}, {}
     for _, it in ipairs(type(inv) == 'table' and inv or {}) do
         local item = type(it) == 'table' and it.id and res.items[it.id]
-        if item and item.category == 'Usable' and not seen[item.en] then seen[item.en] = true out.items[#out.items + 1] = item.en end
+        if item and item.category == 'Usable' and not seen[item.en] then
+            seen[item.en] = true
+            out.items[#out.items + 1] = item.en
+            if item.type == 1 then out.food[#out.food + 1] = item.en end                    -- food
+            if item.en:find('Reraise') then out.reraise[#out.reraise + 1] = item.en end      -- Instant Reraise, ...
+        end
+    end
+    -- (series 2 round 10) Reraise spells it can cast, and the mounts it owns, for the app's upkeep menus
+    for _, n in ipairs({ 'Reraise IV', 'Reraise III', 'Reraise II', 'Reraise' }) do
+        local sp = util.spell(n)
+        if sp and util.can_cast(sp, player) then table.insert(out.reraise, 1, n) end
+    end
+    local owned = {}
+    for _, id in pairs((windower.ffxi.get_key_items and windower.ffxi.get_key_items()) or {}) do
+        local ki = res.key_items[id]
+        if ki and ki.en then owned[ki.en:lower()] = true end
+    end
+    for _, m in pairs(res.mounts or {}) do
+        if m.en and owned[('\226\153\170' .. m.en .. ' companion'):lower()] then out.mounts[#out.mounts + 1] = m.en end   -- key item "♪Raptor companion"
     end
     for _, t in pairs(out) do table.sort(t) end
     return out
