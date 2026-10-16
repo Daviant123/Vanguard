@@ -1,6 +1,6 @@
 _addon.name = 'Vanguard'
 _addon.author = 'Daviant'
-_addon.version = '0.37.0'
+_addon.version = '0.37.1'
 _addon.commands = {'vanguard', 'vg'}
 
 --[[
@@ -364,7 +364,8 @@ local function do_movement(player)
         if t and t.hpp > 0 then
             if party.pull_to_camp(player, me, t) then return end   -- puller: back to camp, let it come
             local d = util.dist(t)
-            if d > settings.assist.melee_range and d < settings.assist.engage_range then
+            -- farming: close in on its own mob from any distance (assist keeps the engage_range limit)
+            if d > settings.assist.melee_range and (d < settings.assist.engage_range or (settings.modules.farm and settings.farm.approach)) then
                 run_toward(me, t)
             else
                 stop_running()

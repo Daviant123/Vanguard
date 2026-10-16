@@ -1,5 +1,12 @@
 [
   {
+    "version": "1.27.1",
+    "date": "2026-10-16",
+    "items": [
+      "Farming fix: the farmer now walks to its mob. Before, when the mob was far away it kept trying to attack from where it stood and never moved. Now it walks up, attacks once it's close enough, walks right up if that didn't work, and skips a mob it can't reach instead of getting stuck on it."
+    ]
+  },
+  {
     "version": "1.27.0",
     "date": "2026-10-16",
     "items": [

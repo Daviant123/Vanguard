@@ -138,6 +138,8 @@ end
 ------------------------------------------------------------------------
 -- which mobs
 ------------------------------------------------------------------------
+local function status(s) state.farm_status = s end
+
 local function blacklisted(id)
     local t = state.farm_bl and state.farm_bl[id]
     if t and now() < t then return true end
@@ -222,28 +224,51 @@ end
 ------------------------------------------------------------------------
 -- engaging: the way a player does it, and giving up on what it can't reach
 ------------------------------------------------------------------------
+-- Going for a mob: how close it has got. Gives up (skip list) after 8 s without getting closer, unless it's already
+-- next to it (then it's the engaging that's being tried).
+local ATTACK_RANGE = 20         -- /attack from here; further away it walks first (the game won't engage from 30+)
+local function progress(mob)
+    local go = state.farm_go
+    if not go or go.id ~= mob.id then
+        go = { id = mob.id, t = now(), best = util.dist(mob), best_t = now(), tries = 0, attacks = 0 }
+        state.farm_go = go
+    end
+    local d = util.dist(mob)
+    if d < go.best - 1 or d <= 5 then go.best, go.best_t = math.min(d, go.best), now() end
+    if now() - go.best_t > 8 then farm.skip(mob.id, 120, "can't get any closer") return nil end
+    return go, d
+end
+
+local function walk_to(me, mob, d)
+    h.run_toward(me, mob)
+    state.route_moving = true
+    status(('walking to %s (%d yalms)'):format(mob.name, math.floor(d + 0.5)))
+end
+
 local function engage(me, mob)
     local _, ids = party()
     local t = windower.ffxi.get_mob_by_target('t')
     if t and farm.judge(t, me, ids, center_of(me)) then
-        if h.recently('farm:attack', 3) then return false end
+        local go, d = progress(t)
+        if not go then return false end
+        -- too far to engage: walk first (the old code sent /attack from 35 yalms every 3 s and never moved)
+        if d > ATTACK_RANGE then walk_to(me, t, d) return false end
+        if h.recently('farm:attack', 4) then return false end
+        if go.attacks >= 3 then farm.skip(t.id, 120, "it won't engage") return false end
+        -- an /attack that didn't take: get right next to it before the next try
+        if go.attacks >= 1 and d > 5 then walk_to(me, t, d) return false end
+        go.attacks = go.attacks + 1
         h.mark('farm:attack')
         h.stop_running()
         h.face(me, t)
         windower.send_command('input /attack <t>')
-        h.log(('Engaging %s (%.1f yalms)'):format(t.name, util.dist(t)))
+        h.log(('Engaging %s (%.1f yalms)'):format(t.name, d))
         state.busy_until = math.max(state.busy_until or 0, now() + 1.5)
         return true
     end
     -- /targetbnpc picks the nearest enemy: when it picked another one, walk closer to ours first
-    local go = state.farm_go
-    if not go or go.id ~= mob.id then
-        go = { id = mob.id, t = now(), best = util.dist(mob), best_t = now(), tries = 0 }
-        state.farm_go = go
-    end
-    local d = util.dist(mob)
-    if d < go.best - 1 then go.best, go.best_t = d, now() end
-    if now() - go.best_t > 8 then farm.skip(mob.id, 120, "can't get any closer") return false end
+    local go, d = progress(mob)
+    if not go then return false end
     if go.tries >= 2 and d > 4 then
         h.run_toward(me, mob)
         state.route_moving = true
@@ -338,7 +363,6 @@ end
 ------------------------------------------------------------------------
 -- every tick (idle): pick, wait, walk
 ------------------------------------------------------------------------
-local function status(s) state.farm_status = s end
 farm.status = status
 
 function farm.tick(player)
