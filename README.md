@@ -225,6 +225,12 @@ Settings are now saved safely with several characters running (one character's s
 Healing & MP (or Recovery) tab: **Keep MP for cures**. Below that MP the character stops casting buffs, songs,
 enfeebles and nukes and saves the rest for Cures, Raise and status removal. 0 = off.
 
+## Go home (new in 0.33.0 / Vanguard Control 1.23.0)
+
+Team tab > Go home: shows how each character gets home (Warp spell, Instant Warp scroll or Warp Ring) and warps one
+character, everyone, or just the alts (click twice). A Warp Ring is put on, used when it's ready, and GearSwap is kept
+off the ring until the character zones. `//vg warp` does the same in game.
+
 ## Alarms (new in Vanguard Control 1.22.0)
 
 App & updates > Alarms: the app plays a sound, shows a red banner and flashes the character's card when a character is

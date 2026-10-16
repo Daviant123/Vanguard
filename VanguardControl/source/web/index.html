@@ -371,6 +371,7 @@ function teamTab(c, p) {
     ${statsBox()}
     ${scBox()}
     ${upkeepBox()}
+    ${homeBox()}
     ${quickBox()}
     <div class="cols">
       <div class="box"><h3>Party</h3><div class="btns">
@@ -697,6 +698,38 @@ function scSave() {
 }
 
 // ---------- Upkeep: food, Reraise and mount per character, from what each one really has ----------
+// ---------- Go home: everyone warps with the best way it has (vg_warp) ----------
+let warpArm = "", warpArmT = 0;
+function homeBox() {
+  const names = Object.keys(chars).sort().filter(n => chars[n].online);
+  if (!names.length) return "";
+  const L = leaderName(), alts = names.filter(n => n !== L);
+  const way = n => (((chars[n].profile || {}).config || {}).known || {}).warp;
+  const btn = (key, label, cls) => `<button class="${warpArm === key ? "stop" : cls || ""}" onclick="warpClick('${esc(key)}')">${warpArm === key ? "Click again to warp" : label}</button>`;
+  return `<div class="box"><h3>Go home</h3>
+    <table class="grid"><thead><tr><th>Character</th><th>Way home</th><th></th></tr></thead><tbody>
+    ${names.map(n => `<tr><td><b>${esc(n)}</b></td>
+      <td>${way(n) ? esc(way(n) === "Warp" ? "Warp spell" : way(n)) : way(n) === "" ? `<span style="color:var(--bad)">none</span>` : `<span class="hint">?</span>`}</td>
+      <td>${way(n) ? btn("one:" + n, "Warp") : ""}</td></tr>`).join("")}
+    </tbody></table>
+    <div class="row" style="margin-top:6px">${btn("all", "Warp everyone", "primary")}${alts.length && L ? btn("alts", "Warp the alts (not " + esc(L) + ")") : ""}</div>
+    <div class="hint" style="margin-top:4px">Each character uses the Warp spell, an Instant Warp scroll or a Warp Ring (put on, used when ready,
+      GearSwap kept off the ring until it zones). Click twice so it never happens by accident.</div></div>`;
+}
+function warpClick(key) {
+  if (warpArm !== key || Date.now() - warpArmT > 5000) {
+    warpArm = key; warpArmT = Date.now(); bodyKey = ""; render();
+    setTimeout(() => { if (warpArm === key && Date.now() - warpArmT >= 5000) { warpArm = ""; bodyKey = ""; render(); } }, 5100);
+    return;
+  }
+  warpArm = ""; bodyKey = "";
+  const L = leaderName();
+  if (key === "all") post("*", "warp");
+  else if (key === "alts") Object.keys(chars).filter(n => chars[n].online && n !== L).forEach(n => post(n, "warp"));
+  else post(key.slice(4), "warp");
+  render();
+}
+
 function upkeepBox() {
   const names = Object.keys(chars).sort().filter(n => chars[n].online);
   if (!names.length) return "";
@@ -1379,7 +1412,7 @@ function renderPanel() {
     (chars[n].snapshot || {}).mpp, (chars[n].snapshot || {}).tp, (chars[n].snapshot || {}).status, (chars[n].snapshot || {}).target,
     (chars[n].snapshot || {}).foe]) : 0;
   const bk = JSON.stringify([tab, p, s.leader, Object.keys(chars), team, tab === "app" ? [addon, crashes] : 0, tab === "strat" ? s.strat : 0, tab === "adv" ? c.nearby : 0,
-    tab === "team" ? [stopTimer.until, Math.floor((stopTimer.left || 0) / 60)] : 0]);
+    tab === "team" ? [warpArm, Object.keys(chars).map(n => ((((chars[n].profile || {}).config || {}).known) || {}).warp), stopTimer.until, Math.floor((stopTimer.left || 0) / 60)] : 0]);
   if (bk === bodyKey) return;
   bodyKey = bk;
   const fn = {job: () => jobTab(c, p), heal: () => healTab(p), buffs: () => buffsTab(p), debuffs: () => debuffsTab(p),

@@ -1,5 +1,13 @@
 [
   {
+    "version": "1.23.0",
+    "date": "2026-10-16",
+    "items": [
+      "New: Go home on the Team tab. Warp everyone, just the alts, or one character home with two clicks. Each character uses what it has: the Warp spell, an Instant Warp scroll, or a Warp Ring (put on, used when it's ready, and GearSwap kept off the ring until it zones).",
+      "The box shows each character's way home, and \"none\" in red if it has no way to warp."
+    ]
+  },
+  {
     "version": "1.22.0",
     "date": "2026-10-16",
     "items": [

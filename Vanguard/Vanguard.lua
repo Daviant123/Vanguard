@@ -1,6 +1,6 @@
 _addon.name = 'Vanguard'
 _addon.author = 'Daviant'
-_addon.version = '0.32.0'
+_addon.version = '0.33.0'
 _addon.commands = {'vanguard', 'vg'}
 
 --[[
@@ -49,6 +49,7 @@ local strat = require('vg_strat')
 local bard = require('vg_bard')
 local stats = require('vg_stats')
 local crash = require('vg_crash')
+local warp = require('vg_warp')
 crash.init(bridge)
 -- Every event handler below runs guarded: an error becomes a crash report instead of red text (vg_crash).
 do
@@ -1215,6 +1216,7 @@ local function ja_ready(name)
     return nil
 end
 quick.init(settings, state, { log = log })
+warp.init(settings, state, { log = log })
 bard.init(settings, state, {
     log = log, recently = recently, mark = mark, try_cast = try_cast, use_ja = use_ja, amnesia = amnesia,
     party_members = party_members, ja_ready = ja_ready,
@@ -1251,6 +1253,7 @@ local function tick()
     if not player then return end
     record_route()
     stats.tick(player)
+    warp.tick(player)
     alts.broadcast_mount(player)
     party.hello(player)
     party.send_pos(player)
@@ -1446,6 +1449,7 @@ end)
 
 windower.register_event('zone change', function()
     stop_running()
+    warp.on_zone()
     state.party_buffs, state.debuffs, state.burst = {}, {}, nil
     state.sc = { target = 0, step = 0, time = 0 }
     state.busy_until = now() + 5
@@ -1570,6 +1574,7 @@ local help = [[Vanguard commands (//vg ...):
   trigger add <rule> | trigger list | trigger clear
   bar <element> [status] | off      keep Bar-element + Bar-status up (leader: on every alt)
   sleep on|off                      sleep extra mobs that attack the party
+  warp                              warp home (Warp spell, Instant Warp or Warp Ring)
   rolls melee|magic|accuracy|...    Corsair roll set (leader: sent to the Corsair)
   pianissimo <song> > <name>|clear  Bard single-target songs
   chain <skillchain>|off            Scholar Immanence skillchains (liquefaction, fusion, ...)
@@ -1704,6 +1709,10 @@ windower.register_event('addon command', function(cmd, ...)
         end
     elseif cmd == 'hk' then
         quick.hk_press(windower.ffxi.get_player(), args[1])
+    elseif cmd == 'warp' then
+        -- the app's Go home box: warp home with the best way this character has (vg_warp)
+        local player = windower.ffxi.get_player()
+        if player then stop_running() warp.go(player) end
     elseif cmd == 'logout' then
         -- the app's stop timer: the normal /logout (the game counts down and can be cancelled by moving)
         stop_running()

@@ -66,6 +66,7 @@ function quick.known(player)
         if m.en and owned[('\226\153\170' .. m.en .. ' companion'):lower()] then out.mounts[#out.mounts + 1] = m.en end   -- key item "♪Raptor companion"
     end
     for k, t in pairs(out) do if k ~= 'wsprops' then table.sort(t) end end
+    out.warp = require('vg_warp').way(player) or ''      -- (series 3 round 6) its way home, for the app's Go home box
     return out
 end
 
