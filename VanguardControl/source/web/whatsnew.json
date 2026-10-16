@@ -1,5 +1,12 @@
 [
   {
+    "version": "1.23.1",
+    "date": "2026-10-16",
+    "items": [
+      "Fixed: \"Something went wrong (event action / ipc message / incoming text)\" messages filling the chat. Since the crash-report version, Vanguard's events lost their details in game, so the characters couldn't react to fights, each other or chat. Everything works again."
+    ]
+  },
+  {
     "version": "1.23.0",
     "date": "2026-10-16",
     "items": [

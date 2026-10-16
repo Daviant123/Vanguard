@@ -34,10 +34,11 @@ local function pack(...) return { n = select('#', ...), ... } end
 local function on_error(e) return { e = e, tb = debug.traceback(tostring(e), 2) } end
 
 -- fn wrapped so an error is reported instead of breaking; returns fn's results when all is well.
--- (LuaJIT's xpcall passes the extra arguments on, like newer Lua's.)
+-- Windower's xpcall does NOT pass extra arguments on (Lua 5.1), so they go in through a closure.
 function crash.guard(where, fn)
     return function(...)
-        local res = pack(xpcall(fn, on_error, ...))
+        local args = pack(...)
+        local res = pack(xpcall(function() return fn(unpack_(args, 1, args.n)) end, on_error))
         if res[1] then return unpack_(res, 2, res.n) end
         local info = res[2]
         if type(info) == 'table' then crash.report(where, info.e, info.tb) else crash.report(where, info) end
