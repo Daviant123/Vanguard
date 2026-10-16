@@ -1,6 +1,6 @@
 _addon.name = 'Vanguard'
 _addon.author = 'Daviant'
-_addon.version = '0.38.0'
+_addon.version = '0.39.0'
 _addon.commands = {'vanguard', 'vg'}
 
 --[[
@@ -111,6 +111,7 @@ local defaults = {
              mode = 'list', area = 'camp', camp = '', camp_zone = 0, back_to_camp = true,
              wait_party = true, wait_hp = 70, wait_mp = 40, wait_near = 20, stop_full = true, stop_kills = 0,
              item = '', item_goal = 0,     -- farming for an item: stop when item_goal of it are in the inventory
+             pull_back = false,           -- bring each mob back to camp before fighting (the others wait there)
              packs = true, pack_range = 8, pack_strict = false },
     farmspots = { s0 = '' },      -- saved farm spots (vg_farm): s1, s2, ... = "name|zone|field=value|..." 
     -- "Spell>target" pairs. target = me or a party member name. "ja:" prefix = job ability.
@@ -351,9 +352,15 @@ local function face(me, mob)
 end
 
 local function do_movement(player)
-    if busy() then stop_running() return end
     local me = windower.ffxi.get_mob_by_target('me')
     if not me then return end
+    -- bringing a mob back to camp comes first (abilities wait until it's there)
+    state.farm_bringing = nil
+    if player.status == 1 and settings.modules.farm and settings.farm.pull_back and not state.hold then
+        local t = windower.ffxi.get_mob_by_target('t')
+        if t and t.hpp > 0 and party.pull_to_camp(player, me, t) then state.farm_bringing = t.id return end
+    end
+    if busy() then stop_running() return end
     if state.hold then stop_running() return end
     if safety.unstick() then return end
 
@@ -402,6 +409,8 @@ local function do_assist(player)
     local lt = windower.ffxi.get_mob_by_index(l.target_index)
     if not lt or lt.hpp == 0 or not lt.valid_target then return false end
     if util.dist(lt) > settings.assist.engage_range then return false end
+    -- the leader is bringing it back to camp: wait there for it
+    if player.status == 0 and party.mob_far_from_camp(lt) then return false end
 
     if player.status == 0 then
         if recently('engage', 4) then return false end
@@ -1184,6 +1193,7 @@ local function tick()
     local ctx = make_ctx(player)
     local pr = state.profile
 
+    if state.farm_bringing then return end                          -- running a mob back to camp: nothing else now
     if settings.modules.farm and player.status == 1 then   -- (abilities run first in a fight, so say it here)
         local t = windower.ffxi.get_mob_by_target('t')
         farm.status('fighting ' .. (t and t.name or 'a mob'))
@@ -1823,15 +1833,17 @@ windower.register_event('addon command', function(cmd, ...)
             if settings.trusts.list ~= '' then settings.modules.trusts = true end
             settings.enabled = true
             farm.start(windower.ffxi.get_player(), windower.ffxi.get_mob_by_target('me'))
+            farm.share_camp(windower.ffxi.get_player(), true)
             if settings.farm.mode == 'list' and #util.split(settings.farm.targets, ',') == 0 then log('Farming on, but no mobs are picked yet: pick what to fight') else log('Farming started') end
         elseif sub == 'stop' then
             settings.modules.farm, settings.enabled = false, false
             stop_running()
+            if settings.farm.pull_back then farm.share_camp(windower.ffxi.get_player(), false) end
             log('Farming stopped')
         elseif sub == 'camp' then
             -- "Set camp here"
             local me = windower.ffxi.get_mob_by_target('me')
-            if me then farm.set_camp(me) settings.farm.area = 'camp' log('Camp set here') end
+            if me then farm.set_camp(me) settings.farm.area = 'camp' log('Camp set here') if settings.modules.farm then farm.share_camp(windower.ffxi.get_player(), true) end end
         end
         store.save(settings) send_profile()
     elseif cmd == 'farmitem' then

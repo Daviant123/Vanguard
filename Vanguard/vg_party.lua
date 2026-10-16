@@ -260,9 +260,10 @@ function party.on_order(player, from, what, rest)
         h.log(state.hold and ('Holding (by ' .. from .. ')') or ('Following ' .. from .. ' again'))
     elseif what == 'camp' then
         if rest == 'off' then state.camp = nil h.log('Camp off') return end
-        local x, y, f, z = rest:match('^(%-?[%d.]+) (%-?[%d.]+) (%-?[%d.]+) (%d+)$')
+        local x, y, f, z, pull = rest:match('^(%-?[%d.]+) (%-?[%d.]+) (%-?[%d.]+) (%d+)%s*(%a*)$')
         if x then
-            state.camp = { x = tonumber(x), y = tonumber(y), facing = tonumber(f), zone = tonumber(z) }
+            -- "pull": the farmer brings each mob back here, so wait for it instead of running out to it
+            state.camp = { x = tonumber(x), y = tonumber(y), facing = tonumber(f), zone = tonumber(z), pull = pull == 'pull' }
             h.log('Camp set by ' .. from)
         end
     end
@@ -270,16 +271,48 @@ end
 
 -- Pull to camp: the farmer has pulled its target (farm.pull_cmd) and has its own camp: run back to camp
 -- and wait there for the mob, instead of chasing it. Returns true when it handled movement.
+-- Round 10 (farming 3/5): "Bring each mob back to camp" on the Farming tab uses the farming camp, works for melee
+-- pulls too (once the mob is ours it follows), and runs all the way back once per mob before fighting.
 function party.pull_to_camp(player, me, t)
-    local camp = state.my_camp
     local zone = (windower.ffxi.get_info() or {}).zone
-    if not camp or camp.zone ~= zone or not S.modules.farm or not t or not state.farm_pulled[t.id] then return false end
+    local camp = state.my_camp
+    local back = S.modules.farm and S.farm.pull_back and S.farm.area == 'camp'
+    if back then
+        local fc = require('vg_farm').camp()
+        camp = fc and { x = fc.x, y = fc.y, zone = zone } or nil
+    end
+    if not camp or camp.zone ~= zone or not S.modules.farm or not t then return false end
+    state.farm_atcamp = state.farm_atcamp or {}
+    if state.farm_atcamp[t.id] then return false end                         -- brought it back already: fight
+    local ours = false
+    if t.claim_id and t.claim_id ~= 0 then
+        local p = windower.ffxi.get_party() or {}
+        for _, k in ipairs({ 'p0', 'p1', 'p2', 'p3', 'p4', 'p5' }) do
+            if p[k] and p[k].mob and p[k].mob.id == t.claim_id then ours = true end
+        end
+    end
+    if not (state.farm_pulled[t.id] or (back and ours)) then return false end
+    local home = dist2(me, camp.x, camp.y)
+    if back then
+        if home <= 3 then state.farm_atcamp[t.id] = true h.stop_running() return false end
+        h.run_toward(me, camp)
+        state.farm_status = ('bringing %s back to camp (%d yalms to go)'):format(t.name, math.floor(home + 0.5))
+        return true
+    end
     local td = math.sqrt(t.distance or 0)
     if td <= S.assist.melee_range + 0.5 then return false end                 -- it's here: fight normally
-    if dist2(me, camp.x, camp.y) > 2 then h.run_toward(me, camp) return true end
+    if home > 2 then h.run_toward(me, camp) return true end
     h.stop_running()
     h.face(me, t)
     return true
+end
+
+-- On the others with a camp: wait at camp until the leader's mob is close to it (the puller is bringing it back)
+function party.mob_far_from_camp(mob)
+    local camp = state.camp
+    local zone = (windower.ffxi.get_info() or {}).zone
+    if not camp or not camp.pull or camp.zone ~= zone or not mob or not mob.x then return false end
+    return dist2(mob, camp.x, camp.y) > 10
 end
 
 function party.init(settings, runtime_state, helpers)

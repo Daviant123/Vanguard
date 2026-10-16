@@ -1,5 +1,13 @@
 [
   {
+    "version": "1.29.0",
+    "date": "2026-10-16",
+    "items": [
+      "Farming: bring each mob back to camp. Tick it under Where - the farmer pulls, runs back to camp with the mob following, and fights it there.",
+      "Your other characters wait at camp instead of running out to the mob, and join in when it arrives (like a real FFXI party puller)."
+    ]
+  },
+  {
     "version": "1.28.0",
     "date": "2026-10-16",
     "items": [

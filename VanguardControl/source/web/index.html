@@ -1412,7 +1412,7 @@ function farmTab(c, p) {
   const others = Object.keys(chars).filter(n => n !== selected && chars[n].online);
   const following = others.filter(n => lc((chars[n].snapshot || {}).leader) === lc(selected));
   const statusText = farming ? cap(f.status || "starting") : f.status && f.status.startsWith("stopped: ") ? cap(f.status) : ready ? "Ready" : "Pick what to fight";
-  const statusCol = !farming ? "var(--muted)" : /^(waiting|at camp)/.test(f.status || "") ? "var(--tp)" : /^(fighting|going)/.test(f.status || "") ? "var(--good)" : "var(--text)";
+  const statusCol = !farming ? "var(--muted)" : /^(waiting|at camp)/.test(f.status || "") ? "var(--tp)" : /^(fighting|going|bringing|walking)/.test(f.status || "") ? "var(--good)" : "var(--text)";
 
   return `<div class="stack">
     <div class="box" style="border-color:${farming ? "var(--good)" : "var(--line)"}">
@@ -1480,7 +1480,10 @@ function farmTab(c, p) {
           <button onclick="send('farming camp')">${x.farm_camp ? "Move camp here" : "Set camp here"}</button>
           <span class="hint">${x.farm_camp ? "" : "(Start farming sets it where you stand)"}</span>
         </div>
-        <div class="row" style="margin-top:8px">${chk("Go back to camp after each kill", x.farm_back !== false, "set farm.back_to_camp true", "set farm.back_to_camp false")}</div>`
+        <div class="row" style="margin-top:8px;flex-wrap:wrap;gap:6px 18px">${chk("Go back to camp after each kill", x.farm_back !== false, "set farm.back_to_camp true", "set farm.back_to_camp false")}
+          ${chk("Bring each mob back to camp (the others wait there)", !!x.farm_pull_back, "set farm.pull_back true", "set farm.pull_back false")}</div>
+        ${x.farm_pull_back ? `<div class="hint" style="margin-top:4px">It pulls, runs back to camp with the mob following, and fights it there. The others wait at camp and join when it arrives
+          (they get the camp when you click Start farming).</div>` : ""}`
       : `<div class="row" style="margin-top:8px;align-items:center">
           ${f.rec != null ? `<span class="pill warn">● Recording: ${route} points - walk your path</span><button class="primary" onclick="send('route stop')">Stop &amp; save</button>`
             : `<span class="hint">${route ? `${route} points saved` : "No route yet."}</span>

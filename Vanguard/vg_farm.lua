@@ -398,6 +398,18 @@ function farm.start(player, me)
     if me and (S.farm.area ~= 'route') and not farm.camp() then farm.set_camp(me) end
 end
 
+-- "Bring each mob back to camp": the others (who follow this farmer) wait at the camp (the team camp order, vg_camp)
+function farm.share_camp(player, on)
+    if not player then return end
+    local camp = farm.camp()
+    if on and S.farm.pull_back and S.farm.area == 'camp' and camp then
+        windower.send_ipc_message(('vg_camp %s %.2f %.2f %.3f %d pull'):format(player.name, camp.x, camp.y, 0, zone()))
+        h.log('The others wait at camp; I bring the mobs back')
+    elseif not on or not S.farm.pull_back then
+        windower.send_ipc_message(('vg_camp %s off'):format(player.name))
+    end
+end
+
 function farm.run_stats()
     local r = state.farm_run
     if not r then return nil end
@@ -549,7 +561,7 @@ end
 ------------------------------------------------------------------------
 local SPOT_FIELDS = { 'targets', 'ignore', 'claim', 'mode', 'range', 'height', 'pull_cmd', 'loop', 'aggro_first',
     'approach', 'route', 'area', 'camp', 'camp_zone', 'back_to_camp', 'wait_party', 'wait_hp', 'wait_mp', 'wait_near',
-    'packs', 'pack_range', 'pack_strict', 'item', 'item_goal' }
+    'packs', 'pack_range', 'pack_strict', 'item', 'item_goal', 'pull_back' }
 
 local function spot_keys()
     local keys = {}
