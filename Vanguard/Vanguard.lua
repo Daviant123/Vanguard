@@ -1,6 +1,6 @@
 _addon.name = 'Vanguard'
 _addon.author = 'Daviant'
-_addon.version = '0.25.0'
+_addon.version = '0.26.0'
 _addon.commands = {'vanguard', 'vg'}
 
 --[[
@@ -1792,9 +1792,19 @@ windower.register_event('addon command', function(cmd, ...)
             while settings.triggers['t' .. n] and settings.triggers['t' .. n] ~= '' do n = n + 1 end
             settings.triggers['t' .. n] = table.concat(args, ' ')
             log('trigger t' .. n .. ' added')
+            store.save(settings) send_profile()
+        elseif sub == 'del' then
+            -- the app's x on a reaction: //vg trigger del t3
+            local key = args[1] or ''
+            if key:match('^t%d+$') and settings.triggers[key] then
+                settings.triggers[key] = ''
+                log('trigger ' .. key .. ' removed')
+                store.save(settings) send_profile()
+            end
         elseif sub == 'clear' then
             settings.triggers = { t1 = '' }
             log('triggers cleared')
+            store.save(settings) send_profile()
         else
             for k, v in pairs(settings.triggers) do
                 if v ~= '' then windower.add_to_chat(207, ('  %s: %s'):format(k, v)) end

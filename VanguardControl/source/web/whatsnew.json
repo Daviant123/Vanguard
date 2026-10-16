@@ -1,5 +1,13 @@
 [
   {
+    "version": "1.15.0",
+    "date": "2026-10-16",
+    "items": [
+      "New: Reactions builder on the Advanced tab (like the skill editors in paid tools). Pick When (my HP / MP below, TP at least, someone's HP below, the enemy's HP below, the enemy readies or casts something it was seen using, I have / don't have a buff, fighting or not), Do (a spell, ability, weapon skill or item, on whom) and How often - all from menus.",
+      "Reactions are listed in plain words with an x to remove them, and are saved properly now."
+    ]
+  },
+  {
     "version": "1.14.0",
     "date": "2026-10-16",
     "items": [

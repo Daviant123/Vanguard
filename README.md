@@ -218,6 +218,12 @@ Settings are now saved safely with several characters running (one character's s
   Got a Terpander / Daurdabla? Just put 3 or 4 songs in the song list.
 - **Horde Lullaby.** With `//vg sleep on`, two or more extra mobs get Horde Lullaby (or Sleepga) at once.
 
+## Reactions (new in 0.26.0 / Vanguard Control 1.15.0)
+
+Advanced tab > Reactions: pick **When** (my HP / MP below, TP at least, someone's HP below, the enemy's HP below, the
+enemy readies or casts something it was seen using, I have / don't have a buff, fighting or not), **Do** (a spell,
+ability, weapon skill or item, on whom) and **How often**. Each reaction is listed in plain words with an x.
+
 ## Farm mob lists by clicking (new in 0.25.0 / Vanguard Control 1.14.0)
 
 Advanced tab > Farming > **Look around** lists the mobs near the selected character (how many, how close, who

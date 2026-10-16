@@ -934,6 +934,93 @@ function geoTab(p) {
   </div>`;
 }
 
+// ---------- Reactions: "when ... do ... how often", built from menus (a skill editor like the paid suites') ----------
+let rx = {when: "hpp", val: "40", who: "", fight: true, kind: "ma", name: "", target: "me", cd: "30"};
+const RX_WHEN = [["hpp", "my HP is below"], ["mpp", "my MP is below"], ["tp", "my TP is at least"], ["party_hpp", "anyone's HP is below"],
+  ["member", "this member's HP is below"], ["mob_hpp", "the enemy's HP is below"], ["readies", "the enemy readies"], ["casts", "the enemy casts"],
+  ["nobuff", "I don't have"], ["buff", "I have"], ["engaged", "I'm fighting"], ["idle", "I'm not fighting"]];
+const COMMON_BUFFS = ["Haste", "Refresh", "Regen", "Protect", "Shell", "Phalanx", "Stoneskin", "Blink", "Aquaveil", "Reraise", "Food", "Sneak", "Invisible"];
+function rxCondition() {
+  const v = rx.val;
+  switch (rx.when) {
+    case "hpp": case "mpp": case "party_hpp": case "mob_hpp": return `${rx.when}<${v}`;
+    case "tp": return `tp>=${v}`;
+    case "member": return rx.who ? `hpp:${rx.who}<${v}` : "";
+    case "readies": case "casts": return v ? `${rx.when}:${v}` : "";
+    case "nobuff": return v ? `!buff:${v}` : "";
+    case "buff": return v ? `buff:${v}` : "";
+    default: return rx.when;
+  }
+}
+function rxDescribe(rule) {
+  const m = String(rule).match(/^(.*?)\s*->\s*(.*?)(?:\s*\|\s*(\w+))?$/); if (!m) return rule;
+  const conds = m[1].split(/\s+and\s+/).map(c => {
+    let x;
+    if ((x = c.match(/^(hpp|mpp|party_hpp|mob_hpp)<(\d+)$/))) return ({hpp: "my HP", mpp: "my MP", party_hpp: "anyone's HP", mob_hpp: "the enemy's HP"})[x[1]] + ` below ${x[2]}%`;
+    if ((x = c.match(/^tp>=(\d+)$/))) return `my TP at least ${x[1]}`;
+    if ((x = c.match(/^hpp:(\w+)<(\d+)$/))) return `${x[1]}'s HP below ${x[2]}%`;
+    if ((x = c.match(/^(readies|casts):(.+)$/))) return `the enemy ${x[1]} ${x[2]}`;
+    if ((x = c.match(/^(!?)buff:(.+)$/))) return x[1] ? `I don't have ${x[2]}` : `I have ${x[2]}`;
+    return ({engaged: "I'm fighting", idle: "I'm not fighting", resting: "I'm resting"})[c] || c;
+  }).join(" and ");
+  let act = m[2]; const a = act.match(/^vg act (\w+) (\S+) ?(.*)$/);
+  if (a) act = `${({ma: "cast", ja: "use", ws: "weapon skill", item: "use item"})[a[1]] || a[1]} ${a[3]} on ${TARGET_LABEL[a[2]] || a[2]}`;
+  const cd = m[3] === "once" ? "once per mob" : `at most every ${m[3] || 10} s`;
+  return `When ${conds}: ${act} (${cd})`;
+}
+function reactBox(p) {
+  const x = (p.config || {}).extra || {}, seen = x.seen || {}, list = arr(x.triggers);
+  const known = quickKnown(selected), names = known[rx.kind] || [];
+  if (!names.includes(rx.name)) rx.name = names[0] || "";
+  const party = arr(p.party).slice(1);
+  const o = (v, l, cur) => `<option value="${esc(v)}" ${String(v) === String(cur) ? "selected" : ""}>${esc(l)}</option>`;
+  let valSel = "";
+  if (["hpp", "mpp", "party_hpp", "member", "mob_hpp"].includes(rx.when)) {
+    if (!/^\d+$/.test(rx.val) || +rx.val > 95) rx.val = "40";
+    valSel = `<select id="rxval">${[10, 15, 20, 25, 30, 35, 40, 45, 50, 60, 70, 75, 80, 90, 95].map(n => o(n, n + "%", rx.val)).join("")}</select>`;
+  } else if (rx.when === "tp") {
+    if (!["1000", "1500", "2000", "2500", "3000"].includes(rx.val)) rx.val = "1000";
+    valSel = `<select id="rxval">${[1000, 1500, 2000, 2500, 3000].map(n => o(n, n, rx.val)).join("")}</select>`;
+  } else if (rx.when === "readies" || rx.when === "casts") {
+    const seenList = arr(seen[rx.when]).slice().reverse();
+    if (!seenList.includes(rx.val)) rx.val = seenList[0] || "";
+    valSel = seenList.length ? `<select id="rxval">${seenList.map(n => o(n, n, rx.val)).join("")}</select>`
+      : `<span class="hint">none seen yet - fight a while, they appear here</span>`;
+  } else if (rx.when === "buff" || rx.when === "nobuff") {
+    const mine = arr((chars[selected].snapshot || {}).buffs).filter(b => !b.b).map(b => b.n);
+    const opts = [...new Set(COMMON_BUFFS.concat(mine))];
+    if (!opts.includes(rx.val)) rx.val = opts[0];
+    valSel = `<select id="rxval">${opts.map(n => o(n, n, rx.val)).join("")}</select>`;
+  }
+  const targets = [["me", "itself"], ["bt", "the enemy"], ["leader", "the leader"]].concat(party.map(n => [n, n]));
+  const cond = rxCondition(), ok = cond && rx.name;
+  return `<div class="box"><h3>Reactions: when something happens, do something</h3>
+    <div class="row" style="align-items:flex-end">
+      <label class="field">When <select id="rxwhen">${RX_WHEN.map(([v, l]) => o(v, l, rx.when)).join("")}</select></label>
+      ${rx.when === "member" ? `<label class="field">Who <select id="rxwho">${party.map(n => o(n, n, rx.who || (rx.who = party[0] || ""))).join("")}</select></label>` : ""}
+      ${valSel ? `<label class="field">&nbsp;${valSel}</label>` : ""}
+      ${!["engaged", "idle"].includes(rx.when) ? `<label class="chk" style="margin-bottom:6px"><input type="checkbox" id="rxfight" ${rx.fight ? "checked" : ""}><span>only while fighting</span></label>` : ""}
+    </div>
+    <div class="row" style="align-items:flex-end;margin-top:6px">
+      <label class="field">Do <select id="rxkind">${["ma", "ja", "ws", "item"].map(k => o(k, KIND_LABEL[k], rx.kind)).join("")}</select></label>
+      <label class="field">Which <select id="rxname">${names.length ? names.map(n => o(n, n, rx.name)).join("") : `<option value="">— nothing known —</option>`}</select></label>
+      <label class="field">On <select id="rxtarget">${targets.map(([v, l]) => o(v, l, rx.target)).join("")}</select></label>
+      <label class="field">How often <select id="rxcd">${[["once", "once per mob"], ["5", "every 5 s at most"], ["10", "every 10 s"], ["30", "every 30 s"], ["60", "every minute"], ["120", "every 2 minutes"], ["300", "every 5 minutes"]].map(([v, l]) => o(v, l, rx.cd)).join("")}</select></label>
+      <button class="primary" ${ok ? "" : "disabled"} onclick="rxAdd()">Add reaction</button>
+    </div>
+    ${list.length ? `<div style="margin-top:8px">${list.map(t => `<div class="act"><span>${esc(rxDescribe(t.rule))}</span>
+      <button title="Remove" onclick="send('trigger del ${esc(t.k)}')">×</button></div>`).join("")}</div>`
+      : `<div class="hint" style="margin-top:6px">No reactions yet. E.g. "When my HP is below 40%: Cure IV on itself", "When the enemy readies (a TP move): Stoneskin on itself".</div>`}
+    <div class="hint" style="margin-top:4px">Adding one switches the Triggers module on.</div>
+  </div>`;
+}
+function rxAdd() {
+  const cond = rxCondition(); if (!cond || !rx.name) return;
+  const full = cond + (rx.fight && !["engaged", "idle"].includes(rx.when) ? " and engaged" : "");
+  send(`trigger add ${full} -> vg act ${rx.kind} ${rx.target} ${rx.name} | ${rx.cd}`);
+  send("triggers on");
+}
+
 // Farming: mob lists filled by clicking what's around (MMOMinion's grind whitelist / blacklist), and the route.
 function farmBox(p) {
   const x = (p.config || {}).extra || {}, mods = (p.config || {}).modules || {};
@@ -968,6 +1055,7 @@ function advTab(p) {
   const mods = (p.config || {}).modules || (chars[selected].snapshot || {}).modules || {};
   return `<div class="stack">
     <div class="box"><h3>All modules</h3><div class="mods">${MODULES.map(m => modChk(m, mods, m)).join("")}</div></div>
+    ${reactBox(p)}
     ${farmBox(p)}
     <div class="box"><h3>Command</h3><div class="row">
       <select id="cmdtarget"><option value="sel">${esc(selected)}</option><option value="*">All characters</option></select>
@@ -994,6 +1082,11 @@ document.addEventListener("change", e => {
   if (el.id === "profsel") return;
   if (["tmmode", "tmmins", "tmhour", "tmminute", "tmaction", "tmwho"].includes(el.id)) { tm[el.id.slice(2)] = el.value; bodyKey = ""; render(); return; }
   if (el.id === "hkhost") { hkHost = el.value; return; }
+  if (["rxwhen", "rxval", "rxwho", "rxkind", "rxname", "rxtarget", "rxcd"].includes(el.id)) {
+    rx[el.id.slice(2)] = el.value; if (el.id === "rxwhen") rx.val = ""; if (el.id === "rxkind") rx.name = "";
+    bodyKey = ""; render(); return;
+  }
+  if (el.id === "rxfight") { rx.fight = el.checked; return; }
   if (el.dataset.hk !== undefined) { quickDo(`do=key&i=${el.dataset.hk}&key=${encodeURIComponent(el.value)}&host=${encodeURIComponent(hkHost || leaderName() || selected)}`); return; }
   if (["qbwho", "qbkind", "qbname", "qbtarget"].includes(el.id)) {
     qb[el.id.slice(2)] = el.value; if (el.id !== "qbname" && el.id !== "qbtarget") qb.name = "";

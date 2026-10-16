@@ -30,6 +30,7 @@ local util = require('vg_util')
 local triggers = {}
 
 local recent = { readies = {}, casts = {}, chat = {} }
+local names_seen = { readies = {}, casts = {} }   -- TP moves / spells mobs were seen using (for the app's menus)
 local fired = {}
 
 local function now() return os.clock() end
@@ -37,6 +38,17 @@ local function now() return os.clock() end
 function triggers.note_mob(kind, name, actor)
     recent[kind][#recent[kind] + 1] = { name = name:lower(), t = now() }
     if #recent[kind] > 20 then table.remove(recent[kind], 1) end
+    local list = names_seen[kind]
+    if list then
+        for i = #list, 1, -1 do if list[i] == name then table.remove(list, i) end end
+        list[#list + 1] = name
+        if #list > 30 then table.remove(list, 1) end
+    end
+end
+
+-- The app's Reactions builder: moves / spells seen lately (newest last).
+function triggers.seen_names()
+    return { readies = names_seen.readies, casts = names_seen.casts }
 end
 
 function triggers.note_chat(text)

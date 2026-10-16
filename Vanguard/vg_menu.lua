@@ -222,6 +222,15 @@ function menu.extra(settings)
         strat = settings.strat,
         farm_targets = settings.farm.targets, farm_ignore = settings.farm.ignore,
         farm_claim = settings.farm.claim,
+        triggers = (function()
+            local out = {}
+            for k, v in pairs(settings.triggers or {}) do
+                if type(v) == 'string' and v ~= '' then out[#out + 1] = { k = k, rule = v } end
+            end
+            table.sort(out, function(a, b) return (tonumber(a.k:sub(2)) or 0) < (tonumber(b.k:sub(2)) or 0) end)
+            return out
+        end)(),
+        seen = require('vg_triggers').seen_names(),
     }
 end
 
