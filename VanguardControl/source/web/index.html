@@ -949,6 +949,7 @@ function alarmsBox() {
       <span style="display:inline-flex;align-items:center;gap:6px">${tick("hp", "HP under")} ${pct("hp_at", [20, 25, 30, 40, 50])}</span>
       <span style="display:inline-flex;align-items:center;gap:6px">${tick("mp", "MP under")} ${pct("mp_at", [5, 10, 15, 20, 30])}</span>
       ${tick("problem", "a problem is caught")}
+      ${tick("farm", "farming stops, or has nothing to fight for 5 minutes")}
     </div>
     <div class="hint" style="margin-top:6px">The app rings even while it's minimized behind the game. The character's card flashes red and the
       app's taskbar title says what happened until you click OK. Logging out (Log out button or the stop timer) doesn't ring.
@@ -1335,6 +1336,29 @@ function finishBox(p) {
     : `<div class="hint" style="margin-top:4px">Pick a weapon skill to make sure it lands the killing blow (e.g. for a weapon skill trial).</div>`}</div>`;
 }
 
+// ---------- Trusts by role (his request: "sort trusts by category"). The game data doesn't say what a trust does, so
+// this is a list of the well-known roles; a trust that isn't on it shows under "Other" rather than a guessed role.
+const TRUST_ROLES = {
+  Tank: ["AAEV", "AAHM", "I. Shield", "Amchuchu", "Ark Angel EV", "Ark Angel HM", "August", "Curilla", "Gessho", "Halver", "Mnejing", "Rahal", "Rughadjeen", "Trion", "Valaineral"],
+  Healer: ["Nashmeira", "Apururu", "Cherukiki", "Ferreous Coffin", "Karaha-Baruha", "Kupipi", "Mihli Aliapoh", "Monberaux", "Pieuje", "Yoran-Oran", "Ygnas"],
+  Support: ["Fablinix", "Arciela", "Brygid", "Joachim", "Kupofried", "Koru-Moru", "Kuyin Hathdenna", "Moogle", "Ovjang", "Qultada", "Robel-Akbel", "Sakura", "Star Sibyl", "Sylvie", "Ulmia", "Cornelia"],
+  Melee: ["AAGK", "AAMR", "Babban", "Chacharoon", "Cid", "Flaviria", "Jakoh", "Lhe Lhangavo", "Maximilian", "Mayakov", "Naja", "Noillurie", "Romaa Mihgo", "Rongelouts", "Uka Totlihn", "Abenzio", "Abquhbah", "Aldo", "Areuhat", "Ark Angel GK", "Ark Angel MR", "Ark Angel TT", "Ayame", "Balamor", "Darrcuiln", "Excenmille", "Gilgamesh", "Ingrid", "Iroha", "Iron Eater", "Klara", "Lehko Habhoka", "Lhu Mhakaracca", "Lilisette", "Lion", "Luzaf", "Maat", "Matsui-P", "Mildaurion", "Morimar", "Mumor", "Naja Salaheem", "Naji", "Nanaa Mihgo", "Prishe", "Rainemard", "Selh'teus", "Shikaree Z", "Teodor", "Tenzen", "Volker", "Zazarg", "Zeid"],
+  Ranged: ["Margret", "Elivira", "Makki-Chebukki", "Najelith", "Semih Lafihna"],
+  Caster: ["AATT", "D. Shantotto", "Kayeel-Payeel", "Adelheid", "Ajido-Marujido", "Domina Shantotto", "Gadalar", "King of Hearts", "Kukki-Chebukki", "Leonoyne", "Rosulatia", "Shantotto", "Ullegore"],
+};
+function trustRole(name) {
+  const base = String(name).replace(/\s*\[S\]$/, "").replace(/\s*\(UC\)$/, "").replace(/\s+II$/, "").trim();
+  for (const [role, names] of Object.entries(TRUST_ROLES)) if (names.includes(base)) return role;
+  return "Other";
+}
+function trustSelect(avail) {
+  const groups = {};
+  for (const n of avail) (groups[trustRole(n)] = groups[trustRole(n)] || []).push(n);
+  const order = ["Tank", "Healer", "Support", "Melee", "Ranged", "Caster", "Other"];
+  return `<select data-cmd="trustlist add " data-empty=""><option value="">+ Add a trust...</option>
+    ${order.filter(r => groups[r]).map(r => `<optgroup label="${r}">${groups[r].sort().map(n => `<option value="${esc(n)}">${esc(n)}</option>`).join("")}</optgroup>`).join("")}</select>`;
+}
+
 // ---------- Farming tab (rebuilt): dashboard + radar, then what / where / how / team / stop ----------
 // The farming engine is vg_farm.lua: camp + leash, back to camp, a give-up list for mobs it can't reach, waiting for
 // the party (and telling the low one to rest), aggro-only / anything-nearby modes, stop conditions, run stats, spots.
@@ -1355,7 +1379,7 @@ function radarSvg(rd, farmer) {
   for (const m of arr(rd.mobs)) {
     if (!inside(m)) continue;
     const c = RADAR_COL[m.s] || RADAR_COL.no, big = m.s === "target" || m.s === "aggro";
-    g += `<circle cx="${X(m.x)}" cy="${Y(m.y)}" r="${big ? 4.5 : 3}" fill="${c}" opacity="${big ? 1 : .55}"><title>${esc(m.n)} (${esc(m.s)}${m.p ? `, ${m.p} other${m.p > 1 ? "s" : ""} next to it` : ""})</title></circle>`;
+    g += `<circle class="rdot" data-mob="${esc(m.n)}" cx="${X(m.x)}" cy="${Y(m.y)}" r="${big ? 5 : 4}" fill="${c}" opacity="${big ? 1 : .6}" style="cursor:pointer"><title>${esc(m.n)} (${esc(m.s)}${m.p ? `, ${m.p} other${m.p > 1 ? "s" : ""} next to it` : ""}) - click to choose</title></circle>`;
     if (m.t) g += `<circle cx="${X(m.x)}" cy="${Y(m.y)}" r="8" fill="none" stroke="#fff" stroke-width="1.5"/><line x1="${X(me.x)}" y1="${Y(me.y)}" x2="${X(m.x)}" y2="${Y(m.y)}" stroke="#fff" stroke-opacity=".35"/>`;
   }
   for (const pm of arr(rd.party)) if (inside(pm)) g += `<circle cx="${X(pm.x)}" cy="${Y(pm.y)}" r="4" fill="#4a8fe0" stroke="#14161b"/><text x="${X(pm.x)}" y="${(+Y(pm.y) + 14).toFixed(1)}" font-size="9" fill="#8fb6ec" text-anchor="middle">${esc(pm.n)}</text>`;
@@ -1363,9 +1387,23 @@ function radarSvg(rd, farmer) {
   return `<svg class="radar" width="${W}" height="${W}" viewBox="0 0 ${W} ${W}">${g}</svg>
     <div class="legend"><span><i style="background:${RADAR_COL.target}"></i>to fight</span><span><i style="background:${RADAR_COL.aggro}"></i>attacking us</span>
       <span><i style="background:${RADAR_COL.theirs}"></i>someone else's</span><span><i style="background:${RADAR_COL.skipped}"></i>skipped (can't reach)</span><span><i style="background:${RADAR_COL.pack}"></i>in a pack (left for now)</span>
-      <span><i style="background:${RADAR_COL.no};opacity:.55"></i>left alone</span><span><i style="background:#4a8fe0"></i>party</span></div>`;
+      <span><i style="background:${RADAR_COL.no};opacity:.55"></i>left alone</span><span><i style="background:#4a8fe0"></i>party</span></div>
+    <div class="hint" style="margin-top:2px">Click a mob to fight that kind or leave it alone.</div>`;
 }
 let radarTimer = null;
+// click a mob on the radar: fight that kind / leave it alone
+document.addEventListener("click", e => {
+  const dot = e.target.closest && e.target.closest(".rdot");
+  let menu = $("radarmenu");
+  if (!dot) { if (menu && !e.target.closest("#radarmenu")) menu.remove(); return; }
+  if (!menu) { menu = document.createElement("div"); menu.id = "radarmenu"; document.body.appendChild(menu); }
+  const n = dot.dataset.mob;
+  menu.style.cssText = `position:fixed;left:${e.clientX + 8}px;top:${e.clientY + 8}px;z-index:50;background:var(--panel-2);border:1px solid var(--line);border-radius:8px;padding:8px;box-shadow:0 6px 20px rgba(0,0,0,.4)`;
+  menu.innerHTML = `<div style="font-weight:600;margin-bottom:6px">${esc(n)}</div>
+    <button class="primary" id="rm-fight">Fight these</button> <button id="rm-leave">Leave alone</button>`;
+  $("rm-fight").onclick = () => { send("farmlist add targets " + n); menu.remove(); };
+  $("rm-leave").onclick = () => { send("farmlist add ignore " + n); menu.remove(); };
+});
 function radarPoll() {          // the Farming tab is open: ask the selected character for its radar every few seconds
   clearInterval(radarTimer);
   const ask = () => fetch("/api/send", {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({target: selected, command: "radar"})});
@@ -1420,7 +1458,8 @@ function farmTab(c, p) {
         <div>
           <div class="row" style="align-items:center;gap:14px">
             ${farming ? `<button class="stop" style="font-size:16px;padding:10px 22px" onclick="send('farming stop')">■ Stop farming</button>`
-              : `<button class="go" style="font-size:16px;padding:10px 22px" ${ready ? "" : "disabled title='Pick what to fight first'"} onclick="send('farming start')">▶ Start farming</button>`}
+              : `<button class="go" style="font-size:16px;padding:10px 22px" ${ready ? "" : "disabled title='Pick what to fight first'"} onclick="send('farming start')">▶ Start farming</button>
+                 <button title="Farms the most common unclaimed mob within 30 yalms, with the camp where you stand" onclick="send('farming quick')">⚡ Quick start: farm what's here</button>`}
             <div><div class="fstatus" style="color:${statusCol}">${esc(statusText)}</div>
               <div class="hint">${esc(selected)} ${farming ? `· ${mode === "list" ? esc(tgt.join(", ")) : mode === "aggro" ? "only what attacks us" : "anything nearby"}` : ready ? "· click Start farming" : "· step 1 below"}</div></div>
           </div>
@@ -1552,6 +1591,10 @@ function farmTab(c, p) {
       <div class="row" style="flex-wrap:wrap;gap:6px 18px">
         ${chk("The inventory is full", x.farm_stop_full !== false, "set farm.stop_full true", "set farm.stop_full false")}
         <label class="field">After ${sel("set farm.stop_kills ", [{v: 0, l: "no limit"}].concat(nums([10, 25, 50, 100, 200, 500], " kills")), x.farm_stop_kills ?? 0)}</label>
+        <label class="field">or after ${sel("set farm.stop_mins ", [{v: 0, l: "no time limit"}].concat([15, 30, 45, 60, 90, 120, 180, 240].map(v => ({v, l: v >= 60 ? (v / 60) + " hour" + (v > 60 ? "s" : "") : v + " minutes"}))), x.farm_stop_mins ?? 0)}</label>
+      </div>
+      <div class="row" style="margin-top:8px">
+        <label class="field">When done ${sel("set farm.when_done ", [{v: "stay", l: "stay where they are"}, {v: "warp", l: "everyone warps home"}, {v: "logout", l: "everyone logs out"}], x.farm_when_done || "stay")}</label>
       </div>
       <div class="row" style="margin-top:8px;align-items:flex-end">
         <label class="field">Farm for ${sel("farmitem ", [{v: "none", l: "nothing in particular"}].concat(
@@ -1559,18 +1602,18 @@ function farmTab(c, p) {
         ${x.farm_item ? `<label class="field">until I have ${sel("set farm.item_goal ", [1, 3, 5, 10, 12, 20, 30, 50, 99, 100, 200, 500].map(v => ({v, l: v + ""})), x.farm_item_goal || 12)}</label>` : ""}
       </div>
       <div class="hint" style="margin-top:4px">Pick something you already have or that dropped this run; it stops when that many are in the inventory.</div>
-      <div class="hint" style="margin-top:6px">It always stops if ${esc(selected)} is KO'd (and the Alarms ring). To stop at a set time, use the Stop timer on the Team tab.</div>`)}
+      <div class="hint" style="margin-top:6px">It also stops if ${esc(selected)} is KO'd or changes zone. The Alarms ring when farming stops.</div>`)}
 
     ${card(6, "Trusts (optional)", (() => {
       const picked = String(x.trusts_list || "").split(",").map(t => t.trim()).filter(Boolean);
       const avail = arr(known.trusts).filter(t => !picked.some(q => lc(q) === lc(t))).sort();
       return `<div class="row" style="align-items:flex-start;gap:18px">
-          <div><b style="font-size:12px;color:var(--accent)">Call these</b><div>${picked.length ? picked.map(n => `<span class="btag" style="font-size:12px">${esc(n)}
+          <div><b style="font-size:12px;color:var(--accent)">Call these</b><div>${picked.length ? picked.map(n => `<span class="btag" style="font-size:12px"><span class="hint">${trustRole(n)}:</span> ${esc(n)}
             <a href="#" style="color:var(--bad);text-decoration:none" title="Remove" onclick="send('trustlist remove ${esc(n)}');return false">×</a></span>`).join("")
             : `<span class="hint">none</span>`}</div></div>
           <label class="field">until the party has ${sel("set trusts.party_size ", nums([2, 3, 4, 5, 6], " members"), x.trusts_size ?? 5)}</label>
         </div>
-        ${avail.length ? `<div class="row" style="margin-top:8px">${sel("trustlist add ", [{v: "", l: "+ Add a trust..."}].concat(avail.map(n => ({v: n, l: n}))), "")}</div>`
+        ${avail.length ? `<div class="row" style="margin-top:8px">${trustSelect(avail)}</div>`
           : `<div class="hint" style="margin-top:6px">${arr(known.trusts).length ? "All its trusts are picked." : "No trusts known by this character."}</div>`}`;
     })())}
     </div>

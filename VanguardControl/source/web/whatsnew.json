@@ -1,5 +1,16 @@
 [
   {
+    "version": "1.32.0",
+    "date": "2026-10-16",
+    "items": [
+      "Farming is steadier: the farmer no longer gets pulled back by following or assisting someone else, it helps a party member who gets attacked, and it stops cleanly if it changes zone.",
+      "⚡ Quick start: one click farms the most common mob around you, with the camp where you stand.",
+      "Click a mob on the radar to fight that kind or leave it alone.",
+      "Stop after a set time, and choose what happens when done: stay, everyone warps home, or everyone logs out. The Alarms ring when farming stops or has had nothing to fight for 5 minutes.",
+      "Trusts are now sorted by role in the trust menu: Tank, Healer, Support, Melee, Ranged, Caster."
+    ]
+  },
+  {
     "version": "1.31.0",
     "date": "2026-10-16",
     "items": [

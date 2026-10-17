@@ -31,6 +31,7 @@ type alarmConfig struct {
 	Offline  bool `json:"offline"`
 	Alerts   bool `json:"alerts"`
 	Problem  bool `json:"problem"`
+	Farm     bool `json:"farm"` // farming stopped, or nothing to fight for 5 minutes
 }
 
 type alarm struct {
@@ -57,7 +58,7 @@ var playAlarm = func() {
 
 func defaultAlarms() alarmConfig {
 	return alarmConfig{On: true, Sound: true, KO: true, HP: false, HPAt: 30, MP: false, MPAt: 10, Disabled: true,
-		Offline: true, Alerts: true, Problem: true}
+		Offline: true, Alerts: true, Problem: true, Farm: true}
 }
 
 func alarmPath() string {
@@ -173,7 +174,15 @@ func (h *hub) checkAlarms() {
 func (h *hub) alarmFromLog(who, text string) {
 	alarmMu.Lock()
 	defer alarmMu.Unlock()
-	if !alarmCfg.On || !strings.HasPrefix(text, "ALERT ") {
+	if !alarmCfg.On {
+		return
+	}
+	// farming: it stopped (a goal reached, KO'd, full bags, zoned) or has had nothing to fight for 5 minutes
+	if alarmCfg.Farm && (strings.HasPrefix(text, "Farming stopped: ") || strings.HasPrefix(text, "Farming: nothing to fight")) {
+		h.raiseAlarm(who, "farm", strings.TrimPrefix(text, "Farming stopped: "))
+		return
+	}
+	if !strings.HasPrefix(text, "ALERT ") {
 		return
 	}
 	t := strings.TrimPrefix(text, "ALERT ")

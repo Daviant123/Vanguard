@@ -528,6 +528,7 @@ local function stop_reason(player)
     if r and S.farm.stop_kills > 0 and r.kills >= S.farm.stop_kills then return r.kills .. ' kills done' end
     local have = farm.item_have()
     if have and S.farm.item_goal > 0 and have >= S.farm.item_goal then return ('%d %s in the bags'):format(have, S.farm.item) end
+    if r and S.farm.stop_mins > 0 and r.secs >= S.farm.stop_mins * 60 then return S.farm.stop_mins .. ' minutes done' end
     if S.farm.stop_full then
         local inv = windower.ffxi.get_items('inventory')
         if inv and inv.max and inv.max > 0 and (inv.count or 0) >= inv.max then return 'the inventory is full' end
@@ -539,12 +540,35 @@ function farm.check_stop(player)
     if not S.modules.farm or not S.enabled then return false end
     local why = stop_reason(player)
     if not why then return false end
+    farm.finish(player, why)
+    return true
+end
+
+-- Stop farming (a stop condition, a zone change) and do what "When done" says: stay, warp everyone home, or log
+-- everyone out (the normal commands, through //vg all). Not when KO'd - it can't.
+function farm.finish(player, why)
     S.modules.farm, S.enabled = false, false
     h.stop_running()
     state.farm_status = 'stopped: ' .. why
-    h.log('Farming stopped: ' .. why)
+    h.log('Farming stopped: ' .. why)                 -- (the app's Alarms ring on this line)
+    if S.farm.pull_back then farm.share_camp(player, false) end
+    local dead = player and (player.status == 2 or player.status == 3)
+    if not dead and why ~= 'changed zone' then
+        if S.farm.when_done == 'warp' then
+            windower.send_command('vg all off; wait 1; vg all warp')
+            h.log('Done: everyone warps home')
+        elseif S.farm.when_done == 'logout' then
+            windower.send_command('vg all off; wait 1; vg all logout')
+            h.log('Done: everyone logs out')
+        end
+    end
     h.save()
-    return true
+end
+
+-- zoned while farming (warped, fell through a zone line, KO'd home point): the camp and route belong to the old zone
+function farm.on_zone()
+    if not S.modules.farm then return end
+    farm.finish(windower.ffxi.get_player(), 'changed zone')
 end
 
 ------------------------------------------------------------------------
@@ -559,7 +583,6 @@ function farm.tick(player)
     if not S.enabled then status('stopped') return false end
     if state.resting or player.status == 33 then status('resting') return false end
     if player.status ~= 0 then status('waiting') return false end
-    if h.party_engaged(player) then status('helping the party fight') return false end
     if S.farm.mode == 'list' and #list(S.farm.targets) == 0 then status('no mobs picked yet: pick what to fight') return false end
     local me = windower.ffxi.get_mob_by_target('me')
     if not me then return false end
@@ -582,10 +605,17 @@ function farm.tick(player)
         return false
     end
     if mob then
+        state.farm_idle_since, state.farm_idle_told = nil, nil
         status(('going for %s (%d yalms)'):format(mob.name, math.floor(util.dist(mob) + 0.5)))
         return engage(me, mob)
     end
     state.farm_go = nil
+    -- nothing to fight for 5 minutes: say so once (the app's Alarms ring) - the spot may be camped or the list wrong
+    state.farm_idle_since = state.farm_idle_since or now()
+    if not state.farm_idle_told and now() - state.farm_idle_since >= 300 then
+        state.farm_idle_told = true
+        h.log('Farming: nothing to fight for 5 minutes')
+    end
 
     if camp then
         if S.farm.back_to_camp and dist2(me, camp) > 3 then
@@ -660,7 +690,7 @@ end
 ------------------------------------------------------------------------
 local SPOT_FIELDS = { 'targets', 'ignore', 'claim', 'mode', 'range', 'height', 'pull_cmd', 'loop', 'aggro_first',
     'approach', 'route', 'area', 'camp', 'camp_zone', 'back_to_camp', 'wait_party', 'wait_hp', 'wait_mp', 'wait_near',
-    'packs', 'pack_range', 'pack_strict', 'item', 'item_goal', 'pull_back', 'prefer_best', 'keep_chain' }
+    'packs', 'pack_range', 'pack_strict', 'item', 'item_goal', 'pull_back', 'prefer_best', 'keep_chain', 'stop_mins', 'when_done' }
 
 local function spot_keys()
     local keys = {}

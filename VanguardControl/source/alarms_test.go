@@ -94,6 +94,14 @@ func TestAlarms(t *testing.T) {
 		t.Errorf("stuck behind rings, the rest don't: %+v", a)
 	}
 	call("do=ok")
+	// farming
+	h.alarmFromLog("CharB", "Farming stopped: 12 Beastmen's Seal in the bags")
+	h.alarmFromLog("CharB", "Farming: nothing to fight for 5 minutes")
+	h.alarmFromLog("CharB", "Farming started")
+	if a := active(); len(a) != 2 || a[0].Kind != "farm" || a[0].Text != "12 Beastmen's Seal in the bags" {
+		t.Errorf("farming stopped / idle ring, starting doesn't: %+v", a)
+	}
+	call("do=ok")
 	// went offline: rings; but not after a Log out order
 	h.mu.Lock()
 	h.chars["CharB"].LastSeen = time.Now().Add(-10 * time.Second)

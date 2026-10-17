@@ -1,6 +1,6 @@
 _addon.name = 'Vanguard'
 _addon.author = 'Daviant'
-_addon.version = '0.41.0'
+_addon.version = '0.42.0'
 _addon.commands = {'vanguard', 'vg'}
 
 --[[
@@ -114,6 +114,7 @@ local defaults = {
              pull_back = false,           -- bring each mob back to camp before fighting (the others wait there)
              prefer_best = false,         -- prefer the mob kind that pays best per minute (the mob report)
              keep_chain = false,          -- XP / CP chains: while one runs, wait only for emergencies (HP 40%, MP 15%)
+             stop_mins = 0, when_done = 'stay',   -- stop after N minutes (0 = no); then stay | warp | logout (everyone)
              packs = true, pack_range = 8, pack_strict = false },
     farmspots = { s0 = '' },      -- saved farm spots (vg_farm): s1, s2, ... = "name|zone|field=value|..." 
     -- "Spell>target" pairs. target = me or a party member name. "ja:" prefix = job ability.
@@ -385,9 +386,9 @@ local function do_movement(player)
         end
     end
 
-    -- Camp spot / formation behind the leader (vg_party), else plain follow.
-    if party.movement(player, me) then return end
-    if settings.modules.follow then
+    -- Camp spot / formation behind the leader (vg_party), else plain follow - not for the farmer: it leads.
+    if not settings.modules.farm and party.movement(player, me) then return end
+    if settings.modules.follow and not settings.modules.farm then
         local l = leader_mob(player)
         if l then
             local d = util.dist(l)
@@ -406,6 +407,7 @@ end
 ------------------------------------------------------------------------
 local function do_assist(player)
     if not settings.modules.assist or not settings.assist.engage or state.hold or state.retreat then return false end
+    if settings.modules.farm then return false end              -- the farmer picks its own mobs
     local l = leader_mob(player)
     if not l or l.status ~= 1 or not l.target_index or l.target_index == 0 then return false end
     local lt = windower.ffxi.get_mob_by_index(l.target_index)
@@ -1366,6 +1368,7 @@ end)
 windower.register_event('zone change', function()
     stop_running()
     warp.on_zone()
+    farm.on_zone()
     state.party_buffs, state.debuffs, state.burst = {}, {}, nil
     state.sc = { target = 0, step = 0, time = 0 }
     state.busy_until = now() + 5
@@ -1845,6 +1848,29 @@ windower.register_event('addon command', function(cmd, ...)
             stop_running()
             if settings.farm.pull_back then farm.share_camp(windower.ffxi.get_player(), false) end
             log('Farming stopped')
+        elseif sub == 'quick' then
+            -- "Quick start": farm the most common unclaimed mob within 30 yalms, camp here, go
+            local best, ignored = nil, {}
+            for _, n in ipairs(util.split(settings.farm.ignore, ',')) do ignored[n:lower()] = true end
+            for _, m in ipairs(quick.nearby(30)) do
+                local free = m.c - (m.others or 0)
+                if free > 0 and not ignored[m.n:lower()] and (not best or free > best.free) then
+                    best = { n = m.n, free = free }
+                end
+            end
+            if not best then
+                log('Quick start: no unclaimed mobs within 30 yalms')
+            else
+                local me = windower.ffxi.get_mob_by_target('me')
+                settings.farm.mode, settings.farm.area, settings.farm.targets = 'list', 'camp', best.n
+                if me then farm.set_camp(me) end
+                for _, m in ipairs({ 'farm', 'ws', 'rest', 'actions' }) do settings.modules[m] = true end
+                if settings.trusts.list ~= '' then settings.modules.trusts = true end
+                settings.enabled = true
+                farm.start(windower.ffxi.get_player(), me)
+                farm.share_camp(windower.ffxi.get_player(), true)
+                log(('Quick start: farming %s (%d around), camp here'):format(best.n, best.free))
+            end
         elseif sub == 'report' then
             state.farm_report = {}                                  -- "Clear" on the mob report
             log('Mob report cleared')
