@@ -44,7 +44,7 @@ function trials.list()
         if t then
             local rt = state.trial_rate and state.trial_rate[k]
             out[#out + 1] = { k = k, kind = t.kind, goal = t.goal, ws = t.ws, mobs = t.mobs, count = t.count,
-                              hits = rt and rt.hit or nil, tries = rt and rt.all or nil,
+                              hits = rt and rt.hit or nil, tries = rt and rt.all or nil, why = rt and rt.why or nil,
                               assist = S.trial_assist == k or nil, done = t.count >= t.goal and t.goal > 0 or nil }
         end
     end
@@ -102,9 +102,23 @@ function trials.on_kill(mob)
         -- how often the weapon skill lands the kill this session (shown in the app)
         if t and t.kind == 'ws' and t.count < t.goal and matches(mob.name, t.mobs) then
             state.trial_rate = state.trial_rate or {}
-            local rt = state.trial_rate[k] or { hit = 0, all = 0 }
+            local rt = state.trial_rate[k] or { hit = 0, all = 0, why = {} }
             rt.all = rt.all + 1
-            if finisher and finisher == t.ws then rt.hit = rt.hit + 1 end
+            if finisher and finisher == t.ws then rt.hit = rt.hit + 1
+            else
+                -- why it missed (upgrade 25), so the % can be tuned: the weapon skill went off but didn't kill / TP
+                -- wasn't ready / it died in one go from above the line / anything else
+                local why = 'other'
+                local p = windower.ffxi.get_player()
+                local okf, fin = pcall(require, 'vg_finish')
+                local seen = state.finish_seen and state.finish_seen.id == mob.id and state.finish_seen.hpp
+                local line = okf and fin.line and mob.name and fin.line(mob) or nil
+                if hit and hit.n == t.ws then why = 'ws_no_kill'
+                elseif p and p.vitals and (p.vitals.tp or 0) < 1000 then why = 'no_tp'
+                elseif seen and line and seen > line then why = 'jumped' end
+                rt.why = rt.why or {}
+                rt.why[why] = (rt.why[why] or 0) + 1
+            end
             state.trial_rate[k] = rt
         end
         if t and t.count < t.goal and matches(mob.name, t.mobs) and (t.kind == 'kill' or (finisher and finisher == t.ws)) then

@@ -1,5 +1,12 @@
 [
   {
+    "version": "1.56.0",
+    "date": "2026-10-17",
+    "items": [
+      "Magian trials: the trial box now says why the weapon skill missed a kill - the mob died in one go from above your %, TP wasn't ready, or the weapon skill went off but didn't kill - and suggests a higher or lower %."
+    ]
+  },
+  {
     "version": "1.55.0",
     "date": "2026-10-17",
     "items": [

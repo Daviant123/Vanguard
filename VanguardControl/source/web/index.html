@@ -1446,6 +1446,18 @@ function learnedAt(x, mobs) {
   return l ? l.at : null;
 }
 
+// why the weapon skill missed the kill this session, and which way to move the %
+function trialMisses(t) {
+  const w = t.why || {}, n = k => +(w[k] || 0);
+  const total = n("no_tp") + n("jumped") + n("ws_no_kill") + n("other");
+  if (!total) return "";
+  const parts = [[n("jumped"), "died in one go from above the %"], [n("no_tp"), "TP wasn't ready"], [n("ws_no_kill"), esc(t.ws) + " went off but didn't kill"], [n("other"), "other"]]
+    .filter(p => p[0] > 0).map(p => `${p[0]} ${p[1]}`);
+  const tip = n("jumped") > Math.max(n("ws_no_kill"), 1) ? "Try a higher %." : n("ws_no_kill") > Math.max(n("jumped"), 1) ? "Try a lower %." :
+    n("no_tp") > total / 2 ? "TP isn't ready in time: a higher % makes it hold off for TP sooner." : "";
+  return `<div class="hint" style="margin-top:2px">Missed: ${parts.join(", ")}. ${tip}</div>`;
+}
+
 function trialBox(p, mobNames) {
   const x = (p.config || {}).extra || {}, list = arr(x.trials), wl = arr(p.ws_list);
   const f = trialForm;
@@ -1461,6 +1473,7 @@ function trialBox(p, mobNames) {
             <button style="font-size:11px" title="Remove" onclick="send('trial del ${t.k}')">×</button></span></div>
         <div class="hpbar" style="height:8px"><div style="background:var(--good);width:${t.goal ? Math.min(100, t.count * 100 / t.goal) : 0}%"></div></div>
         ${t.tries ? `<div class="hint" style="margin-top:3px">This session ${esc(t.ws)} landed the kill on ${t.hits || 0} of ${t.tries} (${Math.round((t.hits || 0) * 100 / t.tries)}%)</div>` : ""}
+        ${trialMisses(t)}
         ${t.kind === "ws" && !t.done ? `<div class="row" style="margin-top:4px;align-items:center">
           <label class="field">Use ${esc(t.ws)} when the mob's HP is at ${sel("set ws.finish_at ", [{v: 0, l: "Auto (learned" + (learnedAt(x, t.mobs) ? ": " + learnedAt(x, t.mobs) + "%" : "") + ")"}].concat([3, 5, 8, 10, 12, 15, 18, 20, 25, 30, 35, 40, 50].map(v => ({v, l: "or under " + v + "%"}))), x.ws_finish_at ?? 0)}</label>
           ${x.ws_finish !== t.ws ? `<span class="hint">(applies when "Help finish it" is on)</span>` : ""}</div>` : ""}</div>`).join("")
