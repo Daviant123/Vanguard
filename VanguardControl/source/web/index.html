@@ -101,7 +101,7 @@ label.field select { min-width: 190px; color: var(--text); font-size: 13px; }
 @media (max-width: 900px) { .fdash { grid-template-columns: 1fr; } }
 .fgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; align-items: start; }
 @media (max-width: 1000px) { .fgrid { grid-template-columns: 1fr; } }
-.tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 10px; }
+.tiles { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 10px; }
 .tile { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 7px 9px; }
 .tile b { display: block; font-size: 18px; color: var(--text); }
 .tile span { font-size: 11px; color: var(--muted); }
@@ -1363,10 +1363,13 @@ function trustSelect(avail) {
 // The farming engine is vg_farm.lua: camp + leash, back to camp, a give-up list for mobs it can't reach, waiting for
 // the party (and telling the low one to rest), aggro-only / anything-nearby modes, stop conditions, run stats, spots.
 const RADAR_COL = {strong: "#9b59b6", target: "#4caf7a", aggro: "#e0605a", theirs: "#d4a54a", skipped: "#6b7280", ignored: "#4b5160", no: "#8b92a3", pack: "#a07ad8"};
+let radarZoom = 0;            // 0 = fit what's around; else yalms from the centre to the edge
+try { radarZoom = +localStorage.getItem("vg.radarzoom") || 0; } catch (e) {}
+function setRadarZoom(z) { radarZoom = z; try { localStorage.setItem("vg.radarzoom", z); } catch (e) {} bodyKey = ""; render(); }
 function radarSvg(rd, farmer) {
   const W = 270, R = W / 2, me = rd.me, ctr = rd.camp || me;
   const reach = Math.max(25, rd.range + 12, ...arr(rd.mobs).concat(arr(rd.party), [me]).map(m => Math.hypot(m.x - ctr.x, m.y - ctr.y) + 4));
-  const k = (R - 12) / Math.min(reach, 70);
+  const k = (R - 12) / (radarZoom || Math.min(reach, 70));
   const X = v => (R + (v - ctr.x) * k).toFixed(1), Y = v => (R - (v - ctr.y) * k).toFixed(1);
   const inside = m => Math.hypot(m.x - ctr.x, m.y - ctr.y) * k < R - 4;
   let g = "";
@@ -1472,7 +1475,9 @@ function farmTab(c, p) {
             <div class="tile"><b>${run.kph ?? "—"}</b><span>kills / hour</span></div>
             <div class="tile"><b>${run.every ? run.every + "s" : "—"}</b><span>a kill every</span></div>
             <div class="tile"><b>${perHourXp}</b><span>XP / hour (session)</span></div>
-            <div class="tile"><b>${run.skipped ?? "—"}</b><span>mobs skipped (unreachable)</span></div>
+            <div class="tile"><b>${st.secs >= 300 ? fmtN(Math.round((st.cp || 0) * 3600 / st.secs)) : "—"}</b><span>CP / hour (session)</span></div>
+            <div class="tile"><b>${run.skipped ?? "—"}</b><span>mobs skipped</span></div>
+            <div class="tile"><b style="color:${(run.free ?? x.inv_free) === 0 ? "var(--bad)" : "var(--text)"}">${run.free ?? x.inv_free ?? "—"}</b><span>bag spaces free</span></div>
           </div>
           ${run.chain ? `<div class="row" style="margin-top:10px;align-items:center;gap:10px">
               <span class="pill ${run.chain.n >= 1 ? "on" : "off"}" style="font-size:13px">${run.chain.n >= 1 ? `Chain #${run.chain.n}` : "No chain"}</span>
@@ -1491,9 +1496,27 @@ function farmTab(c, p) {
           </div>
           <div class="hint" style="margin-top:4px">A farm spot remembers the mobs, the camp or route and every setting below; load it next time with one click.</div>
         </div>
-        <div>${f.radar ? radarSvg(f.radar, selected) : `<div class="radar" style="width:270px;height:270px;display:flex;align-items:center;justify-content:center"><span class="hint">Radar loading…</span></div>`}</div>
+        <div>${f.radar ? radarSvg(f.radar, selected) : `<div class="radar" style="width:270px;height:270px;display:flex;align-items:center;justify-content:center"><span class="hint">Radar loading…</span></div>`}
+          <div class="seg" style="margin-top:6px">${[[0, "Fit"], [30, "30y"], [60, "60y"], [120, "120y"]].map(([z, l]) => `<button class="${radarZoom === z ? "on" : ""}" style="padding:3px 10px;font-size:11px" onclick="setRadarZoom(${z})">${l}</button>`).join("")}</div></div>
       </div>
     </div>
+
+    ${(() => {
+      const rd = f.radar, inRange = rd ? arr(rd.mobs).filter(m => m.s === "target" || m.s === "aggro").length : null;
+      const free = run.free ?? x.inv_free;
+      const checks = [
+        [ready, mode === "list" ? `Mobs picked (${tgt.length})` : mode === "aggro" ? "Fighting what attacks us" : "Fighting anything nearby", "pick mobs in step 1"],
+        [area !== "camp" || x.farm_camp, area === "camp" ? "Camp set" : `Route: ${route || 0} points`, "Set camp here (step 2)"],
+        [inRange === null ? null : inRange > 0, inRange === null ? "Mobs to fight nearby: (radar loading)" : `Mobs to fight nearby: ${inRange}`, "none in range - move the camp, raise the range or pick other mobs"],
+        [!/^waiting for /.test(f.status || ""), "Party ready", (f.status || "").replace(/^waiting for /, "waiting for ")],
+        [f.status !== "resting", "Not resting", "resting until HP / MP are back"],
+        [free == null ? null : (free > 0 || x.farm_stop_full === false), `Bag space: ${free ?? "?"} free`, "the inventory is full"],
+        [farming, farming ? "Farming is on" : "Farming is off", "click Start farming"],
+      ];
+      return `<div class="box"><h3>Checklist: why it is (or isn't) pulling</h3><div class="row" style="flex-wrap:wrap;gap:4px 18px">
+        ${checks.map(([ok, label, why]) => `<span title="${esc(ok === false ? why : "")}">${ok === null ? "<span class='hint'>•</span>" : ok ? "<b style='color:var(--good)'>✓</b>" : "<b style='color:var(--bad)'>✗</b>"} ${esc(label)}${ok === false ? ` <span class="hint">- ${esc(why)}</span>` : ""}</span>`).join("")}
+      </div></div>`;
+    })()}
 
     <div class="box"><h3>Which mob is worth it</h3>
       ${arr(run.mobs).length ? `<table class="grid"><thead><tr><th style="text-align:left">Mob</th><th>Kills</th><th>A kill takes</th><th>XP / kill</th><th>CP / kill</th><th>Points a minute</th></tr></thead><tbody>
@@ -1583,6 +1606,7 @@ function farmTab(c, p) {
         <label class="field">Rest when HP is under ${sel("set rest.hp_low ", nums([0, 20, 30, 40, 50, 60], "%"), x.rest_hp_low ?? 40)}</label>
         <label class="field">...or MP under ${sel("set rest.mp_low ", nums([0, 10, 20, 25, 30, 40, 50], "%"), x.rest_mp_low ?? 25)}</label>
       </div>
+      <div class="row" style="margin-top:8px">${chk("Treasure Hunter: GearSwap tags each mob (TreasureMode Tag) while farming", !!x.farm_th, "set farm.th true", "set farm.th false")}</div>
       <div class="hint" style="margin-top:6px">Weapon skill and abilities: Job &amp; abilities tab. Food and Reraise: Upkeep on the Team tab. Mobs it can't reach
         (can't see them, can't get closer) are skipped for a couple of minutes instead of being chased forever. A mob with others standing
         next to it can bring them along: mobs on their own are picked first (purple on the radar = left because it has company).</div>`)}

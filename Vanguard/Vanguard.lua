@@ -1,6 +1,6 @@
 _addon.name = 'Vanguard'
 _addon.author = 'Daviant'
-_addon.version = '0.44.0'
+_addon.version = '0.45.0'
 _addon.commands = {'vanguard', 'vg'}
 
 --[[
@@ -117,6 +117,7 @@ local defaults = {
              stop_mins = 0, when_done = 'stay',   -- stop after N minutes (0 = no); then stay | warp | logout (everyone)
              skip_strong = true, strong = '',     -- mobs that nearly KO'd the farmer / took 3+ min twice: set aside
              preset = '',                         -- the last one-click preset (party | items | safe | clear)
+             th = false,                          -- Treasure Hunter: GearSwap TreasureMode Tag while farming
              packs = true, pack_range = 8, pack_strict = false },
     farmspots = { s0 = '' },      -- saved farm spots (vg_farm): s1, s2, ... = "name|zone|field=value|..." 
     -- "Spell>target" pairs. target = me or a party member name. "ja:" prefix = job ability.
@@ -1848,6 +1849,7 @@ windower.register_event('addon command', function(cmd, ...)
             if settings.farm.mode == 'list' and #util.split(settings.farm.targets, ',') == 0 then log('Farming on, but no mobs are picked yet: pick what to fight') else log('Farming started') end
         elseif sub == 'stop' then
             farm.send_run(windower.ffxi.get_player(), 'stopped by you')
+            farm.treasure(false)
             settings.modules.farm, settings.enabled = false, false
             stop_running()
             if settings.farm.pull_back then farm.share_camp(windower.ffxi.get_player(), false) end

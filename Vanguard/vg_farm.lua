@@ -493,6 +493,13 @@ farm.item_id = item_id
 
 local function item_name(id) local it = res.items[id] return it and it.en or ('item ' .. tostring(id)) end
 
+-- free inventory slots (for the dashboard and the checklist)
+function farm.inv_free()
+    local inv = windower.ffxi.get_items('inventory')
+    if not inv or not inv.max or inv.max <= 0 then return nil end
+    return math.max(0, inv.max - (inv.count or 0))
+end
+
 -- every couple of seconds while farming: anything new in the bags counts as loot
 function farm.loot_tick()
     if not S.modules.farm or not state.farm_run then return end
@@ -541,6 +548,15 @@ function farm.start(player, me)
     state.farm_inv, state.farm_inv_t, state.farm_loot = inv_counts(), now(), {}
     state.farm_bl, state.farm_skipped, state.farm_go, state.farm_fails = {}, 0, nil, {}
     if me and (S.farm.area ~= 'route') and not farm.camp() then farm.set_camp(me) end
+    farm.treasure(true)
+end
+
+-- Treasure Hunter (upgrade 4): GearSwap's TreasureMode (Mote / Selindrile files: Tag = TH gear on each new mob) on
+-- while farming, back to None when it stops. A normal GearSwap command; files without TreasureMode just ignore it.
+function farm.treasure(on)
+    if not S.farm.th then return end
+    windower.send_command('gs c set TreasureMode ' .. (on and 'Tag' or 'None'))
+    if on then h.log('Treasure Hunter: tagging each mob (GearSwap TreasureMode Tag)') end
 end
 
 -- "Bring each mob back to camp": the others (who follow this farmer) wait at the camp (the team camp order, vg_camp)
@@ -563,7 +579,7 @@ function farm.run_stats()
     local have = farm.item_have()
     return { secs = secs, kills = kills, kph = secs >= 120 and math.floor(kills * 3600 / secs + 0.5) or nil,
              every = kills > 0 and math.floor(secs / kills + 0.5) or nil, skipped = state.farm_skipped or 0,
-             loot = farm.loot_list(), mobs = farm.report(), chain = farm.chain_info(),
+             loot = farm.loot_list(), mobs = farm.report(), chain = farm.chain_info(), free = farm.inv_free(),
              item = have and { n = S.farm.item, have = have, goal = S.farm.item_goal } or nil }
 end
 
@@ -608,6 +624,7 @@ end
 -- everyone out (the normal commands, through //vg all). Not when KO'd - it can't.
 function farm.finish(player, why)
     farm.send_run(player, why)
+    farm.treasure(false)
     S.modules.farm, S.enabled = false, false
     h.stop_running()
     state.farm_status = 'stopped: ' .. why
@@ -751,7 +768,7 @@ end
 ------------------------------------------------------------------------
 local SPOT_FIELDS = { 'targets', 'ignore', 'claim', 'mode', 'range', 'height', 'pull_cmd', 'loop', 'aggro_first',
     'approach', 'route', 'area', 'camp', 'camp_zone', 'back_to_camp', 'wait_party', 'wait_hp', 'wait_mp', 'wait_near',
-    'packs', 'pack_range', 'pack_strict', 'item', 'item_goal', 'pull_back', 'prefer_best', 'keep_chain', 'stop_mins', 'when_done', 'skip_strong', 'strong' }
+    'packs', 'pack_range', 'pack_strict', 'item', 'item_goal', 'pull_back', 'prefer_best', 'keep_chain', 'stop_mins', 'when_done', 'skip_strong', 'strong', 'th' }
 
 local function spot_keys()
     local keys = {}
@@ -819,7 +836,8 @@ farm.PRESETS = {
               wait_mp = 40, keep_chain = true, prefer_best = true, packs = true, pack_strict = false, skip_strong = true },
     -- an item: fast, little waiting, stop when the bags fill
     items = { mode = 'list', pull_back = false, back_to_camp = false, wait_party = true, wait_hp = 50, wait_mp = 20,
-              keep_chain = false, prefer_best = false, packs = true, pack_strict = false, stop_full = true, skip_strong = true },
+              keep_chain = false, prefer_best = false, packs = true, pack_strict = false, stop_full = true, skip_strong = true,
+              th = true },
     -- careful, on its own: only lone mobs, rest early, set aside anything too strong
     safe = { mode = 'list', area = 'camp', pull_back = false, back_to_camp = true, wait_party = true, wait_hp = 85,
              wait_mp = 50, aggro_first = true, packs = true, pack_strict = true, skip_strong = true, keep_chain = false },
