@@ -206,7 +206,8 @@ function farm.judge(mob, me, ids, center)
     end
     local d = center and dist2(mob, center) or util.dist(mob)
     local aggro = claimed_us and S.farm.aggro_first
-    if d > S.farm.range and not (aggro and util.dist(mob) <= S.farm.range + 10) then return nil, 'out of range' end
+    local range = farm.range()
+    if d > range and not (aggro and util.dist(mob) <= range + 10) then return nil, 'out of range' end
     if aggro then return 'aggro', 'attacking us' end
     local mode = S.farm.mode
     if mode == 'aggro' then return nil, 'not attacking us' end
@@ -653,6 +654,36 @@ end
 
 -- spot rotation (upgrade 5, MMOMinion's grind markers): nothing to fight here for 3 minutes - load the next saved farm
 -- spot in this zone and walk to its camp
+-- Search range (upgrade 20, like MMOMinion's growing grind radius): the set range, plus what a quiet spot has added -
+-- every 30 s with nothing to fight it looks 10 yalms further, up to farm.widen; back to normal as soon as a mob turns
+-- up within the set range again.
+function farm.range()
+    local base = tonumber(S.farm.range) or 20
+    local cap = tonumber(S.farm.widen) or 0
+    if cap <= base then return base end
+    return math.min(cap, base + (state.farm_extra or 0))
+end
+
+function farm.widen_tick(found, center, me)
+    local base = tonumber(S.farm.range) or 20
+    local cap = tonumber(S.farm.widen) or 0
+    if cap <= base then state.farm_extra, state.farm_widen_t = nil, nil return end
+    if found then
+        if (state.farm_extra or 0) > 0 and (center and dist2(found, center) or util.dist(found)) <= base then
+            state.farm_extra, state.farm_widen_t = nil, nil
+            h.log(('Mobs nearby again: back to %d yalms'):format(base))
+        end
+        state.farm_widen_t = nil
+        return
+    end
+    state.farm_widen_t = state.farm_widen_t or now()
+    if now() - state.farm_widen_t >= 30 and base + (state.farm_extra or 0) < cap then
+        state.farm_extra = math.min(cap - base, (state.farm_extra or 0) + 10)
+        state.farm_widen_t = now()
+        h.log(('Nothing close: looking further (%d yalms)'):format(base + state.farm_extra))
+    end
+end
+
 function farm.rotate()
     if not S.farm.rotate then return false end
     local here = {}
@@ -923,6 +954,7 @@ function farm.tick(player)
         end
         return false
     end
+    farm.widen_tick(mob, camp, me)
     if mob then
         state.farm_idle_since, state.farm_idle_told = nil, nil
         status(('going for %s (%d yalms)'):format(mob.name, math.floor(util.dist(mob) + 0.5)))
@@ -945,11 +977,11 @@ function farm.tick(player)
         end
         if (state.farm_packed or 0) > 0 then status(('at camp, waiting for a mob on its own (%d with others next to them)'):format(state.farm_packed)) return false end
         if farm.rest_idle(player) then return true end
-        status(('at camp, waiting for mobs within %d yalms'):format(S.farm.range))
+        status(('at camp, waiting for mobs within %d yalms'):format(farm.range()))
         return false
     end
     local pts = route()
-    if #pts == 0 then status(('waiting for mobs within %d yalms'):format(S.farm.range)) return false end
+    if #pts == 0 then status(('waiting for mobs within %d yalms'):format(farm.range())) return false end
     if state.wp > #pts or state.wp < 1 then state.wp = 1 end
     local wp = pts[state.wp]
     if dist2(me, wp) < 2 then
@@ -1006,7 +1038,7 @@ function farm.radar()
     local _, ids = party()
     local center = center_of(me)
     local r = function(v) return math.floor(v * 10 + 0.5) / 10 end
-    local out = { me = { x = r(me.x), y = r(me.y) }, mobs = {}, party = {}, range = S.farm.range }
+    local out = { me = { x = r(me.x), y = r(me.y) }, mobs = {}, party = {}, range = farm.range() }
     local camp = farm.camp()
     if camp then out.camp = { x = r(camp.x), y = r(camp.y) } end
     if S.farm.area == 'route' then

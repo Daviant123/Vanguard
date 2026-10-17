@@ -254,7 +254,8 @@ common unclaimed mob within 30 yalms, with the camp where you stand. Or:
    again). Optionally **/check** each new kind and skip *Too Weak* (no XP) or *Incredibly Tough* / NMs.
 3. **Where** - *Stay around a camp* (it walks back after each kill; **bring each mob back to camp** and the team waits
    there) or *Walk a route* you record by walking it. Save several **farm spots** and tick "move on to the next saved
-   spot" to rotate when one runs dry.
+   spot" to rotate when one runs dry, or let it **look further when it's quiet** (10 yalms more every 30 s up to a
+   limit you pick, back to normal once mobs are close).
 4. **Start farming.**
 
 **On the dashboard:** what it's doing right now, time, kills, kills / hour, XP and CP / hour, bag space, the XP / CP

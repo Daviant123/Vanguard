@@ -1,6 +1,6 @@
 _addon.name = 'Vanguard'
 _addon.author = 'Daviant'
-_addon.version = '0.59.1'
+_addon.version = '0.60.0'
 _addon.commands = {'vanguard', 'vg'}
 
 --[[
@@ -123,6 +123,7 @@ local defaults = {
              rotate = false,                      -- a spot dry for 3 min: move on to the next saved spot in the zone
              rest_idle = true,                    -- rest at camp while there's nothing to fight (up when a mob comes)
              check = false, skip_weak = false, skip_tough = false,  -- /check each new kind; skip Too Weak / Incredibly Tough + NMs
+             widen = 0,                           -- quiet spot: search 10 yalms further every 30 s, up to this (0 = off)
              polite = true,                       -- leave unclaimed mobs another player is standing next to
              hotkey = '',                         -- a key that starts / stops farming from the game window (^f9 ...)
              emergency = '', emergency_hp = 25,   -- under this HP % in a fight: this item / ability (from a menu)

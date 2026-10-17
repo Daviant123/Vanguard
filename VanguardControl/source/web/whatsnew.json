@@ -1,5 +1,12 @@
 [
   {
+    "version": "1.50.0",
+    "date": "2026-10-17",
+    "items": [
+      "Farming looks further when it's quiet: under Where, pick \"When it's quiet, look further, up to ...\". After 30 seconds with nothing to fight it searches 10 yalms further, step by step up to your limit, and goes back to your normal range once mobs are close again."
+    ]
+  },
+  {
     "version": "1.49.1",
     "date": "2026-10-17",
     "items": [
