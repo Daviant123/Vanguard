@@ -164,6 +164,16 @@ function trials.assist_done()
     return t and t.goal > 0 and t.count >= t.goal or false
 end
 
+-- An open weapon skill trial wants this mob killed with this weapon skill?
+function trials.wants(name, ws)
+    if not ws or ws == '' then return false end
+    for _, k in ipairs(keys()) do
+        local t = decode(S.trials[k])
+        if t and t.kind == 'ws' and t.count < t.goal and t.ws:lower() == ws:lower() and matches(name, t.mobs) then return true end
+    end
+    return false
+end
+
 function trials.game_line() return state.trial_game end
 
 function trials.init(settings, runtime_state, helpers)

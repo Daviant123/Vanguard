@@ -1,5 +1,12 @@
 [
   {
+    "version": "1.60.0",
+    "date": "2026-10-17",
+    "items": [
+      "Magian trials: holding off for TP before the killing blow now works for every mob an open weapon skill trial needs, even without clicking \"Help finish it\"."
+    ]
+  },
+  {
     "version": "1.59.1",
     "date": "2026-10-17",
     "items": [

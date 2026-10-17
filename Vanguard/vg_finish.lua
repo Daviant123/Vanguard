@@ -56,11 +56,17 @@ end
 -- Waiting for TP (finish_wait, or always while helping with a Magian trial): with Auto, stop attacking a little above
 -- the finish line - by the time the mob is under it, a couple of normal hits kill it before TP is 1000 (his real run,
 -- 2026-10-17: Atonement landed 42 of 66 Peapuk kills, the line being 9 %).
-local function waits() return S.ws.finish_wait or (S.trial_assist and S.trial_assist ~= '') end
+-- (also whenever the mob is one an open weapon skill trial for this weapon skill wants - upgrade 29: his next trial
+-- (Buzzflies) wasn't on "Help finish it", so the hold-off never ran and 11 of 12 misses were mobs dying first)
+local function waits(t)
+    if S.ws.finish_wait or (S.trial_assist and S.trial_assist ~= '') then return true end
+    local ok, tr = pcall(require, 'vg_trials')
+    return ok and tr.wants and t and t.name and tr.wants(t.name, S.ws.finish) or false
+end
 
 function finish.wait_line(t)
     local line = finish.line(t)
-    if not waits() then return line end
+    if not waits(t) then return line end
     return line + math.max(5, line)            -- (a % he picks too, not only Auto)
 end
 
@@ -138,7 +144,7 @@ function finish.ws(player, t)
             if h.ws_in_range(t, true) and not h.recently('ws:' .. f, 3) then return h.use_ws(f) and 'used' end
             return 'block'
         end
-        if waits() and player.status == 1 and state.finish_wait ~= t.id then
+        if waits(t) and player.status == 1 and state.finish_wait ~= t.id then
             state.finish_wait, state.finish_wait_t = t.id, clock()
             windower.send_command('input /attackoff')
             h.log(('%s is low and TP is %d: stopping until TP is 1000, then %s'):format(t.name, player.vitals.tp, f))
