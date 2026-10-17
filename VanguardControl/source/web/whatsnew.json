@@ -1,5 +1,12 @@
 [
   {
+    "version": "1.54.1",
+    "date": "2026-10-17",
+    "items": [
+      "Fix: Auto finishing weapon skill could learn from one weak hit and wait until the mob was nearly dead (normal hits then got the kill). It now goes by the typical hit, and remembers what it learned across reloads and updates."
+    ]
+  },
+  {
     "version": "1.54.0",
     "date": "2026-10-17",
     "items": [

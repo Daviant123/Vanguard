@@ -26,6 +26,7 @@ local function on(name) return name and name ~= '' and name:lower() ~= 'none' en
 
 -- Auto finish point: per kind of mob, the HP % recent hits took (newest last) and the highest HP % a hit has killed at
 local learned, killed_at = {}, {}
+local store_learned          -- (below)
 
 local function auto() return (tonumber(S.ws.finish_at) or 25) <= 0 end
 
@@ -34,10 +35,18 @@ function finish.line(t)
     if not auto() then return tonumber(S.ws.finish_at) or 25 end
     local l = learned[t.name]
     if l and #l > 0 then
-        local low = l[1]
-        for _, v in ipairs(l) do if v < low then low = v end end
-        -- the weakest recent hit, less a tenth (others keep hitting while it goes off), never under 3 %
-        return math.max(3, math.floor(low * 0.9))
+        -- the typical recent hit (the middle one), less a tenth (others keep hitting while it goes off), never under
+        -- 3 %. Not the weakest: Atonement's damage follows the hate we hold, so one early weak hit (fired at 30 %
+        -- right after a reload) set the line to 3 % - his live run, 2026-10-17: the kill landed on 3 of 23 Peapuks,
+        -- normal hits finishing them first
+        local sorted = {}
+        for i, v in ipairs(l) do sorted[i] = v end
+        table.sort(sorted)
+        local mid = sorted[math.floor((#sorted + 1) / 2)]
+        local line = math.max(3, math.floor(mid * 0.9))
+        -- a hit that killed from higher up shows it can be trusted that far
+        if killed_at[t.name] and killed_at[t.name] > line and killed_at[t.name] <= mid then line = killed_at[t.name] end
+        return line
     end
     return killed_at[t.name] or 30                    -- nothing learned yet: a careful first guess, learned from
 end
@@ -70,7 +79,9 @@ function finish.learn_tick()
     state.finish_probe = nil
     local m = windower.ffxi.get_mob_by_id(p.id)
     if not m or (m.hpp or 0) <= 0 or m.valid_target == false or m.status == 2 or m.status == 3 then
+        local was = killed_at[p.name]
         killed_at[p.name] = math.max(killed_at[p.name] or 0, p.before)      -- it killed: one hit is at least that much
+        if killed_at[p.name] ~= was then store_learned() end
         return
     end
     local drop = p.before - m.hpp
@@ -79,6 +90,7 @@ function finish.learn_tick()
     l[#l + 1] = drop
     while #l > 5 do table.remove(l, 1) end
     learned[p.name] = l
+    store_learned()
     if auto() then h.log(('%s took %d%% of %s: it will finish them from %d%% HP'):format(S.ws.finish, drop, p.name, finish.line(m))) end
 end
 
@@ -180,8 +192,38 @@ function finish.held(player)
     return mine or player.status ~= 1
 end
 
+-- What Auto learned is kept in the settings (ws.learned = "Peapuk=10/11/9@9;..."), so a reload or an update doesn't
+-- start again from the 30 % guess
+store_learned = function()
+    local parts = {}
+    for name, l in pairs(learned) do
+        local nums = {}
+        for i, v in ipairs(l) do nums[i] = tostring(v) end
+        parts[#parts + 1] = name .. '=' .. table.concat(nums, '/') .. (killed_at[name] and ('@' .. killed_at[name]) or '')
+    end
+    for name, v in pairs(killed_at) do if not learned[name] then parts[#parts + 1] = name .. '=@' .. v end end
+    table.sort(parts)
+    S.ws.learned = table.concat(parts, ';')
+    if h and h.save then pcall(h.save) end
+end
+finish.store_learned = store_learned
+
+local function load_learned()
+    learned, killed_at = {}, {}
+    for entry in tostring(S.ws.learned or ''):gmatch('[^;]+') do
+        local name, nums, k = entry:match('^(.-)=([%d/]*)@?(%d*)$')
+        if name and name ~= '' then
+            local l = {}
+            for v in nums:gmatch('%d+') do l[#l + 1] = tonumber(v) end
+            if #l > 0 then learned[name] = l end
+            if k ~= '' then killed_at[name] = tonumber(k) end
+        end
+    end
+end
+
 function finish.init(settings, runtime_state, helpers)
     S, state, h = settings, runtime_state, helpers
+    load_learned()
 end
 
 return finish

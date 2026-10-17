@@ -1,6 +1,6 @@
 _addon.name = 'Vanguard'
 _addon.author = 'Daviant'
-_addon.version = '0.64.0'
+_addon.version = '0.64.1'
 _addon.commands = {'vanguard', 'vg'}
 
 --[[
@@ -136,7 +136,7 @@ local defaults = {
     buffs = { list = '' },
     -- finish*: the weapon skill that lands the kill (vg_finish): at mob HP% finish_at, saving TP, others stop attacking
     ws = { name = '', tp = 1000, min_mob_hpp = 1, max_range = 6,
-           finish = '', finish_at = 0, finish_save = true, finish_others = true, finish_wait = false },
+           finish = '', finish_at = 0, learned = '', finish_save = true, finish_others = true, finish_wait = false },
     -- Ordered chain steps "Character:Weapon Skill". Each character only fires its own steps.
     sc = { steps = '', open_tp = 1000, window_min = 3, window_max = 8 },
     -- "Element:Spell|Fallback|Fallback" pairs.
@@ -1151,7 +1151,8 @@ stats.chain_hook = function(n) farm.on_points(n) end
 farm.init(settings, state, { log = log, run_toward = run_toward, stop_running = stop_running, face = face,
     party_engaged = party_engaged, recently = recently, mark = mark, save = function() save_profile() store.save(settings) send_profile() end,
     send = bridge.send })
-finish.init(settings, state, { log = log, use_ws = use_ws, ws_in_range = ws_in_range, recently = recently, mark = mark })
+finish.init(settings, state, { log = log, use_ws = use_ws, ws_in_range = ws_in_range, recently = recently, mark = mark,
+    save = function() store.save(settings) end })
 bard.init(settings, state, {
     log = log, recently = recently, mark = mark, try_cast = try_cast, use_ja = use_ja, amnesia = amnesia,
     party_members = party_members, ja_ready = ja_ready,
