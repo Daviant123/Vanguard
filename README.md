@@ -256,6 +256,7 @@ common unclaimed mob within 30 yalms, with the camp where you stand. Or:
    there) or *Walk a route* you record by walking it. Save several **farm spots** and tick "move on to the next saved
    spot" to rotate when one runs dry, or let it **look further when it's quiet** (10 yalms more every 30 s up to a
    limit you pick, back to normal once mobs are close).
+   It learns each spot's **respawn time** from its kills and shows "next <mob> in ~N s" while it waits.
 4. **Start farming.**
 
 **On the dashboard:** what it's doing right now, time, kills, kills / hour, XP and CP / hour, bag space, the XP / CP

@@ -515,7 +515,76 @@ function farm.fight_tick(player)
 end
 
 -- a party kill (from vg_stats): if it was the mob we were fighting, wait a moment for its XP, then record it
+-- Respawn timing (upgrade 22; MMOMinion / OSBot camp scripts wait at spawns): a mob in FFXI comes back at the same spot
+-- with the same id after a fixed time. Each kill is noted; when that id is back the time it took is learned (per mob
+-- and per kind), so farming can say "next Apex Bat in ~40 s" and won't move on to another spot when one is about to pop.
+local function pop_name(mob, f)
+    if mob.name and mob.name ~= '' then return mob.name end
+    return f and f.name or nil
+end
+
+function farm.note_death(mob)
+    if not mob or not mob.id then return end
+    local name = pop_name(mob, state.farm_fight == mob.id and state.farm_fight_info or nil)
+    if not name then
+        local m = windower.ffxi.get_mob_by_id(mob.id)
+        name = m and m.name
+    end
+    if not name or name == '' then return end
+    state.farm_pops = state.farm_pops or {}
+    state.farm_pops[mob.id] = { n = name, died = now() }
+end
+
+local function alive(m)
+    return type(m) == 'table' and m.valid_target ~= false and (m.hpp or 0) > 0 and m.status ~= 2 and m.status ~= 3
+end
+
+function farm.pops_tick()
+    if not state.farm_pops or (state.farm_pops_t and now() - state.farm_pops_t < 1) then return end
+    state.farm_pops_t = now()
+    state.farm_respawn = state.farm_respawn or {}
+    state.farm_respawn_kind = state.farm_respawn_kind or {}
+    for id, p in pairs(state.farm_pops) do
+        local age = now() - p.died
+        local m = age >= 20 and windower.ffxi.get_mob_by_id(id) or nil
+        if m and alive(m) then
+            local secs = math.floor(age + 0.5)
+            state.farm_respawn[id] = secs
+            local k = state.farm_respawn_kind[p.n] or { sum = 0, n = 0 }
+            k.sum, k.n = k.sum + secs, k.n + 1
+            state.farm_respawn_kind[p.n] = k
+            state.farm_pops[id] = nil
+        elseif age > 3600 then
+            state.farm_pops[id] = nil                -- never came back (an NM window, or it's been killed by others)
+        end
+    end
+end
+
+-- the soonest expected pop of a mob farming wants: { n = name, secs = seconds to go (0 = any moment) } or nil
+function farm.next_pop()
+    local best
+    for id, p in pairs(state.farm_pops or {}) do
+        local wanted = S.farm.mode ~= 'list' or matches(p.n, list(S.farm.targets))
+        local k = state.farm_respawn_kind and state.farm_respawn_kind[p.n]
+        local secs = (state.farm_respawn and state.farm_respawn[id]) or (k and k.n > 0 and k.sum / k.n)
+        if wanted and secs then
+            local left = p.died + secs - now()
+            if left > -60 and (not best or left < best.secs) then best = { n = p.n, secs = left } end
+        end
+    end
+    if best then best.secs = math.max(0, math.floor(best.secs + 0.5)) end
+    return best
+end
+
+local function pop_text()
+    local p = farm.next_pop()
+    if not p then return '' end
+    return p.secs <= 5 and (' - next ' .. p.n .. ' any moment') or (' - next %s in ~%s'):format(p.n,
+        p.secs >= 90 and (math.floor(p.secs / 60 + 0.5) .. ' min') or (p.secs .. ' s'))
+end
+
 function farm.on_kill(mob)
+    farm.note_death(mob)
     local f = state.farm_fight_info
     if not f or state.farm_fight ~= mob.id then return end
     if (f.low or 100) < 25 then farm.strong_strike(f.name, ('it took me down to %d%% HP'):format(f.low)) end
@@ -841,7 +910,7 @@ function farm.run_stats()
              every = kills > 0 and math.floor(secs / kills + 0.5) or nil, skipped = state.farm_skipped or 0,
              loot = farm.loot_list(), mobs = farm.report(), chain = farm.chain_info(), free = farm.inv_free(),
              spark = farm.spark(), busy = state.farm_busy, checks = state.farm_checks, value = farm.loot_value(),
-             item = have and { n = S.farm.item, have = have, goal = S.farm.item_goal } or nil, paused = r.paused and true or nil }
+             item = have and { n = S.farm.item, have = have, goal = S.farm.item_goal } or nil, paused = r.paused and true or nil, pop = farm.next_pop() }
 end
 
 -- a reason to stop farming now, or nil
@@ -921,6 +990,7 @@ end
 
 -- zoned while farming (warped, fell through a zone line, KO'd home point): the camp and route belong to the old zone
 function farm.on_zone()
+    state.farm_pops, state.farm_respawn = nil, nil        -- ids belong to the old zone (the per-kind times stay)
     if not S.modules.farm then return end
     farm.finish(windower.ffxi.get_player(), 'changed zone')
 end
@@ -932,6 +1002,7 @@ farm.status = status
 
 function farm.tick(player)
     if not S.modules.farm then state.farm_status = nil return false end
+    farm.pops_tick()
     state.route_moving = false
     if player.status == 1 then return false end
     if not S.enabled then status(state.farm_run and state.farm_run.paused and 'paused' or 'stopped') return false end
@@ -967,7 +1038,8 @@ function farm.tick(player)
     state.farm_go = nil
     -- nothing to fight for 5 minutes: say so once (the app's Alarms ring) - the spot may be camped or the list wrong
     state.farm_idle_since = state.farm_idle_since or now()
-    if now() - state.farm_idle_since >= 180 and farm.rotate() then return false end
+    local soon = farm.next_pop()
+    if now() - state.farm_idle_since >= 180 and not (soon and soon.secs <= 60) and farm.rotate() then return false end
     if not state.farm_idle_told and now() - state.farm_idle_since >= 300 then
         state.farm_idle_told = true
         h.log('Farming: nothing to fight for 5 minutes')
@@ -981,11 +1053,11 @@ function farm.tick(player)
         end
         if (state.farm_packed or 0) > 0 then status(('at camp, waiting for a mob on its own (%d with others next to them)'):format(state.farm_packed)) return false end
         if farm.rest_idle(player) then return true end
-        status(('at camp, waiting for mobs within %d yalms'):format(farm.range()))
+        status(('at camp, waiting for mobs within %d yalms'):format(farm.range()) .. pop_text())
         return false
     end
     local pts = route()
-    if #pts == 0 then status(('waiting for mobs within %d yalms'):format(farm.range())) return false end
+    if #pts == 0 then status(('waiting for mobs within %d yalms'):format(farm.range()) .. pop_text()) return false end
     if state.wp > #pts or state.wp < 1 then state.wp = 1 end
     local wp = pts[state.wp]
     if dist2(me, wp) < 2 then

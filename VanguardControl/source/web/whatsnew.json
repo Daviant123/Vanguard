@@ -1,5 +1,12 @@
 [
   {
+    "version": "1.52.0",
+    "date": "2026-10-17",
+    "items": [
+      "Farming learns respawn times: after a mob it killed comes back, it knows how long that spot takes, shows \"next Apex Bat in ~40 s\" while it waits at camp, and won't move on to another spot when one is about to pop."
+    ]
+  },
+  {
     "version": "1.51.0",
     "date": "2026-10-17",
     "items": [
