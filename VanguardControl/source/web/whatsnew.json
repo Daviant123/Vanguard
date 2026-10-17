@@ -1,5 +1,12 @@
 [
   {
+    "version": "1.44.0",
+    "date": "2026-10-16",
+    "items": [
+      "New: Magian trials on the Farming tab. Add a trial by clicking (defeat N mobs, or with a weapon skill), watch the progress bar, and click \"Help finish it\" - farming fights the right mobs, finishes them with the trial's weapon skill and stops when the trial is done."
+    ]
+  },
+  {
     "version": "1.43.1",
     "date": "2026-10-16",
     "items": [

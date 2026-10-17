@@ -1428,6 +1428,37 @@ function bringTeam(farmer) {    // everyone else follows and helps the farmer
 let farmView = "simple";
 try { farmView = localStorage.getItem("vg.farmview") || "simple"; } catch (e) {}
 function setFarmView(v) { farmView = v; try { localStorage.setItem("vg.farmview", v); } catch (e) {} bodyKey = ""; render(); }
+// ---------- Magian trials (his request): track trials, "Help finish it" sets farming up for one ----------
+let trialForm = {kind: "kill", goal: 100, ws: "", mobs: ""};
+function trialAdd() { const f = trialForm; send(`trial add ${f.kind}|${f.goal}|${f.kind === "ws" ? f.ws : ""}|${f.mobs}`); }
+function trialBox(p, mobNames) {
+  const x = (p.config || {}).extra || {}, list = arr(x.trials), wl = arr(p.ws_list);
+  const f = trialForm;
+  const o = (v, l, cur) => `<option value="${esc(v)}" ${String(v) === String(cur) ? "selected" : ""}>${esc(l)}</option>`;
+  return `<div class="box"><h3>Magian trials</h3>
+    ${list.length ? list.map(t => `<div style="margin-bottom:8px">
+        <div class="row" style="justify-content:space-between;align-items:center">
+          <span><b>${t.kind === "ws" ? `Defeat ${t.goal} ${esc(t.mobs || "enemies")} with ${esc(t.ws)}` : `Defeat ${t.goal} ${esc(t.mobs || "enemies")}`}</b>
+            ${t.done ? `<span class="pill on">done</span>` : t.assist ? `<span class="pill on">helping</span>` : ""}</span>
+          <span><b>${t.count}</b> / ${t.goal}
+            <button style="font-size:11px" class="${t.assist ? "primary" : ""}" ${t.done ? "disabled" : ""} onclick="send('trial assist ${t.k}')">${t.assist ? "Helping ✓" : "Help finish it"}</button>
+            <button style="font-size:11px" title="Start the count again" onclick="send('trial reset ${t.k}')">↺</button>
+            <button style="font-size:11px" title="Remove" onclick="send('trial del ${t.k}')">×</button></span></div>
+        <div class="hpbar" style="height:8px"><div style="background:var(--good);width:${t.goal ? Math.min(100, t.count * 100 / t.goal) : 0}%"></div></div></div>`).join("")
+      : `<div class="hint">No trials yet. Add one below - Vanguard counts the kills that fit it.</div>`}
+    <div class="row" style="margin-top:8px;align-items:flex-end;flex-wrap:wrap">
+      <label class="field">Trial <select onchange="trialForm.kind=this.value;bodyKey='';render()">${o("kill", "Defeat enemies", f.kind)}${o("ws", "Defeat enemies with a weapon skill", f.kind)}</select></label>
+      ${f.kind === "ws" ? `<label class="field">Weapon skill <select onchange="trialForm.ws=this.value;bodyKey='';render()"><option value="">- pick -</option>${wl.map(w => o(w, w, f.ws)).join("")}</select></label>` : ""}
+      <label class="field">Which <select onchange="trialForm.mobs=this.value"><option value="">any enemy</option>${mobNames.map(n => o(n, n, f.mobs)).join("")}</select></label>
+      <label class="field">How many <select onchange="trialForm.goal=+this.value">${[10, 20, 30, 50, 75, 100, 150, 200, 250, 300, 500, 1000].map(v => o(v, v, f.goal)).join("")}</select></label>
+      <button class="primary" onclick="trialAdd()" ${f.kind === "ws" && !f.ws ? "disabled" : ""}>Add trial</button>
+    </div>
+    ${x.trial_game ? `<div class="hint" style="margin-top:6px">The game said: "${esc(x.trial_game)}"</div>` : ""}
+    <div class="hint" style="margin-top:4px">A weapon skill trial counts a kill only when that weapon skill lands the killing blow. "Help finish it" farms the trial's
+      mobs, finishes them with its weapon skill (TP saved, the others leave the mob) and stops farming when the count is reached. Wear the trial weapon yourself.</div>
+  </div>`;
+}
+
 function farmTab(c, p) {
   const s = c.snapshot || {}, x = (p.config || {}).extra || {}, mods = (p.config || {}).modules || s.modules || {};
   const known = (p.config || {}).known || {};
@@ -1555,6 +1586,8 @@ function farmTab(c, p) {
       </div>
       <div class="hint" style="margin-top:4px">Points a minute = (XP + CP) per minute of fighting. It needs two kills of a kind before it prefers one.</div>
     </div>` : ""}
+
+    ${trialBox(p, Array.from(new Set(tgt.concat(mobs.map(m => m.n), arr(run.mobs).map(m => m.n), arr((f.radar || {}).mobs).map(m => m.n)))).filter(Boolean).sort())}
 
     <div class="box"><h3>Quick setups</h3>
       <div class="row" style="flex-wrap:wrap;gap:8px">

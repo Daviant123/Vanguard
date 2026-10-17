@@ -1,6 +1,6 @@
 _addon.name = 'Vanguard'
 _addon.author = 'Daviant'
-_addon.version = '0.53.1'
+_addon.version = '0.54.0'
 _addon.commands = {'vanguard', 'vg'}
 
 --[[
@@ -52,6 +52,7 @@ local crash = require('vg_crash')
 local warp = require('vg_warp')
 local finish = require('vg_finish')
 local farm = require('vg_farm')
+local trials = require('vg_trials')
 crash.init(bridge)
 -- Every event handler below runs guarded: an error becomes a crash report instead of red text (vg_crash).
 do
@@ -124,7 +125,8 @@ local defaults = {
              check = false, skip_weak = false, skip_tough = false,  -- /check each new kind; skip Too Weak / Incredibly Tough + NMs
              polite = true,                       -- leave unclaimed mobs another player is standing next to
              packs = true, pack_range = 8, pack_strict = false },
-    farmspots = { s0 = '' },      -- saved farm spots (vg_farm): s1, s2, ... = "name|zone|field=value|..." 
+    farmspots = { s0 = '' },
+    trials = { t0 = '' }, trial_assist = '',   -- Magian trials (vg_trials): t1 = "kind|goal|ws|mobs|count"      -- saved farm spots (vg_farm): s1, s2, ... = "name|zone|field=value|..." 
     -- "Spell>target" pairs. target = me or a party member name. "ja:" prefix = job ability.
     buffs = { list = '' },
     -- finish*: the weapon skill that lands the kill (vg_finish): at mob HP% finish_at, saving TP, others stop attacking
@@ -1138,7 +1140,8 @@ local function ja_ready(name)
 end
 quick.init(settings, state, { log = log })
 warp.init(settings, state, { log = log })
-stats.kill_hook = function(mob) farm.on_kill(mob) end
+stats.kill_hook = function(mob) farm.on_kill(mob) trials.on_kill(mob) end
+trials.init(settings, state, { log = log, save = function() store.save(settings) send_profile() end })
 stats.chain_hook = function(n) farm.on_points(n) end
 farm.init(settings, state, { log = log, run_toward = run_toward, stop_running = stop_running, face = face,
     party_engaged = party_engaged, recently = recently, mark = mark, save = function() save_profile() store.save(settings) send_profile() end,
@@ -1319,6 +1322,10 @@ windower.register_event('action', function(act)
     support.note_hate(act, player)
 
     -- Our own action results: release the busy lock, record songs / debuffs.
+    if act.actor_id == player.id and act.category == 3 and first then           -- a weapon skill (Magian trials)
+        local wsr = res.weapon_skills[act.param]
+        if wsr then trials.note_ws(first.id, wsr.en) end
+    end
     if act.actor_id == player.id then
         if act.category == 8 then
             if act.param == 28787 then state.busy_until = now() + 1 end       -- interrupted
@@ -1401,6 +1408,7 @@ end)
 windower.register_event('incoming text', function(original)
     if settings.modules.triggers then triggers.note_chat(original) end
     if settings.modules.farm then farm.on_text(original) end
+    trials.on_text(original)
     local inviter = original:match('(%a+) invites you to')
     if inviter then
         local player = windower.ffxi.get_player()
@@ -1932,6 +1940,16 @@ windower.register_event('addon command', function(cmd, ...)
             if me then farm.set_camp(me) settings.farm.area = 'camp' log('Camp set here') if settings.modules.farm then farm.share_camp(windower.ffxi.get_player(), true) end end
         end
         save_profile() send_profile()   -- (the job setup carries the module switches a reload restores)
+    elseif cmd == 'trial' then
+        -- the Farming tab's Magian trials: //vg trial add <kind>|<goal>|<weapon skill>|<mobs> | del <t1> | reset <t1> | assist <t1>
+        local sub, rest = (args[1] or ''):lower(), table.concat(args, ' ', 2)
+        if sub == 'add' then
+            local k = trials.add(rest)
+            log(k and 'Magian trial added' or 'That trial could not be added (pick a weapon skill for a weapon skill trial)')
+        elseif sub == 'del' then trials.remove(rest)
+        elseif sub == 'reset' then trials.reset(rest)
+        elseif sub == 'assist' then trials.assist(rest) end
+        save_profile() send_profile()
     elseif cmd == 'farmitem' then
         -- the Farming tab's "Farm for": //vg farmitem <item name> | none
         local name = table.concat(args, ' ')

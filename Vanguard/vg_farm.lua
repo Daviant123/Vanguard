@@ -777,6 +777,8 @@ local function stop_reason(player)
     local have = farm.item_have()
     if have and S.farm.item_goal > 0 and have >= S.farm.item_goal then return ('%d %s in the bags'):format(have, S.farm.item) end
     if r and S.farm.stop_mins > 0 and r.secs >= S.farm.stop_mins * 60 then return S.farm.stop_mins .. ' minutes done' end
+    local ok, tr = pcall(require, 'vg_trials')
+    if ok and tr.assist_done and tr.assist_done() then S.trial_assist = '' return 'Magian trial done' end
     if S.farm.stop_full then
         local inv = windower.ffxi.get_items('inventory')
         if inv and inv.max and inv.max > 0 and (inv.count or 0) >= inv.max then return 'the inventory is full' end

@@ -22,6 +22,7 @@ vg_strat.lua
 vg_support.lua
 vg_team.lua
 vg_travel.lua
+vg_trials.lua
 vg_triggers.lua
 vg_update.lua
 vg_util.lua
