@@ -267,7 +267,7 @@ party ready, resting, bag space, Reraise, food). **Pause** stops for a moment wi
 sooner), walk up or let it come, rest levels, rest at camp while idle, Treasure Hunter (GearSwap TreasureMode), save TP
 on nearly dead mobs; **The team** - others follow and help in one click, wait for everyone's HP / MP before each pull
 (whoever is low is told to rest), keep the XP / CP chain going, sleep extra mobs; **Finish mobs with a weapon skill**;
-**Stop when** - inventory full, after N kills or minutes, when you have N of an item; **when done** - stay, everyone
+**Stop when** - inventory full, after N kills or minutes, when you have N of an item, at a level (for levelling a job); **when done** - stay, everyone
 warps home or everyone logs out; **Trusts**, sorted by role.
 
 **Safety nets:** it never chases a mob it can't reach (skipped for a while), lets go of a mob someone else claims or one

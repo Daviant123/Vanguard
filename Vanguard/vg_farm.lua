@@ -789,7 +789,7 @@ end
 
 function farm.start(player, me)
     local xp, cp = points()
-    state.farm_run = { t = now(), kills0 = kills_now(), xp0 = xp, cp0 = cp }
+    state.farm_run = { t = now(), kills0 = kills_now(), xp0 = xp, cp0 = cp, lv0 = player and tonumber(player.main_job_level) or nil }
     state.farm_inv, state.farm_inv_t, state.farm_loot = inv_counts(), now(), {}
     state.farm_bl, state.farm_skipped, state.farm_go, state.farm_fails = {}, 0, nil, {}
     if me and (S.farm.area ~= 'route') and not farm.camp() then farm.set_camp(me) end
@@ -852,6 +852,10 @@ local function stop_reason(player)
     local have = farm.item_have()
     if have and S.farm.item_goal > 0 and have >= S.farm.item_goal then return ('%d %s in the bags'):format(have, S.farm.item) end
     if r and S.farm.stop_mins > 0 and r.secs >= S.farm.stop_mins * 60 then return S.farm.stop_mins .. ' minutes done' end
+    -- level goal (upgrade 21, DreamBot's "stop at level"): only a level gained during this run counts, so a goal at or
+    -- below the level farming started at doesn't stop it straight away
+    local goal, lv = tonumber(S.farm.stop_level) or 0, tonumber(player.main_job_level) or 0
+    if goal > 0 and r and lv >= goal and lv > (state.farm_run.lv0 or lv) then return ('%s reached level %d'):format(player.main_job or 'job', lv) end
     local ok, tr = pcall(require, 'vg_trials')
     if ok and tr.assist_done and tr.assist_done() then S.trial_assist = '' return 'Magian trial done' end
     if S.farm.stop_full then

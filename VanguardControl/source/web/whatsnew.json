@@ -1,5 +1,12 @@
 [
   {
+    "version": "1.51.0",
+    "date": "2026-10-17",
+    "items": [
+      "Farming can stop at a level: under Stop when, pick \"or when <character> reaches level N\". Handy for levelling a job - it stops (and does your \"When done\") the moment the level is reached."
+    ]
+  },
+  {
     "version": "1.50.0",
     "date": "2026-10-17",
     "items": [
