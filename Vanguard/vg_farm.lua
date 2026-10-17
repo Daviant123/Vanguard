@@ -223,7 +223,7 @@ end
 function farm.player_near(mob, ids)
     if not mob.x then return false end
     for _, o in pairs(windower.ffxi.get_mob_array() or {}) do
-        if type(o) == 'table' and o.spawn_type == 13 and not o.is_npc and o.x and not ids[o.id]
+        if util.is_player(o) and o.x and not ids[o.id]
             and (o.hpp or 0) > 0 and dist2(o, mob) <= 6 then
             return true
         end

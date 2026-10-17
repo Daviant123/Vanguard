@@ -1,5 +1,12 @@
 [
   {
+    "version": "1.49.1",
+    "date": "2026-10-17",
+    "items": [
+      "Fix: farming's \"leave mobs near other players alone\" never saw players outside your party, and the bard's nearby-player song list missed them too. Both now recognise other players correctly."
+    ]
+  },
+  {
     "version": "1.49.0",
     "date": "2026-10-17",
     "items": [

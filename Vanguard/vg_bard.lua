@@ -190,7 +190,7 @@ function bard.candidates(player)
     for name in pairs(require('vg_party').known or {}) do add(name) end
     local me = windower.ffxi.get_mob_by_target('me')
     for _, m in pairs(windower.ffxi.get_mob_array() or {}) do
-        if type(m) == 'table' and not m.is_npc and m.spawn_type == 13 and m.name and util.dist(m) <= 30 then add(m.name) end
+        if util.is_player(m) and m.name and util.dist(m) <= 30 then add(m.name) end
     end
     table.sort(out)
     return out

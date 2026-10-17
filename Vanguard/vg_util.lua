@@ -37,6 +37,13 @@ function util.targets(entry, what)
     return false
 end
 
+-- Is this entity a player character? spawn_type 1 = another player, 13 = in my party, 9 = in my alliance (14 = a
+-- trust, 16 = a monster, 2 / 34 = an NPC), as the InfoBar addon reads them. (Vanguard used 13 alone, which misses every
+-- player outside the party.)
+function util.is_player(m)
+    return type(m) == 'table' and not m.is_npc and (m.spawn_type == 1 or m.spawn_type == 9 or m.spawn_type == 13)
+end
+
 function util.spell(name)   return name and util.spells[name:lower()] end
 function util.ability(name) return name and util.abilities[name:lower()] end
 function util.wskill(name)  return name and util.wskills[name:lower()] end
