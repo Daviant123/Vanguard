@@ -49,6 +49,11 @@ function stats.on_message(actor_id, target_id, message_id, p1, p2)
     local player = windower.ffxi.get_player()
     if not player then return end
     local me = player.id
+    if actor_id == me and stats.chain_hook then
+        -- chains (farming): 253 "EXP chain #p2", 735 "Capacity chain #p1", 372 "Limit chain #p2"; 8 / 718 / 371: no chain
+        local chain = ({ [253] = tonumber(p2), [735] = tonumber(p1), [372] = tonumber(p2), [8] = 0, [718] = 0, [371] = 0 })[message_id]
+        if chain then pcall(stats.chain_hook, chain) end
+    end
     if actor_id == me then
         if message_id == 8 or message_id == 253 then s.exp = s.exp + (tonumber(p1) or 0)
         elseif message_id == 105 then s.exp = s.exp + (tonumber(p2) or 0)

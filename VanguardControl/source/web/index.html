@@ -1432,6 +1432,9 @@ function farmTab(c, p) {
             <div class="tile"><b>${perHourXp}</b><span>XP / hour (session)</span></div>
             <div class="tile"><b>${run.skipped ?? "—"}</b><span>mobs skipped (unreachable)</span></div>
           </div>
+          ${run.chain ? `<div class="row" style="margin-top:10px;align-items:center;gap:10px">
+              <span class="pill ${run.chain.n >= 1 ? "on" : "off"}" style="font-size:13px">${run.chain.n >= 1 ? `Chain #${run.chain.n}` : "No chain"}</span>
+              <span class="hint">${run.chain.since}s since the last kill · best #${run.chain.best}${run.chain.min || run.chain.max ? ` · chain window ${run.chain.min ? `at least ${run.chain.min}s` : ""}${run.chain.min && run.chain.max ? ", " : ""}${run.chain.max ? `under ${run.chain.max}s` : ""}` : ""}</span></div>` : ""}
           ${run.item ? `<div style="margin-top:10px"><div class="row" style="justify-content:space-between"><b style="font-size:12px">Farming for ${esc(run.item.n)}</b>
               <span><b>${run.item.have}</b> / ${run.item.goal || "?"} in the bags</span></div>
               <div class="hpbar" style="height:8px"><div style="background:var(--good);width:${run.item.goal ? Math.min(100, run.item.have * 100 / run.item.goal) : 0}%"></div></div></div>` : ""}
@@ -1540,7 +1543,8 @@ function farmTab(c, p) {
         <label class="field">Within ${sel("set farm.wait_near ", [{v: 0, l: "any distance"}].concat(nums([10, 15, 20, 30], " yalms")), x.farm_wait_near ?? 20)}</label>
       </div>
       <div class="hint" style="margin-top:6px">Before pulling, it waits until everyone is ready. Whoever is low (the healer out of MP, itself hurt) is told to rest.
-        Something already attacking you is always fought.</div>` : ""}`)}
+        Something already attacking you is always fought.</div>
+      <div class="row" style="margin-top:8px">${chk("Keep the XP / CP chain going (while a chain runs, wait only if HP is under 40% or MP under 15%)", !!x.farm_keep_chain, "set farm.keep_chain true", "set farm.keep_chain false")}</div>` : ""}`)}
 
     ${finishBox(p)}
 

@@ -1,5 +1,13 @@
 [
   {
+    "version": "1.31.0",
+    "date": "2026-10-16",
+    "items": [
+      "Farming: XP / CP chains. The Farming tab shows your chain number, how long since the last kill and your best chain. Vanguard learns how long the chain window is from your own kills.",
+      "\"Keep the XP / CP chain going\" (under The team): while a chain is running, it only waits for the party in a real emergency (HP under 40% or MP under 15%), so the chain doesn't break."
+    ]
+  },
+  {
     "version": "1.30.0",
     "date": "2026-10-16",
     "items": [

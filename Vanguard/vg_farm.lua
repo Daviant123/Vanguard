@@ -94,14 +94,18 @@ function farm.party_wait(player)
     if not S.farm.wait_party then return nil end
     state.farm_maxmp = state.farm_maxmp or {}
     local me = windower.ffxi.get_mob_by_target('me')
+    -- keeping a chain going: only real emergencies make it wait
+    local chain = farm.chain_running and farm.chain_running()
+    local need_hp = chain and math.min(40, S.farm.wait_hp) or S.farm.wait_hp
+    local need_mp = chain and math.min(15, S.farm.wait_mp) or S.farm.wait_mp
     for _, m in ipairs((party())) do
         local mob = m.mob
         if (m.mp or 0) > (state.farm_maxmp[m.name] or 0) then state.farm_maxmp[m.name] = m.mp end
         if not (mob and mob.is_npc) then
             if (m.hpp or 100) <= 0 or (mob and (mob.status == 2 or mob.status == 3)) then return m.name .. " is KO'd", m.name end
             if mob and mob.status == 33 then return m.name .. ' (resting)', m.name end
-            if (m.hpp or 100) < S.farm.wait_hp then return ('%s (HP %d%%)'):format(m.name, m.hpp), m.name, true end
-            if (state.farm_maxmp[m.name] or 0) > 0 and (m.mpp or 100) < S.farm.wait_mp then
+            if (m.hpp or 100) < need_hp then return ('%s (HP %d%%)'):format(m.name, m.hpp), m.name, true end
+            if (state.farm_maxmp[m.name] or 0) > 0 and (m.mpp or 100) < need_mp then
                 return ('%s (MP %d%%)'):format(m.name, m.mpp), m.name, true
             end
             if m.name ~= player.name and S.farm.wait_near > 0 then
@@ -377,6 +381,41 @@ function farm.pay_factor(name)
 end
 
 ------------------------------------------------------------------------
+-- XP / CP chains (round 12, farming 5/5): the game says the chain number with the points after each kill. The time
+-- allowed between kills isn't guessed: it's learned from this run - a chain that went on after N s means the window
+-- is at least N s, one that broke after N s means it's under N s. "Keep the chain going" then waits only for real
+-- emergencies (HP 40 %, MP 15 %) while a chain is running and there's time left.
+------------------------------------------------------------------------
+function farm.on_points(chain)
+    local t = now()
+    if state.chain_t and t - state.chain_t < 2 then        -- XP and CP messages for the same kill
+        state.chain_n = math.max(state.chain_n or 0, chain)
+        return
+    end
+    local gap = state.chain_t and (t - state.chain_t) or nil
+    if gap then
+        if chain >= 1 then state.chain_min = math.max(state.chain_min or 0, gap)
+        elseif (state.chain_n or 0) >= 1 then state.chain_max = math.min(state.chain_max or 9999, gap) end
+    end
+    state.chain_n, state.chain_t = chain, t
+    state.chain_best = math.max(state.chain_best or 0, chain)
+end
+
+function farm.chain_info()
+    if not state.chain_t then return nil end
+    return { n = state.chain_n or 0, since = math.floor(now() - state.chain_t + 0.5), best = state.chain_best or 0,
+             min = state.chain_min and math.floor(state.chain_min + 0.5) or nil,
+             max = state.chain_max and state.chain_max < 9999 and math.floor(state.chain_max + 0.5) or nil }
+end
+
+-- a chain is running and there's still time to keep it (10 s to spare inside what we know of the window)
+function farm.chain_running()
+    if not S.farm.keep_chain or not state.chain_t or (state.chain_n or 0) < 1 then return false end
+    local window = state.chain_min or 30
+    return now() - state.chain_t < window - 10
+end
+
+------------------------------------------------------------------------
 -- the run: stats and stop conditions
 ------------------------------------------------------------------------
 local function kills_now() return (require('vg_stats').get() or {}).kills or 0 end
@@ -478,7 +517,7 @@ function farm.run_stats()
     local have = farm.item_have()
     return { secs = secs, kills = kills, kph = secs >= 120 and math.floor(kills * 3600 / secs + 0.5) or nil,
              every = kills > 0 and math.floor(secs / kills + 0.5) or nil, skipped = state.farm_skipped or 0,
-             loot = farm.loot_list(), mobs = farm.report(),
+             loot = farm.loot_list(), mobs = farm.report(), chain = farm.chain_info(),
              item = have and { n = S.farm.item, have = have, goal = S.farm.item_goal } or nil }
 end
 
@@ -621,7 +660,7 @@ end
 ------------------------------------------------------------------------
 local SPOT_FIELDS = { 'targets', 'ignore', 'claim', 'mode', 'range', 'height', 'pull_cmd', 'loop', 'aggro_first',
     'approach', 'route', 'area', 'camp', 'camp_zone', 'back_to_camp', 'wait_party', 'wait_hp', 'wait_mp', 'wait_near',
-    'packs', 'pack_range', 'pack_strict', 'item', 'item_goal', 'pull_back', 'prefer_best' }
+    'packs', 'pack_range', 'pack_strict', 'item', 'item_goal', 'pull_back', 'prefer_best', 'keep_chain' }
 
 local function spot_keys()
     local keys = {}

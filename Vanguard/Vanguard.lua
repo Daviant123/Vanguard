@@ -1,6 +1,6 @@
 _addon.name = 'Vanguard'
 _addon.author = 'Daviant'
-_addon.version = '0.40.0'
+_addon.version = '0.41.0'
 _addon.commands = {'vanguard', 'vg'}
 
 --[[
@@ -113,6 +113,7 @@ local defaults = {
              item = '', item_goal = 0,     -- farming for an item: stop when item_goal of it are in the inventory
              pull_back = false,           -- bring each mob back to camp before fighting (the others wait there)
              prefer_best = false,         -- prefer the mob kind that pays best per minute (the mob report)
+             keep_chain = false,          -- XP / CP chains: while one runs, wait only for emergencies (HP 40%, MP 15%)
              packs = true, pack_range = 8, pack_strict = false },
     farmspots = { s0 = '' },      -- saved farm spots (vg_farm): s1, s2, ... = "name|zone|field=value|..." 
     -- "Spell>target" pairs. target = me or a party member name. "ja:" prefix = job ability.
@@ -1110,6 +1111,7 @@ end
 quick.init(settings, state, { log = log })
 warp.init(settings, state, { log = log })
 stats.kill_hook = function(mob) farm.on_kill(mob) end
+stats.chain_hook = function(n) farm.on_points(n) end
 farm.init(settings, state, { log = log, run_toward = run_toward, stop_running = stop_running, face = face,
     party_engaged = party_engaged, recently = recently, mark = mark, save = function() store.save(settings) send_profile() end })
 finish.init(settings, state, { log = log, use_ws = use_ws, ws_in_range = ws_in_range, recently = recently, mark = mark })
