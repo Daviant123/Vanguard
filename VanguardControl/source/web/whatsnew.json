@@ -1,5 +1,12 @@
 [
   {
+    "version": "1.53.1",
+    "date": "2026-10-17",
+    "items": [
+      "Fix: kills still showed 0 while farming in the real game. A mob your party claimed that falls dead is now counted as a kill directly, so kills, kills per hour, past runs, respawn times and Magian trial counts work."
+    ]
+  },
+  {
     "version": "1.53.0",
     "date": "2026-10-17",
     "items": [
