@@ -1,5 +1,13 @@
 [
   {
+    "version": "1.53.0",
+    "date": "2026-10-17",
+    "items": [
+      "Finishing weapon skill: new \"Auto: when one hit would kill it\". It learns how much of each kind of mob one hit takes and holds TP until the mob is that low, so the weapon skill lands the kill instead of being used too early.",
+      "While a finishing weapon skill is set, reactions that fire the same weapon skill (like \"TP 1000 or more: Atonement\") wait - the TP is kept for the killing blow."
+    ]
+  },
+  {
     "version": "1.52.1",
     "date": "2026-10-17",
     "items": [

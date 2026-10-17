@@ -4,7 +4,10 @@ in Vanguard to guarantee that can happen"). EasyFarm lets a weapon skill fire by
 trials that need the killing blow to be a set weapon skill, with several characters hitting the same mob:
 
   ws.finish        the weapon skill that should land the kill ('' = off)
-  ws.finish_at     use it once the mob's HP is at or under this % (and TP is 1000+)
+  ws.finish_at     use it once the mob's HP is at or under this % (and TP is 1000+); 0 = Auto: learn how much of each
+                   kind of mob one hit takes (HP % just before and 1.5 s after it lands) and use it once the mob is
+                   low enough for one hit to kill it (his report 2026-10-17: "it uses atonement so early the mob
+                   doesnt get killed by atonement"). Auto always saves TP for it.
   ws.finish_save   save TP for it: the normal weapon skill isn't used while a finisher is set
   ws.finish_others the other characters stop attacking that mob once it's that low (they keep curing / buffing)
   ws.finish_wait   if the mob gets that low before TP is ready, stop attacking until TP is 1000 (a tank still gains
@@ -21,11 +24,69 @@ local function clock() return os.clock() end
 
 local function on(name) return name and name ~= '' and name:lower() ~= 'none' end
 
+-- Auto finish point: per kind of mob, the HP % recent hits took (newest last) and the highest HP % a hit has killed at
+local learned, killed_at = {}, {}
+
+local function auto() return (tonumber(S.ws.finish_at) or 25) <= 0 end
+
+-- The mob's HP % at which the finishing weapon skill should go off.
+function finish.line(t)
+    if not auto() then return tonumber(S.ws.finish_at) or 25 end
+    local l = learned[t.name]
+    if l and #l > 0 then
+        local low = l[1]
+        for _, v in ipairs(l) do if v < low then low = v end end
+        -- the weakest recent hit, less a tenth (others keep hitting while it goes off), never under 3 %
+        return math.max(3, math.floor(low * 0.9))
+    end
+    return killed_at[t.name] or 30                    -- nothing learned yet: a careful first guess, learned from
+end
+
+-- Our weapon skill hit something (from the 'action' event): if it's the finisher, measure what it does.
+function finish.note_ws(target_id, ws_name)
+    if not on(S.ws.finish) or not ws_name or ws_name:lower() ~= S.ws.finish:lower() then return end
+    local m = windower.ffxi.get_mob_by_id(target_id)
+    if not m or not m.name then return end
+    local seen = state.finish_seen and state.finish_seen.id == target_id and state.finish_seen.hpp or 0
+    local before = math.max(seen, m.hpp or 0)
+    if before <= 0 then return end
+    state.finish_probe = { id = target_id, name = m.name, before = before, t = clock() }
+end
+
+function finish.learn_tick()
+    local p = state.finish_probe
+    if not p or clock() - p.t < 1.5 then return end
+    state.finish_probe = nil
+    local m = windower.ffxi.get_mob_by_id(p.id)
+    if not m or (m.hpp or 0) <= 0 or m.valid_target == false or m.status == 2 or m.status == 3 then
+        killed_at[p.name] = math.max(killed_at[p.name] or 0, p.before)      -- it killed: one hit is at least that much
+        return
+    end
+    local drop = p.before - m.hpp
+    if drop <= 0 then return end
+    local l = learned[p.name] or {}
+    l[#l + 1] = drop
+    while #l > 5 do table.remove(l, 1) end
+    learned[p.name] = l
+    if auto() then h.log(('%s took %d%% of %s: it will finish them from %d%% HP'):format(S.ws.finish, drop, p.name, finish.line(m))) end
+end
+
+-- For the app: what Auto has learned
+function finish.learned_list()
+    local out = {}
+    for name in pairs(learned) do out[#out + 1] = { n = name, at = finish.line({ name = name }) } end
+    for name, v in pairs(killed_at) do if not learned[name] then out[#out + 1] = { n = name, at = finish.line({ name = name }) } end end
+    table.sort(out, function(a, b) return a.n < b.n end)
+    return out
+end
+
 -- On the finisher, from do_ws. Returns 'used' (weapon skill sent), 'block' (no normal weapon skill now) or nil.
 function finish.ws(player, t)
     local f = S.ws.finish
     if not on(f) or not t or not t.hpp or t.hpp <= 0 then return nil end
-    if t.hpp <= S.ws.finish_at then
+    finish.learn_tick()
+    state.finish_seen = { id = t.id, hpp = t.hpp }
+    if t.hpp <= finish.line(t) then
         if S.ws.finish_others and state.finish_told ~= t.id then
             state.finish_told = t.id
             windower.send_ipc_message(('vg_finish %d %s'):format(t.id, player.name))
@@ -43,7 +104,7 @@ function finish.ws(player, t)
         end
         return 'block'
     end
-    if S.ws.finish_save then return 'block' end
+    if S.ws.finish_save or auto() then return 'block' end
     return nil
 end
 
@@ -74,6 +135,7 @@ end
 
 -- On the others, every tick: true while holding off a mob that's being finished (only curing / buffing then).
 function finish.held(player)
+    finish.learn_tick()
     local hold = state.finish_hold
     if not hold then return false end
     local m = windower.ffxi.get_mob_by_id(hold.id)

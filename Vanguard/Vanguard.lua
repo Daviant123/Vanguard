@@ -1,6 +1,6 @@
 _addon.name = 'Vanguard'
 _addon.author = 'Daviant'
-_addon.version = '0.62.1'
+_addon.version = '0.63.0'
 _addon.commands = {'vanguard', 'vg'}
 
 --[[
@@ -136,7 +136,7 @@ local defaults = {
     buffs = { list = '' },
     -- finish*: the weapon skill that lands the kill (vg_finish): at mob HP% finish_at, saving TP, others stop attacking
     ws = { name = '', tp = 1000, min_mob_hpp = 1, max_range = 6,
-           finish = '', finish_at = 25, finish_save = true, finish_others = true, finish_wait = false },
+           finish = '', finish_at = 0, finish_save = true, finish_others = true, finish_wait = false },
     -- Ordered chain steps "Character:Weapon Skill". Each character only fires its own steps.
     sc = { steps = '', open_tp = 1000, window_min = 3, window_max = 8 },
     -- "Element:Spell|Fallback|Fallback" pairs.
@@ -1339,7 +1339,7 @@ windower.register_event('action', function(act)
     -- Our own action results: release the busy lock, record songs / debuffs.
     if act.actor_id == player.id and act.category == 3 and first then           -- a weapon skill (Magian trials)
         local wsr = res.weapon_skills[act.param]
-        if wsr then trials.note_ws(first.id, wsr.en) end
+        if wsr then trials.note_ws(first.id, wsr.en) finish.note_ws(first.id, wsr.en) end
     end
     if act.actor_id == player.id then
         if act.category == 8 then
@@ -2055,7 +2055,7 @@ windower.register_event('addon command', function(cmd, ...)
         local name = table.concat(args, ' ')
         local ws = util.wskill(name)
         settings.ws.finish = ws and ws.en or ''
-        log(settings.ws.finish ~= '' and ('Finish mobs with %s under %d%% HP'):format(settings.ws.finish, settings.ws.finish_at) or 'No finishing weapon skill')
+        log(settings.ws.finish ~= '' and ('Finish mobs with %s %s'):format(settings.ws.finish, settings.ws.finish_at > 0 and ('under ' .. settings.ws.finish_at .. '% HP') or 'when one hit would kill them (learned)') or 'No finishing weapon skill')
         store.save(settings) send_profile()
     elseif cmd == 'trustlist' then
         -- the Farming tab's trust picker: //vg trustlist add|remove <trust> | clear

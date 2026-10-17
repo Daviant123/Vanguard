@@ -177,16 +177,24 @@ local fired_on = {}   -- [rule key] = mob id it fired on (for "once")
 -- A weapon skill can only be used engaged, and anything aimed at the battle target needs one: a rule like
 -- "tp>=1000 -> vg act ws bt Atonement" (no "engaged") kept firing between fights - his report, 2026-10-17 - so such
 -- commands wait until they can work (without using up the rule's cooldown).
+local settings_ref
 local function can_work(cmd, player, bt)
     local c = ' ' .. cmd:lower() .. ' '
     local ws = c:find(' act ws ', 1, true) or c:find('/ws ', 1, true) or c:find('/weaponskill ', 1, true)
     if ws and player.status ~= 1 then return false end
+    -- a finishing weapon skill is set (vg_finish): it owns the TP - a reaction firing the same weapon skill (or any,
+    -- when TP is saved for the finisher) would spend it before the mob is low enough to die from it
+    local fin = settings_ref and settings_ref.ws and settings_ref.ws.finish or ''
+    if ws and fin ~= '' and fin:lower() ~= 'none' then
+        if c:find(fin:lower(), 1, true) or settings_ref.ws.finish_save or (tonumber(settings_ref.ws.finish_at) or 25) <= 0 then return false end
+    end
     local at_bt = c:find('<bt>', 1, true) or c:find(' act %a+ bt ')
     if at_bt and not bt then return false end
     return true
 end
 
 function triggers.run(settings, player, state)
+    settings_ref = settings
     for key, rule in pairs(settings.triggers) do
         if type(rule) == 'string' and rule ~= '' then
             local conds, cmd, cooldown, once = parse_rule(rule)

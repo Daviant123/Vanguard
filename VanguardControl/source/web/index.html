@@ -1320,12 +1320,15 @@ function rxAdd() {
 // ---------- Finishing weapon skill: the killing blow is a set weapon skill (trials like "kill it with Atonement") ----------
 function finishBox(p) {
   const x = (p.config || {}).extra || {}, wl = arr(p.ws_list), f = x.ws_finish || "";
-  const pct = [5, 10, 15, 20, 25, 30, 40, 50].map(v => ({v, l: v + "%"}));
+  const pct = [{v: 0, l: "Auto: when one hit would kill it"}].concat([5, 10, 15, 20, 25, 30, 40, 50].map(v => ({v, l: "HP at or under " + v + "%"})));
+  const learned = arr(x.ws_finish_learned), auto = (x.ws_finish_at ?? 0) <= 0;
   return `<div class="box"><h3>Finish mobs with a weapon skill</h3>
     <div class="row" style="align-items:flex-end">
       <label class="field">Finish with ${sel("finish ", [{v: "none", l: "Off"}].concat(wl.map(w => ({v: w, l: w}))), f || "none")}</label>
-      ${f ? `<label class="field">when its HP is at or under ${sel("set ws.finish_at ", pct, x.ws_finish_at ?? 25)}</label>` : ""}
+      ${f ? `<label class="field">Use it ${sel("set ws.finish_at ", pct, x.ws_finish_at ?? 0)}</label>` : ""}
     </div>
+    ${f && auto ? `<div class="hint" style="margin-top:6px">${learned.length ? "Learned: " + learned.map(l => `${esc(l.n)} from ${l.at}%`).join(", ")
+      : `It watches how much one ${esc(f)} takes from each kind of mob and saves TP until the mob is that low. The first one of a kind goes at 30%.`}</div>` : ""}
     ${f ? `<div class="row" style="margin-top:8px;flex-wrap:wrap;gap:6px 18px">
       ${chk("Save TP for it (no other weapon skill)", x.ws_finish_save !== false, "set ws.finish_save true", "set ws.finish_save false")}
       ${chk("The other characters stop attacking it then", x.ws_finish_others !== false, "set ws.finish_others true", "set ws.finish_others false")}
