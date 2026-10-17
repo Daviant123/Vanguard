@@ -1010,10 +1010,37 @@ function farm.finish(player, why)
 end
 
 -- zoned while farming (warped, fell through a zone line, KO'd home point): the camp and route belong to the old zone
-function farm.on_zone()
+-- Back in the zone (upgrade 28): his Abyssea runs end when he's sent out ("changed zone"); after topping up time and
+-- coming back he had to press Start again. With farm.rezone, farming that stopped because of a zone change starts
+-- again on its own when he's back in that zone within 15 minutes (15 s after arriving, to load and buff).
+local REZONE_MINS = 15
+
+function farm.on_zone(new_id, old_id)
     state.farm_pops, state.farm_respawn = nil, nil        -- ids belong to the old zone (the per-kind times stay)
+    local rz = state.farm_rezone
+    if rz and new_id and tonumber(new_id) == rz.zone and now() - rz.t <= REZONE_MINS * 60 and not S.modules.farm then
+        rz.at = now() + 15
+    end
     if not S.modules.farm then return end
+    local was_on = S.enabled
     farm.finish(windower.ffxi.get_player(), 'changed zone')
+    if S.farm.rezone and was_on and old_id and tonumber(old_id) and tonumber(old_id) ~= 0 then
+        state.farm_rezone = { zone = tonumber(old_id), t = now() }
+        local z = res.zones[tonumber(old_id)]
+        h.log(('Farming starts again if you come back to %s within %d minutes'):format(z and z.en or 'this zone', REZONE_MINS))
+    end
+end
+
+function farm.forget_rezone() state.farm_rezone = nil end
+
+-- every tick: time to start farming again here?
+function farm.rezone_due()
+    local rz = state.farm_rezone
+    if not rz or not rz.at or now() < rz.at then return false end
+    state.farm_rezone = nil
+    if not S.farm.rezone or S.modules.farm or zone() ~= rz.zone then return false end
+    h.log('Back in the zone: farming carries on')
+    return true
 end
 
 ------------------------------------------------------------------------

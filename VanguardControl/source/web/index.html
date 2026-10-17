@@ -1759,6 +1759,7 @@ function farmTab(c, p) {
       <div class="row" style="flex-wrap:wrap;gap:6px 18px">
         ${chk("The inventory is full", x.farm_stop_full !== false, "set farm.stop_full true", "set farm.stop_full false")}
         ${chk("Ring when Abyssea time is running out", x.farm_time_alert !== false, "set farm.time_alert true", "set farm.time_alert false")}
+        ${chk("Sent out of the zone? Farm again when I come back (within 15 minutes)", x.farm_rezone !== false, "set farm.rezone true", "set farm.rezone false")}
         <label class="field">After ${sel("set farm.stop_kills ", [{v: 0, l: "no limit"}].concat(nums([10, 25, 50, 100, 200, 500], " kills")), x.farm_stop_kills ?? 0)}</label>
         <label class="field">or after ${sel("set farm.stop_mins ", [{v: 0, l: "no time limit"}].concat([15, 30, 45, 60, 90, 120, 180, 240].map(v => ({v, l: v >= 60 ? (v / 60) + " hour" + (v > 60 ? "s" : "") : v + " minutes"}))), x.farm_stop_mins ?? 0)}</label>
         <label class="field">or when ${c.name || "this character"} reaches ${sel("set farm.stop_level ", [{v: 0, l: "any level (keep going)"}].concat(Array.from({length: 99 - Math.min(98, x.my_level || 1)}, (_, i) => Math.min(98, x.my_level || 1) + 1 + i).map(v => ({v, l: "level " + v}))).concat(x.farm_stop_level && !(x.farm_stop_level > (x.my_level || 1)) ? [{v: x.farm_stop_level, l: "level " + x.farm_stop_level}] : []), x.farm_stop_level ?? 0)}</label>

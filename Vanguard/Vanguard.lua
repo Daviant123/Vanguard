@@ -1,6 +1,6 @@
 _addon.name = 'Vanguard'
 _addon.author = 'Daviant'
-_addon.version = '0.68.0'
+_addon.version = '0.69.0'
 _addon.commands = {'vanguard', 'vg'}
 
 --[[
@@ -123,6 +123,7 @@ local defaults = {
              rotate = false,                      -- a spot dry for 3 min: move on to the next saved spot in the zone
              rest_idle = true,                    -- rest at camp while there's nothing to fight (up when a mob comes)
              check = false, skip_weak = false, skip_tough = false,  -- /check each new kind; skip Too Weak / Incredibly Tough + NMs
+             rezone = true,                       -- zoned out while farming: back in the same zone within 15 min -> farm again
              time_alert = true,                   -- ring when the game says Abyssea (Visitant) time is running out
              stop_level = 0,                      -- stop when this character's main job reaches this level (0 = no)
              widen = 0,                           -- quiet spot: search 10 yalms further every 30 s, up to this (0 = off)
@@ -1208,6 +1209,7 @@ local function tick()
     -- a rest that ended without us (hit by a mob, moved): stop thinking we're resting
     if state.resting and player.status ~= 33 and not recently('rest', 3) and not recently('farm:rest', 3) then state.resting = false end
     stats.tick(player)
+    if farm.rezone_due() then windower.send_command('vg farming start') end
     farm.loot_tick()
     farm.kill_watch()
     farm.fight_tick(player)
@@ -1442,10 +1444,10 @@ windower.register_event('incoming text', function(original)
     end
 end)
 
-windower.register_event('zone change', function()
+windower.register_event('zone change', function(new_id, old_id)
     stop_running()
     warp.on_zone()
-    farm.on_zone()
+    farm.on_zone(new_id, old_id)
     state.party_buffs, state.debuffs, state.burst = {}, {}, nil
     state.sc = { target = 0, step = 0, time = 0 }
     state.busy_until = now() + 5
@@ -1933,6 +1935,7 @@ windower.register_event('addon command', function(cmd, ...)
             farm.share_camp(windower.ffxi.get_player(), true)
             if settings.farm.mode == 'list' and #util.split(settings.farm.targets, ',') == 0 then log('Farming on, but no mobs are picked yet: pick what to fight') else log('Farming started') end
         elseif sub == 'stop' then
+            farm.forget_rezone()
             farm.send_run(windower.ffxi.get_player(), 'stopped by you')
             farm.treasure(false)
             settings.modules.farm, settings.enabled = false, false
