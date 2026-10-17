@@ -1,6 +1,6 @@
 _addon.name = 'Vanguard'
 _addon.author = 'Daviant'
-_addon.version = '0.64.1'
+_addon.version = '0.64.2'
 _addon.commands = {'vanguard', 'vg'}
 
 --[[
@@ -858,12 +858,18 @@ end
 ------------------------------------------------------------------------
 -- Something attacking the party right now (a mob our party has claimed, alive, close by)? Then nobody sits down to rest.
 -- (Found by the farming simulator: a mob hitting a low-HP farmer interrupted its rest, and it sat down again, and again.)
+-- A mob is fighting us: claimed by the party, or going for one of us (a mob on us after /attackoff - waiting for TP to
+-- finish it - still counts: his report 2026-10-17, "if in combat the bot should not try to summon trusts, or if under
+-- attack")
 local function under_attack(player)
-    local ids = {}
+    local ids, idx = {}, {}
     local p = windower.ffxi.get_party() or {}
-    for _, k in ipairs({ 'p0', 'p1', 'p2', 'p3', 'p4', 'p5' }) do if p[k] and p[k].mob then ids[p[k].mob.id] = true end end
+    for _, k in ipairs({ 'p0', 'p1', 'p2', 'p3', 'p4', 'p5' }) do
+        if p[k] and p[k].mob then ids[p[k].mob.id] = true if p[k].mob.index then idx[p[k].mob.index] = true end end
+    end
     for _, m in pairs(windower.ffxi.get_mob_array() or {}) do
-        if type(m) == 'table' and m.spawn_type == 16 and (m.hpp or 0) > 0 and m.claim_id and ids[m.claim_id] and util.dist(m) <= 20 then
+        if type(m) == 'table' and m.spawn_type == 16 and (m.hpp or 0) > 0 and util.dist(m) <= 20
+            and ((m.claim_id and ids[m.claim_id]) or (m.status == 1 and m.target_index and idx[m.target_index])) then
             return true
         end
     end
@@ -923,7 +929,7 @@ end
 
 local function do_trusts(player)
     if not settings.modules.trusts or settings.trusts.list == '' or player.status ~= 0 then return false end
-    if party_engaged(player) or silenced(player) then return false end
+    if party_engaged(player) or silenced(player) or under_attack(player) or state.finish_wait then return false end
     local members = party_members()
     if #members >= settings.trusts.party_size then return false end
     local present = {}

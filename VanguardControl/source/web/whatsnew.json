@@ -1,5 +1,12 @@
 [
   {
+    "version": "1.54.2",
+    "date": "2026-10-17",
+    "items": [
+      "Fix: trusts are no longer called while a mob is fighting you - including when you've stopped attacking (holding off for TP) or a mob is going for someone in the party."
+    ]
+  },
+  {
     "version": "1.54.1",
     "date": "2026-10-17",
     "items": [
