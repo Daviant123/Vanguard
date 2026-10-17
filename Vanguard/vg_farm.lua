@@ -135,8 +135,27 @@ end
 function farm.on_rest_call(player, who)
     if not player or who:lower() ~= player.name:lower() or player.status ~= 0 or state.resting then return end
     windower.send_command('input /heal on')
-    state.resting = true
+    state.resting, state.farm_rest_called = true, true
+    h.mark('farm:restcalled')
     h.log('Resting: the farmer waits for me')
+end
+
+-- the character the farmer asked to rest gets up when it's full again - even with its own resting switched off (found
+-- by the team simulator: it rested to 100 % and never stood up, so the farmer waited forever)
+function farm.rest_called_check(player)
+    if not state.farm_rest_called or player.status ~= 33 then
+        -- (sitting down takes a moment after /heal on: only forget it once it has had time to sit)
+        if player.status ~= 33 and not h.recently('farm:restcalled', 5) then state.farm_rest_called = nil end
+        return false
+    end
+    local v = player.vitals or {}
+    local full = (v.hpp or 100) >= 95 and ((v.max_mp or 0) == 0 or (v.mpp or 100) >= 95)
+    if not full then return false end
+    h.mark('farm:getup2')
+    windower.send_command('input /heal off')
+    state.resting, state.farm_rest_called = false, nil
+    h.log('Rested: ready for the next pull')
+    return true
 end
 
 ------------------------------------------------------------------------

@@ -1,5 +1,12 @@
 [
   {
+    "version": "1.38.1",
+    "date": "2026-10-16",
+    "items": [
+      "Fixed: when the farmer asked another character to rest (low MP), that character could rest to full and never stand up again, so farming waited forever. It gets up by itself now."
+    ]
+  },
+  {
     "version": "1.38.0",
     "date": "2026-10-16",
     "items": [

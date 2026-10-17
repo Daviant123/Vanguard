@@ -1,6 +1,6 @@
 _addon.name = 'Vanguard'
 _addon.author = 'Daviant'
-_addon.version = '0.48.0'
+_addon.version = '0.48.1'
 _addon.commands = {'vanguard', 'vg'}
 
 --[[
@@ -1192,6 +1192,7 @@ local function tick()
 
     if player.status == 33 then
         if farm.rest_check(player) then return end                 -- resting at camp: up when a mob shows up
+        if farm.rest_called_check(player) then return end          -- the farmer asked me to rest: up when full
         if not travel.rest_stand(player) then do_rest(player) end
         return
     end
