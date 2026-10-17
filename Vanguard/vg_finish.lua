@@ -26,6 +26,7 @@ local function on(name) return name and name ~= '' and name:lower() ~= 'none' en
 
 -- Auto finish point: per kind of mob, the HP % recent hits took (newest last) and the highest HP % a hit has killed at
 local learned, killed_at = {}, {}
+local adjust = {}             -- kind -> % added to the line from its misses (upgrade 26)
 local store_learned          -- (below)
 
 local function auto() return (tonumber(S.ws.finish_at) or 25) <= 0 end
@@ -46,7 +47,8 @@ function finish.line(t)
         local line = math.max(3, math.floor(mid * 0.9))
         -- a hit that killed from higher up shows it can be trusted that far
         if killed_at[t.name] and killed_at[t.name] > line and killed_at[t.name] <= mid then line = killed_at[t.name] end
-        return line
+        -- tuned by its misses, between 3 % and the typical hit
+        return math.max(3, math.min(mid, line + (adjust[t.name] or 0)))
     end
     return killed_at[t.name] or 30                    -- nothing learned yet: a careful first guess, learned from
 end
@@ -71,6 +73,7 @@ function finish.note_ws(target_id, ws_name)
     local before = math.max(seen, m.hpp or 0)
     if before <= 0 then return end
     state.finish_probe = { id = target_id, name = m.name, before = before, t = clock() }
+    state.finish_last_ws = { id = target_id, before = before }
 end
 
 function finish.learn_tick()
@@ -194,12 +197,38 @@ end
 
 -- What Auto learned is kept in the settings (ws.learned = "Peapuk=10/11/9@9;..."), so a reload or an update doesn't
 -- start again from the 30 % guess
+-- Auto tunes itself from the trial's misses (upgrade 26; his run: 8 of 9 misses were Peapuks dying in one go from
+-- above the line): died from above the line -> 2 % higher; went off but didn't kill -> 2 % lower.
+function finish.note_miss(name, why, mob_id)
+    if not auto() or not name or not learned[name] then return end
+    local step = (why == 'jumped' and 2) or (why == 'ws_no_kill' and -2) or 0
+    if step == 0 then return end
+    local before = finish.line({ name = name })
+    -- "didn't kill" only says the line is too high when it went off at the line (not a 30 % first guess, not a
+    -- weapon skill used higher up some other way)
+    if why == 'ws_no_kill' then
+        local w = state.finish_last_ws
+        if not (w and w.id == mob_id and w.before <= before + 1) then return end
+    end
+    adjust[name] = math.max(-20, math.min(20, (adjust[name] or 0) + step))
+    local after = finish.line({ name = name })
+    if after ~= before then
+        h.log(('%s: %s - %s from %d%% now'):format(name, why == 'jumped' and 'it died before the weapon skill'
+            or "the weapon skill didn't kill it", S.ws.finish, after))
+        store_learned()
+    else
+        adjust[name] = adjust[name] - step                          -- at the limit: don't build up
+    end
+end
+
 store_learned = function()
     local parts = {}
     for name, l in pairs(learned) do
         local nums = {}
         for i, v in ipairs(l) do nums[i] = tostring(v) end
+        local a = adjust[name] or 0
         parts[#parts + 1] = name .. '=' .. table.concat(nums, '/') .. (killed_at[name] and ('@' .. killed_at[name]) or '')
+            .. (a > 0 and ('+' .. a) or a < 0 and tostring(a) or '')
     end
     for name, v in pairs(killed_at) do if not learned[name] then parts[#parts + 1] = name .. '=@' .. v end end
     table.sort(parts)
@@ -209,10 +238,11 @@ end
 finish.store_learned = store_learned
 
 local function load_learned()
-    learned, killed_at = {}, {}
+    learned, killed_at, adjust = {}, {}, {}
     for entry in tostring(S.ws.learned or ''):gmatch('[^;]+') do
-        local name, nums, k = entry:match('^(.-)=([%d/]*)@?(%d*)$')
+        local name, nums, k, a = entry:match('^(.-)=([%d/]*)@?(%d*)([+-]?%d*)$')
         if name and name ~= '' then
+            if a ~= '' and tonumber(a) then adjust[name] = tonumber(a) end
             local l = {}
             for v in nums:gmatch('%d+') do l[#l + 1] = tonumber(v) end
             if #l > 0 then learned[name] = l end

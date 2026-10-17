@@ -1,5 +1,12 @@
 [
   {
+    "version": "1.57.0",
+    "date": "2026-10-17",
+    "items": [
+      "Auto finishing weapon skill tunes itself: when mobs die before it goes off, it goes off 2% earlier next time; when it goes off but doesn't kill, 2% later (never past a typical hit). It remembers the tuning."
+    ]
+  },
+  {
     "version": "1.56.0",
     "date": "2026-10-17",
     "items": [

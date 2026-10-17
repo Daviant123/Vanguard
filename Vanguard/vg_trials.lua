@@ -118,6 +118,7 @@ function trials.on_kill(mob)
                 elseif seen and line and seen > line then why = 'jumped' end
                 rt.why = rt.why or {}
                 rt.why[why] = (rt.why[why] or 0) + 1
+                if okf and fin.note_miss and mob.name then fin.note_miss(mob.name, why, mob.id) end
             end
             state.trial_rate[k] = rt
         end
