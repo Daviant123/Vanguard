@@ -1,6 +1,6 @@
 _addon.name = 'Vanguard'
 _addon.author = 'Daviant'
-_addon.version = '0.63.2'
+_addon.version = '0.63.3'
 _addon.commands = {'vanguard', 'vg'}
 
 --[[
@@ -1037,8 +1037,8 @@ end
 
 local function save_profile()
     if not state.profile then return end
-    settings.profiles[state.profile.job] = encode_profile(state.profile)
-    settings.menus[state.profile.job] = menu.encode(settings)
+    util.job_set(settings.profiles, state.profile.job, encode_profile(state.profile))
+    util.job_set(settings.menus, state.profile.job, menu.encode(settings))
     store.save(settings)
 end
 
@@ -1091,7 +1091,7 @@ local function load_profile(player, force_default)
     player = player or windower.ffxi.get_player()
     if not player or not player.main_job then return end
     local job = player.main_job
-    local saved = settings.profiles[job]
+    local saved = util.job_get(settings.profiles, job)
     local pr
     if saved and saved ~= '' and not force_default then
         pr = decode_profile(job, saved)
@@ -1102,7 +1102,7 @@ local function load_profile(player, force_default)
     if not pr.ws or pr.ws == '' then pr.ws = default_ws(job) end
     menu.reset_cache()
     apply_profile(pr)
-    local saved_menu = settings.menus[job]
+    local saved_menu = util.job_get(settings.menus, job)
     if saved_menu and saved_menu ~= '' and not force_default then
         menu.apply(settings, saved_menu)
     else

@@ -192,7 +192,7 @@ end
 -- Everything the panel's Team tab and job extras show (rounds 1-10 settings).
 function menu.extra(settings)
     local setups = {}
-    for name in pairs(settings.setups or {}) do setups[#setups + 1] = name end
+    for name, s in pairs(settings.setups or {}) do if type(s) == 'table' then setups[#setups + 1] = s.name or name end end
     table.sort(setups)
     local m, c = settings.mages or {}, settings.cor or {}
     return {

@@ -13,6 +13,7 @@ Vanguard: whole-team commands (round 6, 2026-10-15; after Trust's profiles and i
 The leader's order goes to the others over Windower's local IPC ("vg_setup", "vg_mode").
 ]]
 
+local util = require('vg_util')
 local team = {}
 local S, state, h
 
@@ -25,21 +26,21 @@ function team.save(player, name)
     if not valid(name) then h.log('Setup names: letters, digits and _ only (e.g. Odyssey, Exp_party)') return false end
     local job = player.main_job
     h.save_profile()
-    S.setups[name] = {
-        job = job, profile = S.profiles[job] or '', menu = S.menus[job] or '',
+    util.job_set(S.setups, name, {
+        name = name, job = job, profile = util.job_get(S.profiles, job) or '', menu = util.job_get(S.menus, job) or '',
         leader = S.leader, formation = S.follow.formation, assist = S.modules.assist and 'on' or 'off',
         approach = S.assist.approach and 'on' or 'off', farm = S.farm.targets, pull = S.farm.pull_cmd,
         food = S.upkeep.food, reraise = S.upkeep.reraise, mount = S.mount.name,
-    }
+    })
     h.store(S)
     h.log(('Setup "%s" saved (%s)'):format(name, job))
     return true
 end
 
 function team.load(player, name)
-    local s = S.setups[name]
+    local s = util.job_get(S.setups, name or '')      -- (saved names come back in lower case after a reload)
     if not s then h.log(('No setup called "%s" on this character (//vg setup list)'):format(tostring(name))) return false end
-    S.profiles[s.job], S.menus[s.job] = s.profile, s.menu
+    util.job_set(S.profiles, s.job, s.profile) util.job_set(S.menus, s.job, s.menu)
     S.leader, S.follow.formation = s.leader or S.leader, s.formation or S.follow.formation
     S.farm.targets, S.farm.pull_cmd = s.farm or S.farm.targets, s.pull or S.farm.pull_cmd
     S.upkeep.food, S.upkeep.reraise, S.mount.name = s.food or '', s.reraise or '', s.mount or S.mount.name
@@ -57,7 +58,7 @@ end
 
 function team.list()
     local names = {}
-    for n, s in pairs(S.setups) do if type(s) == 'table' then names[#names + 1] = ('%s (%s)'):format(n, s.job or '?') end end
+    for n, s in pairs(S.setups) do if type(s) == 'table' then names[#names + 1] = ('%s (%s)'):format(s.name or n, s.job or '?') end end
     table.sort(names)
     h.log(#names > 0 and ('Setups: ' .. table.concat(names, ', ')) or 'No setups saved yet (//vg setup save <name>)')
 end
@@ -70,7 +71,7 @@ function team.command(player, sub, name)
             windower.send_ipc_message(('vg_setup %s %s %s'):format(player.name, sub, name))
         end
     elseif sub == 'delete' and name then
-        S.setups[name] = nil
+        util.job_set(S.setups, name, nil)
         h.store(S)
         h.log(('Setup "%s" deleted'):format(name))
     else team.list() end

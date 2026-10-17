@@ -1,5 +1,12 @@
 [
   {
+    "version": "1.53.3",
+    "date": "2026-10-17",
+    "items": [
+      "Fix: after every update or reload, each job's setup (which actions are on, the menus, and whether farming was on) could reset to the defaults. It's now kept, and farming carries on after a reload."
+    ]
+  },
+  {
     "version": "1.53.2",
     "date": "2026-10-17",
     "items": [

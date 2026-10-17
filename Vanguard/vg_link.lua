@@ -44,7 +44,7 @@ end
 function link.dump(player)
     h.save_profile()
     local job = player.main_job
-    local out = { job = job, sub = player.sub_job, profile = S.profiles[job] or '', menu = S.menus[job] or '',
+    local out = { job = job, sub = player.sub_job, profile = util.job_get(S.profiles, job) or '', menu = util.job_get(S.menus, job) or '',
                   leader = S.leader, settings = {} }
     for sec, keys in pairs(SECTIONS) do
         if type(S[sec]) == 'table' then
@@ -80,8 +80,8 @@ function link.apply(player, p)
             end
         end
     end
-    if type(p.profile) == 'string' and p.profile ~= '' then S.profiles[p.job] = p.profile end
-    if type(p.menu) == 'string' and p.menu ~= '' then S.menus[p.job] = p.menu end
+    if type(p.profile) == 'string' and p.profile ~= '' then util.job_set(S.profiles, p.job, p.profile) end
+    if type(p.menu) == 'string' and p.menu ~= '' then util.job_set(S.menus, p.job, p.menu) end
     h.store(S)
     if player.main_job == p.job then
         h.load_profile(player)

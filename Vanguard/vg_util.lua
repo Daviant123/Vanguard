@@ -44,6 +44,23 @@ function util.is_player(m)
     return type(m) == 'table' and not m.is_npc and (m.spawn_type == 1 or m.spawn_type == 9 or m.spawn_type == 13)
 end
 
+-- Per-job saved setups (profiles, menus) are kept under the job in lower case: Windower's config library lower-cases
+-- every tag name when it reads settings.xml, so "PLD" saved came back as "pld" and every reload / update started the
+-- job from its defaults (farming off, his job setup gone - found in his real game 2026-10-17). Old "PLD" keys are
+-- still read.
+function util.job_get(t, job)
+    if type(t) ~= 'table' or not job then return nil end
+    local v = rawget(t, job:lower())
+    if v == nil or v == '' then v = rawget(t, job) end
+    return v
+end
+
+function util.job_set(t, job, v)
+    if type(t) ~= 'table' or not job then return end
+    rawset(t, job:lower(), v)
+    if job ~= job:lower() then rawset(t, job, nil) end
+end
+
 function util.spell(name)   return name and util.spells[name:lower()] end
 function util.ability(name) return name and util.abilities[name:lower()] end
 function util.wskill(name)  return name and util.wskills[name:lower()] end
