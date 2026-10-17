@@ -1507,6 +1507,18 @@ function farmTab(c, p) {
       <div class="hint" style="margin-top:4px">Points a minute = (XP + CP) per minute of fighting. It needs two kills of a kind before it prefers one.</div>
     </div>
 
+    <div class="box"><h3>Quick setups</h3>
+      <div class="row" style="flex-wrap:wrap;gap:8px">
+        ${[["party", "XP / CP party", "pull to camp, wait for the healer, keep chains, prefer the best mob"],
+           ["items", "Item farming", "fast, little waiting, stop when the bags fill"],
+           ["safe", "Safe and careful", "only lone mobs, rest early, set aside anything too strong"],
+           ["clear", "Clear everything", "anything around the camp"]].map(([k, l, d]) =>
+          `<button class="${x.farm_preset === k ? "primary" : ""}" title="${d}" onclick="send('farmpreset ${k}')" style="text-align:left">
+            <b>${l}</b><div class="hint" style="font-size:11px;${x.farm_preset === k ? "color:var(--accent-ink)" : ""}">${d}</div></button>`).join("")}
+      </div>
+      <div class="hint" style="margin-top:6px">A quick setup sets the choices below for you; change any of them afterwards.</div>
+    </div>
+
     <div class="fgrid">
     ${card(1, "What to fight", `
       ${segBtns(mode, [{v: "list", l: "Mobs I pick", cmd: "set farm.mode list"}, {v: "aggro", l: "Only what attacks us", cmd: "set farm.mode aggro"}, {v: "any", l: "Anything nearby", cmd: "set farm.mode any"}])}

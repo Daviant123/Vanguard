@@ -1,6 +1,6 @@
 _addon.name = 'Vanguard'
 _addon.author = 'Daviant'
-_addon.version = '0.43.0'
+_addon.version = '0.44.0'
 _addon.commands = {'vanguard', 'vg'}
 
 --[[
@@ -116,6 +116,7 @@ local defaults = {
              keep_chain = false,          -- XP / CP chains: while one runs, wait only for emergencies (HP 40%, MP 15%)
              stop_mins = 0, when_done = 'stay',   -- stop after N minutes (0 = no); then stay | warp | logout (everyone)
              skip_strong = true, strong = '',     -- mobs that nearly KO'd the farmer / took 3+ min twice: set aside
+             preset = '',                         -- the last one-click preset (party | items | safe | clear)
              packs = true, pack_range = 8, pack_strict = false },
     farmspots = { s0 = '' },      -- saved farm spots (vg_farm): s1, s2, ... = "name|zone|field=value|..." 
     -- "Spell>target" pairs. target = me or a party member name. "ja:" prefix = job ability.
@@ -1891,6 +1892,13 @@ windower.register_event('addon command', function(cmd, ...)
         if settings.farm.item == '' then settings.farm.item_goal = 0
         elseif settings.farm.item_goal <= 0 then settings.farm.item_goal = 12 end
         log(settings.farm.item ~= '' and ('Farming for %d %s'):format(settings.farm.item_goal, settings.farm.item) or 'Not farming for an item')
+        store.save(settings) send_profile()
+    elseif cmd == 'farmpreset' then
+        -- the Farming tab's presets: //vg farmpreset party | items | safe | clear
+        local name = (args[1] or ''):lower()
+        if farm.preset(name) then
+            log('Farming preset: ' .. ({ party = 'XP / CP party', items = 'item farming', safe = 'safe and careful', clear = 'clear everything nearby' })[name])
+        end
         store.save(settings) send_profile()
     elseif cmd == 'farmstrong' then
         -- the "too strong" list on the Farming tab: //vg farmstrong remove <name> | clear

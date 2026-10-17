@@ -1,5 +1,13 @@
 [
   {
+    "version": "1.34.0",
+    "date": "2026-10-16",
+    "items": [
+      "Farming: Quick setups. One click sets everything for an XP / CP party, item farming, safe and careful farming, or clearing everything around the camp.",
+      "No more getting stuck on a mob: if the farmer is fighting something it can't reach (no damage for 25 seconds, out of reach) or someone else claims it, it lets go and moves on."
+    ]
+  },
+  {
     "version": "1.33.0",
     "date": "2026-10-16",
     "items": [

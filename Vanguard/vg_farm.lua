@@ -337,9 +337,27 @@ function farm.fight_tick(player)
     if player.status == 1 and t and state.farm_fight ~= t.id then
         local xp, cp = points()
         state.farm_fight = t.id
-        state.farm_fight_info = { name = t.name, t = now(), xp = xp, cp = cp, low = 100 }
+        state.farm_fight_info = { name = t.name, t = now(), xp = xp, cp = cp, low = 100, hpp = t.hpp, hurt_t = now(), id = t.id }
     end
     local f = state.farm_fight_info
+    -- stuck in a fight (upgrade 3): engaged, but its HP hasn't moved for 25 s and it's out of reach - let go of it;
+    -- and one that someone else claimed while we were on it
+    if f and player.status == 1 and t and t.id == f.id then
+        if (t.hpp or 100) < (f.hpp or 100) then f.hpp, f.hurt_t = t.hpp, now() end
+        local _, ids = party()
+        local theirs = t.claim_id and t.claim_id ~= 0 and not ids[t.claim_id]
+        if theirs and S.farm.claim ~= 'any' then
+            windower.send_command('input /attackoff')
+            farm.skip(t.id, 180, 'someone else claimed it')
+            state.farm_fight, state.farm_fight_info = nil, nil
+            return
+        elseif now() - f.hurt_t > 25 and util.dist(t) > 6 then
+            windower.send_command('input /attackoff')
+            farm.skip(t.id, 120, 'no damage in 25 s and out of reach')
+            state.farm_fight, state.farm_fight_info = nil, nil
+            return
+        end
+    end
     if f and player.status == 1 then
         f.low = math.min(f.low or 100, (player.vitals or {}).hpp or 100)
         if now() - f.t > 180 and not f.long then f.long = true farm.strong_strike(f.name, 'a fight took over 3 minutes') end
@@ -790,6 +808,31 @@ end
 function farm.delete_spot(key)
     if S.farmspots and S.farmspots[key] then S.farmspots[key] = '' return true end
     return false
+end
+
+------------------------------------------------------------------------
+-- one-click presets (upgrade 3): sensible settings for the usual kinds of farming
+------------------------------------------------------------------------
+farm.PRESETS = {
+    -- an XP / CP party: pull to camp, keep the healer topped up, keep chains, prefer the best payer, avoid packs
+    party = { mode = 'list', area = 'camp', pull_back = true, back_to_camp = true, wait_party = true, wait_hp = 70,
+              wait_mp = 40, keep_chain = true, prefer_best = true, packs = true, pack_strict = false, skip_strong = true },
+    -- an item: fast, little waiting, stop when the bags fill
+    items = { mode = 'list', pull_back = false, back_to_camp = false, wait_party = true, wait_hp = 50, wait_mp = 20,
+              keep_chain = false, prefer_best = false, packs = true, pack_strict = false, stop_full = true, skip_strong = true },
+    -- careful, on its own: only lone mobs, rest early, set aside anything too strong
+    safe = { mode = 'list', area = 'camp', pull_back = false, back_to_camp = true, wait_party = true, wait_hp = 85,
+             wait_mp = 50, aggro_first = true, packs = true, pack_strict = true, skip_strong = true, keep_chain = false },
+    -- clear everything around the camp
+    clear = { mode = 'any', area = 'camp', pull_back = false, back_to_camp = true, wait_party = true, wait_hp = 60,
+              wait_mp = 30, packs = false, pack_strict = false, skip_strong = true, aggro_first = true },
+}
+function farm.preset(name)
+    local p = farm.PRESETS[name]
+    if not p then return false end
+    for k, v in pairs(p) do if S.farm[k] ~= nil then S.farm[k] = v end end
+    S.farm.preset = name
+    return true
 end
 
 function farm.init(settings, runtime_state, helpers)
