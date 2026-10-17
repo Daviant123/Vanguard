@@ -1,6 +1,6 @@
 _addon.name = 'Vanguard'
 _addon.author = 'Daviant'
-_addon.version = '0.70.0'
+_addon.version = '0.71.0'
 _addon.commands = {'vanguard', 'vg'}
 
 --[[
@@ -285,6 +285,7 @@ local function cast(spell, target, why)
     stop_running()
     windower.send_command(('input /ma "%s" %s'):format(spell.en, target))
     state.busy_until = now() + (spell.cast_time or 2) + 3
+    state.no_move_until = now() + (spell.cast_time or 2) + 1     -- casting: can't walk, not "stuck"
     mark('ma:' .. spell.en .. ':' .. target)
     if why then log(('%s -> %s (%s)'):format(spell.en, target, why)) end
     return true
@@ -300,6 +301,7 @@ end
 local function use_ws(ws_name)
     windower.send_command(('input /ws "%s" <t>'):format(ws_name))
     state.busy_until = now() + 2
+    state.no_move_until = now() + 4          -- the weapon skill's animation: not "stuck" (vg_safety)
     mark('ws:' .. ws_name)
     log('WS: ' .. ws_name)
     return true

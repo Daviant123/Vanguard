@@ -75,6 +75,9 @@ local watch = { x = nil, y = nil, t = 0, tries = 0, side = 1 }
 -- Called every tick after movement.
 function safety.watch(player)
     local me = windower.ffxi.get_mob_by_target('me')
+    -- (a weapon skill or spell keeps us standing: that's not being stuck - "Stuck: stepping around" came 4 s after
+    -- nearly every Atonement in his real game)
+    if state.no_move_until and clock() < state.no_move_until then watch.x, watch.tries = nil, 0 return end
     if not me or not state.running or (state.unstick_until and clock() < state.unstick_until) then
         if not state.running then watch.x, watch.tries = nil, 0 end
         return

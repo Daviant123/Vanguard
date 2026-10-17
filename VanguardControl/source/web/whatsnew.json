@@ -1,5 +1,13 @@
 [
   {
+    "version": "1.61.0",
+    "date": "2026-10-17",
+    "items": [
+      "Auto finishing weapon skill can now go off earlier when mobs keep dying first - up to its strongest recent hit instead of a typical one.",
+      "Fix: \"Stuck: stepping around\" no longer shows up after a weapon skill or spell (you can't walk while it goes off)."
+    ]
+  },
+  {
     "version": "1.60.0",
     "date": "2026-10-17",
     "items": [

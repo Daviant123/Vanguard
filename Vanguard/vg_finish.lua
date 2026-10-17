@@ -47,8 +47,10 @@ function finish.line(t)
         local line = math.max(3, math.floor(mid * 0.9))
         -- a hit that killed from higher up shows it can be trusted that far
         if killed_at[t.name] and killed_at[t.name] > line and killed_at[t.name] <= mid then line = killed_at[t.name] end
-        -- tuned by its misses, between 3 % and the typical hit
-        return math.max(3, math.min(mid, line + (adjust[t.name] or 0)))
+        -- tuned by its misses, between 3 % and the strongest recent hit (upgrade 30: capped at the typical hit it
+        -- couldn't rise far enough - his Buzzfly run: 24 died first, 3 didn't-kill)
+        local top = sorted[#sorted]
+        return math.max(3, math.min(top, line + (adjust[t.name] or 0)))
     end
     return killed_at[t.name] or 30                    -- nothing learned yet: a careful first guess, learned from
 end
