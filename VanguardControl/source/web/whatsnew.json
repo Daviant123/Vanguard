@@ -1,5 +1,14 @@
 [
   {
+    "version": "1.33.0",
+    "date": "2026-10-16",
+    "items": [
+      "Farming: Past runs. Every farming run is kept at the bottom of the Farming tab - how long, kills, kills per hour, XP / CP, loot and why it stopped.",
+      "Too strong: a kind of mob that takes your farmer under 25% HP or over 3 minutes (twice), or KOs it, is set aside automatically. It shows in purple on the radar; click ↺ to fight it again.",
+      "Extra mobs joining a fight: one click and everyone who can sleep them will."
+    ]
+  },
+  {
     "version": "1.32.0",
     "date": "2026-10-16",
     "items": [

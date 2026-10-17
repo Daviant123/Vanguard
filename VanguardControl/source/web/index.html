@@ -1362,7 +1362,7 @@ function trustSelect(avail) {
 // ---------- Farming tab (rebuilt): dashboard + radar, then what / where / how / team / stop ----------
 // The farming engine is vg_farm.lua: camp + leash, back to camp, a give-up list for mobs it can't reach, waiting for
 // the party (and telling the low one to rest), aggro-only / anything-nearby modes, stop conditions, run stats, spots.
-const RADAR_COL = {target: "#4caf7a", aggro: "#e0605a", theirs: "#d4a54a", skipped: "#6b7280", ignored: "#4b5160", no: "#8b92a3", pack: "#a07ad8"};
+const RADAR_COL = {strong: "#9b59b6", target: "#4caf7a", aggro: "#e0605a", theirs: "#d4a54a", skipped: "#6b7280", ignored: "#4b5160", no: "#8b92a3", pack: "#a07ad8"};
 function radarSvg(rd, farmer) {
   const W = 270, R = W / 2, me = rd.me, ctr = rd.camp || me;
   const reach = Math.max(25, rd.range + 12, ...arr(rd.mobs).concat(arr(rd.party), [me]).map(m => Math.hypot(m.x - ctr.x, m.y - ctr.y) + 4));
@@ -1386,10 +1386,12 @@ function radarSvg(rd, farmer) {
   g += `<circle cx="${X(me.x)}" cy="${Y(me.y)}" r="5.5" fill="#e6e8ee" stroke="#14161b" stroke-width="1.5"/><text x="${X(me.x)}" y="${(+Y(me.y) - 9).toFixed(1)}" font-size="10" fill="#e6e8ee" font-weight="600" text-anchor="middle">${esc(farmer)}</text>`;
   return `<svg class="radar" width="${W}" height="${W}" viewBox="0 0 ${W} ${W}">${g}</svg>
     <div class="legend"><span><i style="background:${RADAR_COL.target}"></i>to fight</span><span><i style="background:${RADAR_COL.aggro}"></i>attacking us</span>
-      <span><i style="background:${RADAR_COL.theirs}"></i>someone else's</span><span><i style="background:${RADAR_COL.skipped}"></i>skipped (can't reach)</span><span><i style="background:${RADAR_COL.pack}"></i>in a pack (left for now)</span>
+      <span><i style="background:${RADAR_COL.theirs}"></i>someone else's</span><span><i style="background:${RADAR_COL.skipped}"></i>skipped (can't reach)</span><span><i style="background:${RADAR_COL.strong}"></i>too strong</span><span><i style="background:${RADAR_COL.pack}"></i>in a pack (left for now)</span>
       <span><i style="background:${RADAR_COL.no};opacity:.55"></i>left alone</span><span><i style="background:#4a8fe0"></i>party</span></div>
     <div class="hint" style="margin-top:2px">Click a mob to fight that kind or leave it alone.</div>`;
 }
+let farmRuns = [];
+async function farmRunsDo(q) { try { farmRuns = await (await fetch("/api/farmruns?" + (q || ""))).json(); } catch (e) {} bodyKey = ""; render(); }
 let radarTimer = null;
 // click a mob on the radar: fight that kind / leave it alone
 document.addEventListener("click", e => {
@@ -1406,6 +1408,7 @@ document.addEventListener("click", e => {
 });
 function radarPoll() {          // the Farming tab is open: ask the selected character for its radar every few seconds
   clearInterval(radarTimer);
+  farmRunsDo("");
   const ask = () => fetch("/api/send", {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({target: selected, command: "radar"})});
   radarTimer = setInterval(() => { if (tab === "farm" && selected) ask(); else clearInterval(radarTimer); }, 4000);
   if (selected) ask();
@@ -1520,7 +1523,10 @@ function farmTab(c, p) {
       <div class="row" style="align-items:flex-start;gap:20px;margin-top:10px">
         ${mode === "list" ? `<div><b style="font-size:12px;color:var(--accent)">Fight these</b><div>${tgt.length ? tgt.map(n => chip(n, "targets")).join("") : `<span class="hint" style="color:var(--bad)">none picked yet</span>`}</div></div>` : ""}
         <div><b style="font-size:12px;color:var(--accent)">Leave alone</b><div>${ign.length ? ign.map(n => chip(n, "ignore")).join("") : `<span class="hint">nothing</span>`}</div></div>
+        ${String(x.farm_strong || "").trim() ? `<div><b style="font-size:12px;color:#b07cd0">Too strong (set aside)</b><div>${String(x.farm_strong).split(",").map(t => t.trim()).filter(Boolean).map(n =>
+          `<span class="btag" style="font-size:12px">${esc(n)} <a href="#" style="text-decoration:none" title="Fight them again" onclick="send('farmstrong remove ${esc(n)}');return false">↺</a></span>`).join("")}</div></div>` : ""}
       </div>
+      <div class="row" style="margin-top:6px">${chk("Set aside mobs that are too strong (took me under 25% HP or over 3 minutes, twice)", x.farm_skip_strong !== false, "set farm.skip_strong true", "set farm.skip_strong false")}</div>
       <div class="row" style="margin-top:8px">
         <label class="field">Claim ${sel("set farm.claim ", [{v: "unclaimed", l: "Only unclaimed ones"}, {v: "party", l: "Only ones we already claimed"}, {v: "any", l: "Any (even other players')"}], x.farm_claim || "unclaimed")}</label>
         ${mode !== "aggro" ? chk("Fight mobs that attack us first", x.farm_aggro !== false, "set farm.aggro_first true", "set farm.aggro_first false") : ""}
@@ -1575,6 +1581,10 @@ function farmTab(c, p) {
           <span class="hint">${following.length ? `Following now: ${esc(following.join(", "))}` : "Nobody is following yet"}</span>`
           : `<span class="hint">Only ${esc(selected)} is online.</span>`}
       </div>
+      <div class="row" style="margin-top:8px;align-items:center"><span class="hint">Extra mobs joining a fight:</span>
+        <button style="font-size:11px" onclick="post('*', 'sleep on')">Everyone who can sleeps them</button>
+        <button style="font-size:11px" onclick="post('*', 'sleep off')">Don't sleep them</button>
+        <span class="hint">${x.sleep_extra ? `(${esc(selected)}: on)` : ""}</span></div>
       <div class="row" style="margin-top:10px">${chk("Wait for the party before each pull", x.farm_wait !== false, "set farm.wait_party true", "set farm.wait_party false")}</div>
       ${x.farm_wait !== false ? `<div class="row" style="margin-top:6px">
         <label class="field">Everyone's HP at least ${sel("set farm.wait_hp ", nums([30, 50, 60, 70, 80, 90], "%"), x.farm_wait_hp ?? 70)}</label>
@@ -1616,6 +1626,16 @@ function farmTab(c, p) {
         ${avail.length ? `<div class="row" style="margin-top:8px">${trustSelect(avail)}</div>`
           : `<div class="hint" style="margin-top:6px">${arr(known.trusts).length ? "All its trusts are picked." : "No trusts known by this character."}</div>`}`;
     })())}
+    </div>
+
+    <div class="box"><h3>Past runs</h3>
+      ${farmRuns.length ? `<table class="grid"><thead><tr><th style="text-align:left">When</th><th>Who</th><th style="text-align:left">Where</th><th>Time</th><th>Kills</th><th>Kills / hour</th><th>XP</th><th>CP</th><th style="text-align:left">Loot</th><th style="text-align:left">Why it stopped</th></tr></thead><tbody>
+        ${farmRuns.slice().reverse().slice(0, 15).map(r => `<tr><td style="text-align:left">${esc(r.time)}</td><td>${esc(r.who)}</td><td style="text-align:left">${esc(r.zone)}<div class="hint">${esc(r.mobs)}</div></td>
+          <td>${mins(r.secs)}</td><td>${r.kills}</td><td>${r.secs >= 120 ? Math.round(r.kills * 3600 / r.secs) : "—"}</td><td>${fmtN(r.xp)}</td><td>${fmtN(r.cp)}</td>
+          <td style="text-align:left" class="hint">${esc(r.loot || "—")}</td><td style="text-align:left" class="hint">${esc(r.why)}</td></tr>`).join("")}
+      </tbody></table>
+      <div class="row" style="margin-top:6px"><button style="font-size:11px" onclick="farmRunsDo('do=clear')">Clear the history</button></div>`
+      : `<div class="hint">Each farming run is kept here when it ends: how long, kills, XP / CP, loot and why it stopped.</div>`}
     </div>
   </div>`;
 }
@@ -1738,7 +1758,7 @@ function renderPanel() {
     (chars[n].snapshot || {}).mpp, (chars[n].snapshot || {}).tp, (chars[n].snapshot || {}).status, (chars[n].snapshot || {}).target,
     (chars[n].snapshot || {}).foe]) : 0;
   const bk = JSON.stringify([tab, p, s.leader, Object.keys(chars), team, tab === "app" ? [addon, crashes] : 0, tab === "strat" ? s.strat : 0, tab === "adv" || tab === "farm" ? c.nearby : 0,
-    tab === "farm" ? [s.farm, s.enabled, s.stats, s.modules, s.status, Object.keys(chars).map(n => [(chars[n].snapshot || {}).leader, chars[n].online])] : 0,
+    tab === "farm" ? [farmRuns.length, s.farm, s.enabled, s.stats, s.modules, s.status, Object.keys(chars).map(n => [(chars[n].snapshot || {}).leader, chars[n].online])] : 0,
     tab === "team" ? [warpArm, Object.keys(chars).map(n => ((((chars[n].profile || {}).config || {}).known) || {}).warp), stopTimer.until, Math.floor((stopTimer.left || 0) / 60)] : 0]);
   if (bk === bodyKey) return;
   bodyKey = bk;

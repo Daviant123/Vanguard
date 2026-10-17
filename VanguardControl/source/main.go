@@ -162,6 +162,8 @@ func (h *hub) listen() {
 				c.addr = addr
 			}
 			h.mu.Unlock()
+		case "farmrun":
+			h.addFarmRun(msg)
 		case "crash":
 			// vg_crash.lua caught an error in the addon
 			str := func(k string) string { v, _ := msg[k].(string); return v }
@@ -381,6 +383,7 @@ func main() {
 	mux.HandleFunc("/api/timer", h.handleTimer)
 	mux.HandleFunc("/api/crashes", h.handleCrashes)
 	mux.HandleFunc("/api/alarms", h.handleAlarms)
+	mux.HandleFunc("/api/farmruns", h.handleFarmRuns)
 	mux.HandleFunc("/api/quit", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNoContent)
 		go func() { time.Sleep(200 * time.Millisecond); os.Exit(0) }()

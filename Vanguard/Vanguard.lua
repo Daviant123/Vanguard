@@ -1,6 +1,6 @@
 _addon.name = 'Vanguard'
 _addon.author = 'Daviant'
-_addon.version = '0.42.0'
+_addon.version = '0.43.0'
 _addon.commands = {'vanguard', 'vg'}
 
 --[[
@@ -115,6 +115,7 @@ local defaults = {
              prefer_best = false,         -- prefer the mob kind that pays best per minute (the mob report)
              keep_chain = false,          -- XP / CP chains: while one runs, wait only for emergencies (HP 40%, MP 15%)
              stop_mins = 0, when_done = 'stay',   -- stop after N minutes (0 = no); then stay | warp | logout (everyone)
+             skip_strong = true, strong = '',     -- mobs that nearly KO'd the farmer / took 3+ min twice: set aside
              packs = true, pack_range = 8, pack_strict = false },
     farmspots = { s0 = '' },      -- saved farm spots (vg_farm): s1, s2, ... = "name|zone|field=value|..." 
     -- "Spell>target" pairs. target = me or a party member name. "ja:" prefix = job ability.
@@ -1115,7 +1116,8 @@ warp.init(settings, state, { log = log })
 stats.kill_hook = function(mob) farm.on_kill(mob) end
 stats.chain_hook = function(n) farm.on_points(n) end
 farm.init(settings, state, { log = log, run_toward = run_toward, stop_running = stop_running, face = face,
-    party_engaged = party_engaged, recently = recently, mark = mark, save = function() store.save(settings) send_profile() end })
+    party_engaged = party_engaged, recently = recently, mark = mark, save = function() store.save(settings) send_profile() end,
+    send = bridge.send })
 finish.init(settings, state, { log = log, use_ws = use_ws, ws_in_range = ws_in_range, recently = recently, mark = mark })
 bard.init(settings, state, {
     log = log, recently = recently, mark = mark, try_cast = try_cast, use_ja = use_ja, amnesia = amnesia,
@@ -1844,6 +1846,7 @@ windower.register_event('addon command', function(cmd, ...)
             farm.share_camp(windower.ffxi.get_player(), true)
             if settings.farm.mode == 'list' and #util.split(settings.farm.targets, ',') == 0 then log('Farming on, but no mobs are picked yet: pick what to fight') else log('Farming started') end
         elseif sub == 'stop' then
+            farm.send_run(windower.ffxi.get_player(), 'stopped by you')
             settings.modules.farm, settings.enabled = false, false
             stop_running()
             if settings.farm.pull_back then farm.share_camp(windower.ffxi.get_player(), false) end
@@ -1888,6 +1891,16 @@ windower.register_event('addon command', function(cmd, ...)
         if settings.farm.item == '' then settings.farm.item_goal = 0
         elseif settings.farm.item_goal <= 0 then settings.farm.item_goal = 12 end
         log(settings.farm.item ~= '' and ('Farming for %d %s'):format(settings.farm.item_goal, settings.farm.item) or 'Not farming for an item')
+        store.save(settings) send_profile()
+    elseif cmd == 'farmstrong' then
+        -- the "too strong" list on the Farming tab: //vg farmstrong remove <name> | clear
+        local sub, name = (args[1] or ''):lower(), table.concat(args, ' ', 2)
+        local keep = {}
+        if sub ~= 'clear' then
+            for _, n in ipairs(util.split(settings.farm.strong, ',')) do if n:lower() ~= name:lower() then keep[#keep + 1] = n end end
+        end
+        settings.farm.strong = table.concat(keep, ',')
+        log(sub == 'clear' and 'Too strong list cleared' or ('Will fight ' .. name .. ' again'))
         store.save(settings) send_profile()
     elseif cmd == 'farmspot' then
         -- the Farming tab's spots: //vg farmspot save | load <s1> | del <s1>

@@ -166,6 +166,9 @@ function farm.judge(mob, me, ids, center)
     if not mob or mob.spawn_type ~= 16 or not mob.valid_target or (mob.hpp or 0) <= 0 then return nil, nil end
     local ignore = list(S.farm.ignore)
     if matches(mob.name, ignore) then return nil, 'ignored' end
+    if matches(mob.name, list(S.farm.strong)) and not (mob.claim_id and mob.claim_id ~= 0 and ids[mob.claim_id]) then
+        return nil, 'too strong'
+    end
     local claimed_us = mob.claim_id and mob.claim_id ~= 0 and ids[mob.claim_id]
     local claimed_other = mob.claim_id and mob.claim_id ~= 0 and not claimed_us
     if blacklisted(mob.id) then return nil, 'skipped' end
@@ -334,7 +337,15 @@ function farm.fight_tick(player)
     if player.status == 1 and t and state.farm_fight ~= t.id then
         local xp, cp = points()
         state.farm_fight = t.id
-        state.farm_fight_info = { name = t.name, t = now(), xp = xp, cp = cp }
+        state.farm_fight_info = { name = t.name, t = now(), xp = xp, cp = cp, low = 100 }
+    end
+    local f = state.farm_fight_info
+    if f and player.status == 1 then
+        f.low = math.min(f.low or 100, (player.vitals or {}).hpp or 100)
+        if now() - f.t > 180 and not f.long then f.long = true farm.strong_strike(f.name, 'a fight took over 3 minutes') end
+    end
+    if f and (player.status == 2 or player.status == 3) and not f.ko then
+        f.ko = true farm.strong_strike(f.name, "it KO'd me", true)
     end
     local p = state.farm_pending
     if p and now() >= p.at then                 -- the XP message comes just after the kill
@@ -352,6 +363,7 @@ end
 function farm.on_kill(mob)
     local f = state.farm_fight_info
     if not f or state.farm_fight ~= mob.id then return end
+    if (f.low or 100) < 25 then farm.strong_strike(f.name, ('it took me down to %d%% HP'):format(f.low)) end
     state.farm_pending = { name = f.name, secs = math.max(1, now() - f.t), xp = f.xp, cp = f.cp, at = now() + 2 }
     state.farm_fight, state.farm_fight_info = nil, nil
 end
@@ -366,6 +378,21 @@ function farm.report()
     table.sort(out, function(a, b) if a.pm ~= b.pm then return a.pm > b.pm end return a.n < b.n end)
     while #out > 10 do table.remove(out) end
     return out
+end
+
+-- Too strong (upgrade 2): a kind of mob that took the farmer under 25 % HP or needed over 3 minutes - twice - (or KO'd
+-- it once) is set aside on the "too strong" list (not Leave alone: the app shows it with "fight them again").
+function farm.strong_strike(name, why, now_)
+    if not S.farm.skip_strong or not name then return end
+    state.farm_strikes = state.farm_strikes or {}
+    state.farm_strikes[name] = (state.farm_strikes[name] or 0) + 1
+    if not now_ and state.farm_strikes[name] < 2 then return end
+    for _, n in ipairs(list(S.farm.strong)) do if n:lower() == name:lower() then return end end
+    local l = list(S.farm.strong)
+    l[#l + 1] = name
+    S.farm.strong = table.concat(l, ',')
+    h.log(('Leaving %s alone from now on: too strong (%s)'):format(name, why))
+    h.save()
 end
 
 -- "prefer the best": a slower-paying mob counts as further away (by how much worse it pays)
@@ -491,7 +518,8 @@ function farm.inventory_names()
 end
 
 function farm.start(player, me)
-    state.farm_run = { t = now(), kills0 = kills_now() }
+    local xp, cp = points()
+    state.farm_run = { t = now(), kills0 = kills_now(), xp0 = xp, cp0 = cp }
     state.farm_inv, state.farm_inv_t, state.farm_loot = inv_counts(), now(), {}
     state.farm_bl, state.farm_skipped, state.farm_go, state.farm_fails = {}, 0, nil, {}
     if me and (S.farm.area ~= 'route') and not farm.camp() then farm.set_camp(me) end
@@ -544,9 +572,24 @@ function farm.check_stop(player)
     return true
 end
 
+-- Past runs (upgrade 2): when a run ends, its summary goes to the app, which keeps a history (DreamBot-style logs)
+function farm.send_run(player, why)
+    local r = farm.run_stats()
+    if not r or not h.send then return end
+    local xp, cp = points()
+    local z = res.zones[zone()] and res.zones[zone()].en or '?'
+    local top = {}
+    for i, l in ipairs(r.loot or {}) do if i <= 3 then top[#top + 1] = l.c .. ' ' .. l.n end end
+    pcall(h.send, { type = 'farmrun', name = player and player.name or '?', zone = z, secs = r.secs, kills = r.kills,
+        xp = math.max(0, xp - (state.farm_run.xp0 or xp)), cp = math.max(0, cp - (state.farm_run.cp0 or cp)),
+        loot = table.concat(top, ', '), why = why or 'stopped', mobs = list(S.farm.targets)[1] or S.farm.mode })
+    state.farm_run = nil
+end
+
 -- Stop farming (a stop condition, a zone change) and do what "When done" says: stay, warp everyone home, or log
 -- everyone out (the normal commands, through //vg all). Not when KO'd - it can't.
 function farm.finish(player, why)
+    farm.send_run(player, why)
     S.modules.farm, S.enabled = false, false
     h.stop_running()
     state.farm_status = 'stopped: ' .. why
@@ -671,7 +714,7 @@ function farm.radar()
             local pk = verdict == 'target' and farm.pack_count(mob, ids) or 0
             if pk > 0 and S.farm.pack_strict then verdict = 'pack' end
             mobs[#mobs + 1] = { d = util.dist(mob), e = { x = r(mob.x), y = r(mob.y), n = mob.name,
-                s = verdict or ((why == 'skipped' or why == 'theirs' or why == 'ignored') and why or 'no'),
+                s = verdict or ((why == 'skipped' or why == 'theirs' or why == 'ignored') and why or why == 'too strong' and 'strong' or 'no'),
                 t = (t and t.id == mob.id) or nil, p = pk > 0 and pk or nil } }
         end
     end
@@ -690,7 +733,7 @@ end
 ------------------------------------------------------------------------
 local SPOT_FIELDS = { 'targets', 'ignore', 'claim', 'mode', 'range', 'height', 'pull_cmd', 'loop', 'aggro_first',
     'approach', 'route', 'area', 'camp', 'camp_zone', 'back_to_camp', 'wait_party', 'wait_hp', 'wait_mp', 'wait_near',
-    'packs', 'pack_range', 'pack_strict', 'item', 'item_goal', 'pull_back', 'prefer_best', 'keep_chain', 'stop_mins', 'when_done' }
+    'packs', 'pack_range', 'pack_strict', 'item', 'item_goal', 'pull_back', 'prefer_best', 'keep_chain', 'stop_mins', 'when_done', 'skip_strong', 'strong' }
 
 local function spot_keys()
     local keys = {}
