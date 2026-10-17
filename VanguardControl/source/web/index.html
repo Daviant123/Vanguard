@@ -1453,7 +1453,8 @@ function trialBox(p, mobNames) {
             <button style="font-size:11px" class="${t.assist ? "primary" : ""}" ${t.done ? "disabled" : ""} onclick="send('trial assist ${t.k}')">${t.assist ? "Helping ✓" : "Help finish it"}</button>
             <button style="font-size:11px" title="Start the count again" onclick="send('trial reset ${t.k}')">↺</button>
             <button style="font-size:11px" title="Remove" onclick="send('trial del ${t.k}')">×</button></span></div>
-        <div class="hpbar" style="height:8px"><div style="background:var(--good);width:${t.goal ? Math.min(100, t.count * 100 / t.goal) : 0}%"></div></div></div>`).join("")
+        <div class="hpbar" style="height:8px"><div style="background:var(--good);width:${t.goal ? Math.min(100, t.count * 100 / t.goal) : 0}%"></div></div>
+        ${t.tries ? `<div class="hint" style="margin-top:3px">This session ${esc(t.ws)} landed the kill on ${t.hits || 0} of ${t.tries} (${Math.round((t.hits || 0) * 100 / t.tries)}%)</div>` : ""}</div>`).join("")
       : `<div class="hint">No trials yet. Add one below - Vanguard counts the kills that fit it.</div>`}
     <div class="row" style="margin-top:8px;align-items:flex-end;flex-wrap:wrap">
       <label class="field">Trial <select onchange="trialForm.kind=this.value;bodyKey='';render()">${o("kill", "Defeat enemies", f.kind)}${o("ws", "Defeat enemies with a weapon skill", f.kind)}</select></label>

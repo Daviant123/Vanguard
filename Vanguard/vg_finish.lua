@@ -42,6 +42,17 @@ function finish.line(t)
     return killed_at[t.name] or 30                    -- nothing learned yet: a careful first guess, learned from
 end
 
+-- Waiting for TP (finish_wait, or always while helping with a Magian trial): with Auto, stop attacking a little above
+-- the finish line - by the time the mob is under it, a couple of normal hits kill it before TP is 1000 (his real run,
+-- 2026-10-17: Atonement landed 42 of 66 Peapuk kills, the line being 9 %).
+local function waits() return S.ws.finish_wait or (S.trial_assist and S.trial_assist ~= '') end
+
+function finish.wait_line(t)
+    local line = finish.line(t)
+    if not waits() or not auto() then return line end
+    return line + math.max(5, line)
+end
+
 -- Our weapon skill hit something (from the 'action' event): if it's the finisher, measure what it does.
 function finish.note_ws(target_id, ws_name)
     if not on(S.ws.finish) or not ws_name or ws_name:lower() ~= S.ws.finish:lower() then return end
@@ -86,7 +97,23 @@ function finish.ws(player, t)
     if not on(f) or not t or not t.hpp or t.hpp <= 0 then return nil end
     finish.learn_tick()
     state.finish_seen = { id = t.id, hpp = t.hpp }
-    if t.hpp <= finish.line(t) then
+    local line = finish.line(t)
+    if t.hpp > line and t.hpp <= finish.wait_line(t) and player.vitals.tp < 1000 then
+        -- close to the line without TP: stop now (the others too), attack again when TP is 1000
+        if S.ws.finish_others and state.finish_told ~= t.id then
+            state.finish_told = t.id
+            windower.send_ipc_message(('vg_finish %d %s'):format(t.id, player.name))
+        end
+        if player.status == 1 and state.finish_wait ~= t.id then
+            state.finish_wait, state.finish_wait_t = t.id, clock()
+            windower.send_command('input /attackoff')
+            h.log(('%s is at %d%% and TP is %d: holding off until TP is 1000, then %s at %d%%'):format(t.name, t.hpp,
+                player.vitals.tp, f, line))
+            state.busy_until = math.max(state.busy_until or 0, clock() + 1.5)
+        end
+        return 'block'
+    end
+    if t.hpp <= line then
         if S.ws.finish_others and state.finish_told ~= t.id then
             state.finish_told = t.id
             windower.send_ipc_message(('vg_finish %d %s'):format(t.id, player.name))
@@ -96,8 +123,8 @@ function finish.ws(player, t)
             if h.ws_in_range(t, true) and not h.recently('ws:' .. f, 3) then return h.use_ws(f) and 'used' end
             return 'block'
         end
-        if S.ws.finish_wait and player.status == 1 and state.finish_wait ~= t.id then
-            state.finish_wait = t.id
+        if waits() and player.status == 1 and state.finish_wait ~= t.id then
+            state.finish_wait, state.finish_wait_t = t.id, clock()
             windower.send_command('input /attackoff')
             h.log(('%s is low and TP is %d: stopping until TP is 1000, then %s'):format(t.name, player.vitals.tp, f))
             state.busy_until = math.max(state.busy_until or 0, clock() + 1.5)
@@ -116,7 +143,8 @@ function finish.waiting(player)
     local bt = windower.ffxi.get_mob_by_target('bt')
     if not bt or bt.id ~= id or (bt.hpp or 0) <= 0 then state.finish_wait = nil return false end
     if player.status == 1 then return false end
-    if player.vitals.tp >= 1000 then
+    -- TP isn't coming (the mob isn't hitting us): don't stand there forever - attack again after 30 s
+    if player.vitals.tp >= 1000 or clock() - (state.finish_wait_t or clock()) > 30 then
         if not h.recently('finish:attack', 3) then
             h.mark('finish:attack')
             windower.send_command('input /attack <bt>')

@@ -42,7 +42,9 @@ function trials.list()
     for _, k in ipairs(keys()) do
         local t = decode(S.trials[k])
         if t then
+            local rt = state.trial_rate and state.trial_rate[k]
             out[#out + 1] = { k = k, kind = t.kind, goal = t.goal, ws = t.ws, mobs = t.mobs, count = t.count,
+                              hits = rt and rt.hit or nil, tries = rt and rt.all or nil,
                               assist = S.trial_assist == k or nil, done = t.count >= t.goal and t.goal > 0 or nil }
         end
     end
@@ -97,6 +99,14 @@ function trials.on_kill(mob)
     local changed = false
     for _, k in ipairs(keys()) do
         local t = decode(S.trials[k])
+        -- how often the weapon skill lands the kill this session (shown in the app)
+        if t and t.kind == 'ws' and t.count < t.goal and matches(mob.name, t.mobs) then
+            state.trial_rate = state.trial_rate or {}
+            local rt = state.trial_rate[k] or { hit = 0, all = 0 }
+            rt.all = rt.all + 1
+            if finisher and finisher == t.ws then rt.hit = rt.hit + 1 end
+            state.trial_rate[k] = rt
+        end
         if t and t.count < t.goal and matches(mob.name, t.mobs) and (t.kind == 'kill' or (finisher and finisher == t.ws)) then
             t.count = t.count + 1
             S.trials[k] = encode(t)
@@ -124,7 +134,7 @@ function trials.assist(k)
     if t.kind == 'ws' then
         S.ws.finish = t.ws
         S.ws.finish_save, S.ws.finish_others = true, true
-        if S.ws.finish_at < 30 then S.ws.finish_at = 30 end
+        if S.ws.finish_at > 0 and S.ws.finish_at < 30 then S.ws.finish_at = 30 end   -- (Auto - 0 - stays Auto)
         S.modules.ws = true
     end
     h.log(('Helping with the trial: %s%s, %d to go'):format(t.mobs ~= '' and t.mobs or 'any mob',

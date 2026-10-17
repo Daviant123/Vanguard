@@ -1,5 +1,13 @@
 [
   {
+    "version": "1.54.0",
+    "date": "2026-10-17",
+    "items": [
+      "Magian trials: more kills land with the trial weapon skill. While helping a trial, the finisher stops attacking a little before the mob is low enough when TP isn't ready yet (the others hold off too), and attacks again at TP 1000. The trial box shows how often the weapon skill landed the kill this session.",
+      "Fix: \"Help finish it\" no longer switches the finishing weapon skill from Auto to a fixed 30%."
+    ]
+  },
+  {
     "version": "1.53.3",
     "date": "2026-10-17",
     "items": [
