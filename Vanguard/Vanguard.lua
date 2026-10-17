@@ -1,6 +1,6 @@
 _addon.name = 'Vanguard'
 _addon.author = 'Daviant'
-_addon.version = '0.53.0'
+_addon.version = '0.53.1'
 _addon.commands = {'vanguard', 'vg'}
 
 --[[
@@ -66,6 +66,7 @@ local quick = require('vg_quick')
 local defaults = {
     enabled = false,
     autostart = false,
+    resume_until = 0,       -- set when unloaded while running: a reload within 90 s carries on
     hotkeys = '',            -- quick-button hotkeys bound in this game window (vg_quick, set from the app)       -- start by itself when Vanguard loads (login / reload); off = wait for Start
     leader = '',
     tick = 0.25,
@@ -189,9 +190,13 @@ local settings = config.load(defaults)
 -- Running or not is decided now, not by whatever was saved last time: only Auto start starts it by itself.
 -- Windower's config library re-reads settings.xml right after loading and again at login (bringing back a saved
 -- <enabled>true</enabled> - why CharB kept showing "running" with Auto start off), so it's applied again then.
-settings.enabled = settings.autostart == true
+-- ...except right after a reload (an update, //lua r): a character that was running carries on (resume_until is set
+-- when it unloads). His report: "when I start farming it only stays on for about 2 minutes" - every update reload
+-- switched farming off.
+local resuming = (tonumber(settings.resume_until) or 0) > os.time()
+settings.enabled = settings.autostart == true or resuming
 if type(config.register) == 'function' then
-    config.register(settings, function() settings.enabled = settings.autostart == true end)
+    config.register(settings, function() settings.enabled = settings.autostart == true or resuming end)
 end
 
 ------------------------------------------------------------------------
@@ -1136,7 +1141,7 @@ warp.init(settings, state, { log = log })
 stats.kill_hook = function(mob) farm.on_kill(mob) end
 stats.chain_hook = function(n) farm.on_points(n) end
 farm.init(settings, state, { log = log, run_toward = run_toward, stop_running = stop_running, face = face,
-    party_engaged = party_engaged, recently = recently, mark = mark, save = function() store.save(settings) send_profile() end,
+    party_engaged = party_engaged, recently = recently, mark = mark, save = function() save_profile() store.save(settings) send_profile() end,
     send = bridge.send })
 finish.init(settings, state, { log = log, use_ws = use_ws, ws_in_range = ws_in_range, recently = recently, mark = mark })
 bard.init(settings, state, {
@@ -1174,6 +1179,16 @@ local function tick()
     local player = windower.ffxi.get_player()
     if not player then return end
     record_route()
+    -- reloaded while running: carry on (farming too: a new run from the same camp), and forget the marker
+    if resuming then
+        resuming = false
+        settings.resume_until = 0
+        if settings.modules.farm and settings.enabled then
+            farm.start(player, windower.ffxi.get_mob_by_target('me'))
+            log('Reloaded: farming carries on')
+        end
+        store.save(settings)
+    end
     -- a rest that ended without us (hit by a mob, moved): stop thinking we're resting
     if state.resting and player.status ~= 33 and not recently('rest', 3) and not recently('farm:rest', 3) then state.resting = false end
     stats.tick(player)
@@ -1470,6 +1485,9 @@ windower.register_event('job change', function()
     coroutine.schedule(function() load_profile() end, 2)
 end)
 windower.register_event('unload', function()
+    -- running (or farming) when unloaded: carry on if it's loaded again within 90 s (a reload)
+    settings.resume_until = settings.enabled and (os.time() + 90) or 0
+    pcall(store.save, settings)
     stop_running() bridge.stop() hud.destroy()
     if settings.keys then bind_keys(false) end
     quick.hk_bind_all(false)
@@ -1913,7 +1931,7 @@ windower.register_event('addon command', function(cmd, ...)
             local me = windower.ffxi.get_mob_by_target('me')
             if me then farm.set_camp(me) settings.farm.area = 'camp' log('Camp set here') if settings.modules.farm then farm.share_camp(windower.ffxi.get_player(), true) end end
         end
-        store.save(settings) send_profile()
+        save_profile() send_profile()   -- (the job setup carries the module switches a reload restores)
     elseif cmd == 'farmitem' then
         -- the Farming tab's "Farm for": //vg farmitem <item name> | none
         local name = table.concat(args, ' ')
@@ -1929,7 +1947,7 @@ windower.register_event('addon command', function(cmd, ...)
         if farm.preset(name) then
             log('Farming preset: ' .. ({ party = 'XP / CP party', items = 'item farming', safe = 'safe and careful', clear = 'clear everything nearby' })[name])
         end
-        store.save(settings) send_profile()
+        save_profile() send_profile()   -- (the job setup carries the module switches a reload restores)
     elseif cmd == 'farmstrong' then
         -- the "too strong" list on the Farming tab: //vg farmstrong remove <name> | clear
         local sub, name = (args[1] or ''):lower(), table.concat(args, ' ', 2)

@@ -275,7 +275,9 @@ func (h *hub) reloadWatch() {
 				toldOld[name] = true
 				old = append(old, name)
 			}
-			if online && v != "" && newer(st.Installed, v) && asked[name] != st.Installed {
+			// not in the middle of a fight: the reload waits until it's over (it would drop the fight)
+			status, _ := c.Snapshot["status"].(string)
+			if online && v != "" && newer(st.Installed, v) && asked[name] != st.Installed && status != "Engaged" {
 				todo = append(todo, name+"|"+v)
 			}
 		}

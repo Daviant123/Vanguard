@@ -1,5 +1,12 @@
 [
   {
+    "version": "1.43.1",
+    "date": "2026-10-16",
+    "items": [
+      "Fixed: farming switched itself off after a couple of minutes. Each Vanguard update reloaded your characters and the reload started them switched off. Now a character that was running or farming carries on after an update, and the app waits to update a character that's in a fight."
+    ]
+  },
+  {
     "version": "1.43.0",
     "date": "2026-10-16",
     "items": [
