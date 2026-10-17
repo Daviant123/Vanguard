@@ -199,6 +199,11 @@ function farm.judge(mob, me, ids, center)
     if claimed_other and S.farm.claim ~= 'any' then return nil, 'theirs' end
     if S.farm.claim == 'party' and not claimed_us then return nil, 'unclaimed' end
     if math.abs((mob.z or 0) - (me.z or 0)) > S.farm.height then return nil, 'too high/low' end
+    -- courtesy (upgrade 14): an unclaimed mob with another player (not in our party) right next to it is probably
+    -- theirs in a second - leave it rather than race them for the claim
+    if S.farm.polite and not claimed_us and (not mob.claim_id or mob.claim_id == 0) and farm.player_near(mob, ids) then
+        return nil, 'theirs'
+    end
     local d = center and dist2(mob, center) or util.dist(mob)
     local aggro = claimed_us and S.farm.aggro_first
     if d > S.farm.range and not (aggro and util.dist(mob) <= S.farm.range + 10) then return nil, 'out of range' end
@@ -212,6 +217,18 @@ end
 local function center_of(me)
     if use_route() then return nil end            -- on a route: around wherever it is
     return farm.camp() or nil
+end
+
+-- another player (not in our party, not a trust / NPC) within 6 yalms of this mob?
+function farm.player_near(mob, ids)
+    if not mob.x then return false end
+    for _, o in pairs(windower.ffxi.get_mob_array() or {}) do
+        if type(o) == 'table' and o.spawn_type == 13 and not o.is_npc and o.x and not ids[o.id]
+            and (o.hpp or 0) > 0 and dist2(o, mob) <= 6 then
+            return true
+        end
+    end
+    return false
 end
 
 -- How many other enemies stand within farm.pack_range of this one (alive, not someone else's): the ones that may come

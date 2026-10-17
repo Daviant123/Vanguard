@@ -1594,6 +1594,7 @@ function farmTab(c, p) {
       <div class="row" style="margin-top:8px">
         <label class="field">Claim ${sel("set farm.claim ", [{v: "unclaimed", l: "Only unclaimed ones"}, {v: "party", l: "Only ones we already claimed"}, {v: "any", l: "Any (even other players')"}], x.farm_claim || "unclaimed")}</label>
         ${mode !== "aggro" ? chk("Fight mobs that attack us first", x.farm_aggro !== false, "set farm.aggro_first true", "set farm.aggro_first false") : ""}
+        ${chk("Leave a mob another player is standing next to", x.farm_polite !== false, "set farm.polite true", "set farm.polite false")}
       </div>`)}
 
     ${card(2, "Where", `

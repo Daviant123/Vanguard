@@ -1,5 +1,12 @@
 [
   {
+    "version": "1.43.0",
+    "date": "2026-10-16",
+    "items": [
+      "Farming leaves a mob alone when another player is standing right next to it (they're about to pull it) and takes a different one - fewer lost claims, and polite. You can switch it off under What to fight."
+    ]
+  },
+  {
     "version": "1.42.1",
     "date": "2026-10-16",
     "items": [
