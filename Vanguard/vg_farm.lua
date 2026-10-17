@@ -724,17 +724,32 @@ function farm.share_camp(player, on)
     end
 end
 
+-- pause / resume (upgrade 12): stop for a moment without ending the run; paused time isn't counted
+function farm.pause(on)
+    local r = state.farm_run
+    if on then
+        S.enabled = false
+        if r and not r.paused then r.paused = now() end
+        h.stop_running()
+        state.farm_status = 'paused'
+    else
+        if r and r.paused then r.t = r.t + (now() - r.paused) r.paused = nil end
+        S.enabled = true
+        state.farm_status = 'resuming'
+    end
+end
+
 function farm.run_stats()
     local r = state.farm_run
     if not r then return nil end
-    local secs = math.max(1, math.floor(now() - r.t))
+    local secs = math.max(1, math.floor((r.paused or now()) - r.t))
     local kills = math.max(0, kills_now() - r.kills0)
     local have = farm.item_have()
     return { secs = secs, kills = kills, kph = secs >= 120 and math.floor(kills * 3600 / secs + 0.5) or nil,
              every = kills > 0 and math.floor(secs / kills + 0.5) or nil, skipped = state.farm_skipped or 0,
              loot = farm.loot_list(), mobs = farm.report(), chain = farm.chain_info(), free = farm.inv_free(),
              spark = farm.spark(), busy = state.farm_busy, checks = state.farm_checks,
-             item = have and { n = S.farm.item, have = have, goal = S.farm.item_goal } or nil }
+             item = have and { n = S.farm.item, have = have, goal = S.farm.item_goal } or nil, paused = r.paused and true or nil }
 end
 
 -- a reason to stop farming now, or nil
@@ -763,14 +778,18 @@ end
 -- Past runs (upgrade 2): when a run ends, its summary goes to the app, which keeps a history (DreamBot-style logs)
 function farm.send_run(player, why)
     local r = farm.run_stats()
-    if not r or not h.send then return end
+    if not r then return end
     local xp, cp = points()
     local z = res.zones[zone()] and res.zones[zone()].en or '?'
     local top = {}
     for i, l in ipairs(r.loot or {}) do if i <= 3 then top[#top + 1] = l.c .. ' ' .. l.n end end
-    pcall(h.send, { type = 'farmrun', name = player and player.name or '?', zone = z, secs = r.secs, kills = r.kills,
+    local mins = math.floor(r.secs / 60)
+    h.log(('Run over (%s): %d min, %d kills%s, %d XP, %d CP%s'):format(why or 'stopped', mins, r.kills,
+        r.kph and (' (' .. r.kph .. ' an hour)') or '', math.max(0, xp - (state.farm_run.xp0 or xp)), math.max(0, cp - (state.farm_run.cp0 or cp)),
+        #top > 0 and (', loot: ' .. table.concat(top, ', ')) or ''))
+    if h.send then pcall(h.send, { type = 'farmrun', name = player and player.name or '?', zone = z, secs = r.secs, kills = r.kills,
         xp = math.max(0, xp - (state.farm_run.xp0 or xp)), cp = math.max(0, cp - (state.farm_run.cp0 or cp)),
-        loot = table.concat(top, ', '), why = why or 'stopped', mobs = list(S.farm.targets)[1] or S.farm.mode })
+        loot = table.concat(top, ', '), why = why or 'stopped', mobs = list(S.farm.targets)[1] or S.farm.mode }) end
     state.farm_run = nil
 end
 
@@ -812,7 +831,7 @@ function farm.tick(player)
     if not S.modules.farm then state.farm_status = nil return false end
     state.route_moving = false
     if player.status == 1 then return false end
-    if not S.enabled then status('stopped') return false end
+    if not S.enabled then status(state.farm_run and state.farm_run.paused and 'paused' or 'stopped') return false end
     if state.resting or player.status == 33 then status('resting') return false end
     if player.status ~= 0 then status('waiting') return false end
     if S.farm.mode == 'list' and #list(S.farm.targets) == 0 then status('no mobs picked yet: pick what to fight') return false end

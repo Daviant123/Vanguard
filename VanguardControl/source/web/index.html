@@ -1438,6 +1438,7 @@ function farmTab(c, p) {
   const mode = x.farm_mode || "list", area = x.farm_area || "camp";
   const ready = mode !== "list" || tgt.length > 0;
   const farming = !!mods.farm && s.enabled;
+  const paused = !!mods.farm && !s.enabled && ((s.farm || {}).run || {}).paused;
   const f = s.farm || {}, run = f.run || {}, st = s.stats || {};
   const nums = (list, unit) => list.map(v => ({v, l: v + unit}));
   const segBtns = (cur, opts) => `<div class="seg">${opts.map(o => `<button class="${o.v === cur ? "on" : ""}" onclick="send('${o.cmd}')">${o.l}</button>`).join("")}</div>`;
@@ -1460,7 +1461,7 @@ function farmTab(c, p) {
   const spots = arr(x.farm_spots), here = spots.filter(q => q.here), elsewhere = spots.filter(q => !q.here);
   const others = Object.keys(chars).filter(n => n !== selected && chars[n].online);
   const following = others.filter(n => lc((chars[n].snapshot || {}).leader) === lc(selected));
-  const statusText = farming ? cap(f.status || "starting") : f.status && f.status.startsWith("stopped: ") ? cap(f.status) : ready ? "Ready" : "Pick what to fight";
+  const statusText = paused ? "Paused - the run carries on when you resume" : farming ? cap(f.status || "starting") : f.status && f.status.startsWith("stopped: ") ? cap(f.status) : ready ? "Ready" : "Pick what to fight";
   const statusCol = !farming ? "var(--muted)" : /^(waiting|at camp)/.test(f.status || "") ? "var(--tp)" : /^(fighting|going|bringing|walking)/.test(f.status || "") ? "var(--good)" : "var(--text)";
 
   const all = farmView === "all";
@@ -1471,11 +1472,14 @@ function farmTab(c, p) {
       <div class="fdash">
         <div>
           <div class="row" style="align-items:center;gap:14px">
-            ${farming ? `<button class="stop" style="font-size:16px;padding:10px 22px" onclick="send('farming stop')">■ Stop farming</button>`
+            ${paused ? `<button class="go" style="font-size:16px;padding:10px 22px" onclick="send('farming resume')">▶ Resume</button>
+                 <button class="stop" onclick="send('farming stop')">■ Stop (end the run)</button>`
+              : farming ? `<button class="stop" style="font-size:16px;padding:10px 22px" onclick="send('farming stop')">■ Stop farming</button>
+                 <button title="Stop for a moment without ending the run (paused time isn't counted)" onclick="send('farming pause')">❚❚ Pause</button>`
               : `<button class="go" style="font-size:16px;padding:10px 22px" ${ready ? "" : "disabled title='Pick what to fight first'"} onclick="send('farming start')">▶ Start farming</button>
                  <button title="Farms the most common unclaimed mob within 30 yalms, with the camp where you stand" onclick="send('farming quick')">⚡ Quick start: farm what's here</button>`}
             <div><div class="fstatus" style="color:${statusCol}">${esc(statusText)}</div>
-              <div class="hint">${esc(selected)} ${farming ? `· ${mode === "list" ? esc(tgt.join(", ")) : mode === "aggro" ? "only what attacks us" : "anything nearby"}` : ready ? "· click Start farming" : "· step 1 below"}</div></div>
+              <div class="hint">${esc(selected)} ${farming ? `· ${mode === "list" ? esc(tgt.join(", ")) : mode === "aggro" ? "only what attacks us" : "anything nearby"}` : paused ? "· click Resume" : ready ? "· click Start farming" : "· step 1 below"}</div></div>
           </div>
           <div class="tiles">
             <div class="tile"><b>${run.secs ? mins(run.secs) : "—"}</b><span>this run</span></div>

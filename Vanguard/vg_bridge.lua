@@ -114,7 +114,7 @@ function bridge.farm(settings, state)
     local f = require('vg_farm')
     local on = settings.modules.farm
     local out = {}
-    if on then out.status = settings.enabled and (state.farm_status or 'starting') or 'stopped'
+    if on then out.status = settings.enabled and (state.farm_status or 'starting') or (state.farm_run and state.farm_run.paused and 'paused') or 'stopped'
     elseif state.farm_status and state.farm_status:find('^stopped: ') then out.status = state.farm_status end
     if state.recording then out.rec = #(state.recording_pts or {}) end
     if on then out.run = f.run_stats() end

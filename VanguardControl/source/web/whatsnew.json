@@ -1,5 +1,13 @@
 [
   {
+    "version": "1.41.0",
+    "date": "2026-10-16",
+    "items": [
+      "Farming: ❚❚ Pause and ▶ Resume. Stop for a moment (to trade, talk or move) without ending the run - the numbers carry on and paused time isn't counted.",
+      "When a run ends, a short summary appears in your game chat: time, kills, kills per hour, XP / CP and loot."
+    ]
+  },
+  {
     "version": "1.40.0",
     "date": "2026-10-16",
     "items": [

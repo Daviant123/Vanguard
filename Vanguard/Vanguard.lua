@@ -1,6 +1,6 @@
 _addon.name = 'Vanguard'
 _addon.author = 'Daviant'
-_addon.version = '0.50.0'
+_addon.version = '0.51.0'
 _addon.commands = {'vanguard', 'vg'}
 
 --[[
@@ -1877,6 +1877,10 @@ windower.register_event('addon command', function(cmd, ...)
             stop_running()
             if settings.farm.pull_back then farm.share_camp(windower.ffxi.get_player(), false) end
             log('Farming stopped')
+        elseif sub == 'pause' then
+            farm.pause(true) log('Farming paused')
+        elseif sub == 'resume' then
+            farm.pause(false) log('Farming resumed')
         elseif sub == 'quick' then
             -- "Quick start": farm the most common unclaimed mob within 30 yalms, camp here, go
             local best, ignored = nil, {}
