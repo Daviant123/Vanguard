@@ -1,6 +1,6 @@
 _addon.name = 'Vanguard'
 _addon.author = 'Daviant'
-_addon.version = '0.39.0'
+_addon.version = '0.40.0'
 _addon.commands = {'vanguard', 'vg'}
 
 --[[
@@ -112,6 +112,7 @@ local defaults = {
              wait_party = true, wait_hp = 70, wait_mp = 40, wait_near = 20, stop_full = true, stop_kills = 0,
              item = '', item_goal = 0,     -- farming for an item: stop when item_goal of it are in the inventory
              pull_back = false,           -- bring each mob back to camp before fighting (the others wait there)
+             prefer_best = false,         -- prefer the mob kind that pays best per minute (the mob report)
              packs = true, pack_range = 8, pack_strict = false },
     farmspots = { s0 = '' },      -- saved farm spots (vg_farm): s1, s2, ... = "name|zone|field=value|..." 
     -- "Spell>target" pairs. target = me or a party member name. "ja:" prefix = job ability.
@@ -1108,6 +1109,7 @@ local function ja_ready(name)
 end
 quick.init(settings, state, { log = log })
 warp.init(settings, state, { log = log })
+stats.kill_hook = function(mob) farm.on_kill(mob) end
 farm.init(settings, state, { log = log, run_toward = run_toward, stop_running = stop_running, face = face,
     party_engaged = party_engaged, recently = recently, mark = mark, save = function() store.save(settings) send_profile() end })
 finish.init(settings, state, { log = log, use_ws = use_ws, ws_in_range = ws_in_range, recently = recently, mark = mark })
@@ -1148,6 +1150,7 @@ local function tick()
     record_route()
     stats.tick(player)
     farm.loot_tick()
+    farm.fight_tick(player)
     farm.check_stop(player)
     warp.tick(player)
     alts.broadcast_mount(player)
@@ -1840,6 +1843,9 @@ windower.register_event('addon command', function(cmd, ...)
             stop_running()
             if settings.farm.pull_back then farm.share_camp(windower.ffxi.get_player(), false) end
             log('Farming stopped')
+        elseif sub == 'report' then
+            state.farm_report = {}                                  -- "Clear" on the mob report
+            log('Mob report cleared')
         elseif sub == 'camp' then
             -- "Set camp here"
             local me = windower.ffxi.get_mob_by_target('me')

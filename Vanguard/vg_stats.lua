@@ -67,6 +67,7 @@ function stats.on_message(actor_id, target_id, message_id, p1, p2)
             if not t or now() - t > 60 then          -- one kill per mob (several messages can name it)
                 seen_kill[target_id] = now()
                 s.kills = s.kills + 1
+                if stats.kill_hook then pcall(stats.kill_hook, mob) end   -- farming's mob report
             end
         end
     end

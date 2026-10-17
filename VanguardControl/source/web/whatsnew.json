@@ -1,5 +1,13 @@
 [
   {
+    "version": "1.30.0",
+    "date": "2026-10-16",
+    "items": [
+      "Farming: \"Which mob is worth it\". While you farm, Vanguard learns how long each kind of mob takes to kill and how much XP / CP it gives, and shows the best one with a star.",
+      "Tick \"Prefer the mob that pays best\" and when several mobs are near, it goes for the kind that gives the most points per minute."
+    ]
+  },
+  {
     "version": "1.29.0",
     "date": "2026-10-16",
     "items": [

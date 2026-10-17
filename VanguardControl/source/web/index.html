@@ -1450,6 +1450,18 @@ function farmTab(c, p) {
       </div>
     </div>
 
+    <div class="box"><h3>Which mob is worth it</h3>
+      ${arr(run.mobs).length ? `<table class="grid"><thead><tr><th style="text-align:left">Mob</th><th>Kills</th><th>A kill takes</th><th>XP / kill</th><th>CP / kill</th><th>Points a minute</th></tr></thead><tbody>
+        ${run.mobs.map((m, i) => `<tr><td style="text-align:left">${i === 0 && run.mobs.length > 1 ? "★ " : ""}<b>${esc(m.n)}</b></td><td>${m.k}</td><td>${m.avg}s</td><td>${fmtN(m.xp)}</td><td>${fmtN(m.cp)}</td>
+          <td><b style="color:${i === 0 ? "var(--good)" : "var(--text)"}">${fmtN(m.pm)}</b></td></tr>`).join("")}
+      </tbody></table>` : `<div class="hint">Fills in as it kills: how long each kind of mob takes and what it pays, so you can see which one is worth farming.</div>`}
+      <div class="row" style="margin-top:8px;align-items:center">
+        ${chk("Prefer the mob that pays best (when several are near)", !!x.farm_prefer, "set farm.prefer_best true", "set farm.prefer_best false")}
+        ${arr(run.mobs).length ? `<button style="font-size:11px" onclick="send('farming report')">Clear</button>` : ""}
+      </div>
+      <div class="hint" style="margin-top:4px">Points a minute = (XP + CP) per minute of fighting. It needs two kills of a kind before it prefers one.</div>
+    </div>
+
     <div class="fgrid">
     ${card(1, "What to fight", `
       ${segBtns(mode, [{v: "list", l: "Mobs I pick", cmd: "set farm.mode list"}, {v: "aggro", l: "Only what attacks us", cmd: "set farm.mode aggro"}, {v: "any", l: "Anything nearby", cmd: "set farm.mode any"}])}

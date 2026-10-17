@@ -207,7 +207,7 @@ local function best_target(me)
     for _, mob in pairs(mobs) do
         local verdict = farm.judge(mob, me, ids, center)
         if verdict then
-            local score = util.dist(mob) - (verdict == 'aggro' and 1000 or 0)
+            local score = util.dist(mob) * farm.pay_factor(mob.name) - (verdict == 'aggro' and 1000 or 0)
             local n = verdict == 'target' and farm.pack_count(mob, ids, mobs) or 0
             if n > 0 and S.farm.pack_strict then
                 state.farm_packed = state.farm_packed + 1     -- left for now: it has company
@@ -317,6 +317,66 @@ function farm.on_message(actor_id, target_id, message_id)
 end
 
 ------------------------------------------------------------------------
+-- mob report (round 11, farming 4/5): per kind of mob, how long a kill takes and what it pays (XP / CP per kill,
+-- points per minute of fighting) - DreamBot-style numbers, so you can see which mob is worth farming; "prefer the
+-- best" then picks the better-paying mob when several are near
+------------------------------------------------------------------------
+local function points() local st = require('vg_stats').get() or {} return st.exp or 0, st.cp or 0 end
+
+-- every tick while engaged: note when the fight with this mob started (and the XP / CP then)
+function farm.fight_tick(player)
+    if not S.modules.farm then return end
+    local t = windower.ffxi.get_mob_by_target('t')
+    if player.status == 1 and t and state.farm_fight ~= t.id then
+        local xp, cp = points()
+        state.farm_fight = t.id
+        state.farm_fight_info = { name = t.name, t = now(), xp = xp, cp = cp }
+    end
+    local p = state.farm_pending
+    if p and now() >= p.at then                 -- the XP message comes just after the kill
+        state.farm_pending = nil
+        local xp, cp = points()
+        state.farm_report = state.farm_report or {}
+        local r = state.farm_report[p.name] or { k = 0, secs = 0, xp = 0, cp = 0 }
+        r.k, r.secs = r.k + 1, r.secs + p.secs
+        r.xp, r.cp = r.xp + math.max(0, xp - p.xp), r.cp + math.max(0, cp - p.cp)
+        state.farm_report[p.name] = r
+    end
+end
+
+-- a party kill (from vg_stats): if it was the mob we were fighting, wait a moment for its XP, then record it
+function farm.on_kill(mob)
+    local f = state.farm_fight_info
+    if not f or state.farm_fight ~= mob.id then return end
+    state.farm_pending = { name = f.name, secs = math.max(1, now() - f.t), xp = f.xp, cp = f.cp, at = now() + 2 }
+    state.farm_fight, state.farm_fight_info = nil, nil
+end
+
+function farm.report()
+    local out = {}
+    for name, r in pairs(state.farm_report or {}) do
+        local pts = r.xp + r.cp
+        out[#out + 1] = { n = name, k = r.k, avg = math.floor(r.secs / r.k + 0.5), xp = math.floor(r.xp / r.k + 0.5),
+                          cp = math.floor(r.cp / r.k + 0.5), pm = math.floor(pts * 60 / math.max(1, r.secs) + 0.5) }
+    end
+    table.sort(out, function(a, b) if a.pm ~= b.pm then return a.pm > b.pm end return a.n < b.n end)
+    while #out > 10 do table.remove(out) end
+    return out
+end
+
+-- "prefer the best": a slower-paying mob counts as further away (by how much worse it pays)
+function farm.pay_factor(name)
+    if not S.farm.prefer_best then return 1 end
+    local rep, best = state.farm_report or {}, 0
+    for _, r in pairs(rep) do if r.k >= 2 then best = math.max(best, (r.xp + r.cp) / math.max(1, r.secs)) end end
+    local r = rep[name]
+    if best <= 0 or not r or r.k < 2 then return 1 end
+    local mine = (r.xp + r.cp) / math.max(1, r.secs)
+    if mine <= 0 then return 4 end
+    return math.min(4, best / mine)
+end
+
+------------------------------------------------------------------------
 -- the run: stats and stop conditions
 ------------------------------------------------------------------------
 local function kills_now() return (require('vg_stats').get() or {}).kills or 0 end
@@ -418,7 +478,7 @@ function farm.run_stats()
     local have = farm.item_have()
     return { secs = secs, kills = kills, kph = secs >= 120 and math.floor(kills * 3600 / secs + 0.5) or nil,
              every = kills > 0 and math.floor(secs / kills + 0.5) or nil, skipped = state.farm_skipped or 0,
-             loot = farm.loot_list(),
+             loot = farm.loot_list(), mobs = farm.report(),
              item = have and { n = S.farm.item, have = have, goal = S.farm.item_goal } or nil }
 end
 
@@ -561,7 +621,7 @@ end
 ------------------------------------------------------------------------
 local SPOT_FIELDS = { 'targets', 'ignore', 'claim', 'mode', 'range', 'height', 'pull_cmd', 'loop', 'aggro_first',
     'approach', 'route', 'area', 'camp', 'camp_zone', 'back_to_camp', 'wait_party', 'wait_hp', 'wait_mp', 'wait_near',
-    'packs', 'pack_range', 'pack_strict', 'item', 'item_goal', 'pull_back' }
+    'packs', 'pack_range', 'pack_strict', 'item', 'item_goal', 'pull_back', 'prefer_best' }
 
 local function spot_keys()
     local keys = {}
