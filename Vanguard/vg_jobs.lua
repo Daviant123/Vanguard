@@ -85,7 +85,7 @@ local common = {
     A('light_arts', 'Light Arts', 'Buffs', 'ja', 'Light Arts', {buff = 'Light Arts', when = 'always', on = {healer = true}}),
     A('dark_arts', 'Dark Arts', 'Buffs', 'ja', 'Dark Arts', {buff = 'Dark Arts', when = 'always', on = {nuker = true}}),
     A('refresh_self', 'Refresh (self)', 'Buffs', 'ma', 'Refresh', {when = 'always', on = {healer = true, nuker = true, support = true, tank = true}}),
-    A('phalanx_self', 'Phalanx (self)', 'Defense', 'ma', 'Phalanx', {when = 'combat', on = {tank = true}}),
+    A('phalanx_self', 'Phalanx (self)', 'Defense', 'ma', 'Phalanx', {buff = 'Phalanx', when = 'combat', on = {tank = true}}),
     A('stoneskin', 'Stoneskin', 'Defense', 'ma', 'Stoneskin', {when = 'combat'}),
     A('blink', 'Blink', 'Defense', 'ma', 'Blink', {when = 'combat'}),
     A('aquaveil', 'Aquaveil', 'Defense', 'ma', 'Aquaveil', {when = 'always'}),
@@ -196,15 +196,15 @@ jobs.PLD = {
     ws = {'Savage Blade', 'Chant du Cygne', 'Requiescat', 'Atonement', 'Sanguine Blade'},
     actions = {
         A('majesty', 'Majesty', 'Buffs', 'ja', 'Majesty', {buff = 'Majesty', when = 'combat', on = {tank = true}}),
-        A('crusade', 'Crusade', 'Buffs', 'ma', 'Crusade', {when = 'always', on = {tank = true}}),
-        A('phalanx', 'Phalanx', 'Defense', 'ma', 'Phalanx', {when = 'always', on = {tank = true}}),
-        A('reprisal', 'Reprisal', 'Defense', 'ma', 'Reprisal', {when = 'combat', on = {tank = true}}),
-        A('enlight2', 'Enlight II', 'Offense', 'ma', 'Enlight II', {when = 'combat', on = {tank = true}}),
+        A('crusade', 'Crusade', 'Buffs', 'ma', 'Crusade', {buff = 'Enmity Boost', when = 'always', on = {tank = true}}),
+        A('phalanx', 'Phalanx', 'Defense', 'ma', 'Phalanx', {buff = 'Phalanx', when = 'always', on = {tank = true}}),
+        A('reprisal', 'Reprisal', 'Defense', 'ma', 'Reprisal', {buff = 'Reprisal', shield = true, when = 'combat', on = {tank = true}}),
+        A('enlight2', 'Enlight II', 'Offense', 'ma', 'Enlight II', {buff_any = {'Enlight', 'Enlight II'}, when = 'combat', on = {tank = true}}),
         A('protect5', 'Protect V', 'Defense', 'ma', 'Protect V', {buff = 'Protect', when = 'always', on = {tank = true}}),
         A('shell4', 'Shell IV', 'Defense', 'ma', 'Shell IV', {buff = 'Shell', when = 'always', on = {tank = true}}),
         A('flash_pld', 'Flash (enmity)', 'Defense', 'ma', 'Flash', {target = '<t>', cooldown = 20, on = {tank = true}}),
-        A('shield_bash', 'Shield Bash', 'Defense', 'ja', 'Shield Bash', {target = '<t>', cooldown = 15, on = {tank = true}}),
-        A('palisade', 'Palisade', 'Defense', 'ja', 'Palisade', {buff = 'Palisade', on = {tank = true}}),
+        A('shield_bash', 'Shield Bash', 'Defense', 'ja', 'Shield Bash', {target = '<t>', cooldown = 15, shield = true, on = {tank = true}}),
+        A('palisade', 'Palisade', 'Defense', 'ja', 'Palisade', {buff = 'Palisade', shield = true, on = {tank = true}}),
         A('sentinel', 'Sentinel when HP < 40%', 'Defense', 'ja', 'Sentinel', {hpp_below = 40, on = {tank = true}}),
         A('rampart', 'Rampart when party is low', 'Defense', 'ja', 'Rampart', {party_below = 50, when = 'combat', on = {tank = true}}),
         A('chivalry', 'Chivalry at low MP', 'Recovery', 'ja', 'Chivalry', {mpp_below = 20, tp_min = 1000, on = {tank = true}}),
@@ -457,7 +457,7 @@ jobs.RUN = {
         A('battuta', 'Battuta', 'Defense', 'ja', 'Battuta', {buff = 'Battuta', on = {tank = true}}),
         A('foil', 'Foil', 'Defense', 'ma', 'Foil', {when = 'combat', on = {tank = true}}),
         A('crusade_run', 'Crusade', 'Buffs', 'ma', 'Crusade', {when = 'always', on = {tank = true}}),
-        A('phalanx_run', 'Phalanx', 'Defense', 'ma', 'Phalanx', {when = 'always', on = {tank = true}}),
+        A('phalanx_run', 'Phalanx', 'Defense', 'ma', 'Phalanx', {buff = 'Phalanx', when = 'always', on = {tank = true}}),
         A('temper', 'Temper', 'Buffs', 'ma', 'Temper', {when = 'combat', on = {tank = true}}),
         A('regen4_run', 'Regen IV (self)', 'Recovery', 'ma', 'Regen IV', {when = 'combat', on = {tank = true}}),
         A('flash_run', 'Flash (enmity)', 'Defense', 'ma', 'Flash', {target = '<t>', cooldown = 20, on = {tank = true}}),
@@ -471,12 +471,15 @@ jobs.RUN = {
 ------------------------------------------------------------------------
 function jobs.actions_for(job)
     local def = jobs[job]
-    local out, seen = {}, {}
+    local out, seen, same = {}, {}, {}
+    local function key(a) return a.kind .. '|' .. tostring(a.name) .. '|' .. tostring(a.target) end
     if def then
-        for _, a in ipairs(def.actions) do out[#out + 1] = a; seen[a.id] = true end
+        for _, a in ipairs(def.actions) do out[#out + 1] = a; seen[a.id] = true; same[key(a)] = true end
     end
+    -- a shared action the job already has its own copy of (PLD's Flash, Phalanx, Cure IV on self) is left out: with
+    -- both on, Flash went off twice in 3 s in his real game (2026-10-17)
     for _, a in ipairs(common) do
-        if not seen[a.id] then out[#out + 1] = a; seen[a.id] = true end
+        if not seen[a.id] and not same[key(a)] then out[#out + 1] = a; seen[a.id] = true end
     end
     return out
 end

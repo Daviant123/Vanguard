@@ -35,8 +35,41 @@ local function best_nuke(element, player, ready_only)
     return nil
 end
 
+-- Is a shield in the off hand? true / false, or nil when it can't be told (then it isn't held against anything).
+function engine.has_shield()
+    local eq = windower.ffxi.get_items('equipment')
+    if type(eq) ~= 'table' or eq.sub == nil then return nil end
+    if eq.sub == 0 then return false end
+    local it = windower.ffxi.get_items(eq.sub_bag or 0, eq.sub)
+    local r = it and it.id and it.id ~= 0 and require('resources').items[it.id]
+    if not r then return nil end
+    return (r.shield_size or 0) > 0
+end
+
+-- Actions the game refused ("That action requires a shield.", "Unable to use job ability."): paused (10 minutes for
+-- a missing shield / pet / weapon, 1 minute for a plain "unable") instead of retried every few seconds (his real game: Shield Bash while dual-wielding, 2026-10-17)
+local refused = {}          -- action id -> time it may be tried again
+local last_used             -- { id, label, t } the action engine's last command
+
+local REFUSED = { [199] = { 'it needs a shield', 600 }, [215] = { 'it needs a pet', 600 },
+                  [216] = { 'no ranged weapon equipped', 600 }, [307] = { 'it needs a two-handed weapon', 600 },
+                  [40] = { "it can't be used in this area", 600 },
+                  [87] = { 'the game says it is unable to use it', 60 }, [88] = { 'the game says it is unable to use it', 60 } }
+
+function engine.on_message(actor_id, message_id, me)
+    local r = REFUSED[message_id]
+    if not r or actor_id ~= me or not last_used or now() - last_used.t > 4 then return nil end
+    refused[last_used.id] = now() + r[2]
+    local l = last_used
+    last_used = nil
+    return ('%s paused for %s: %s'):format(l.label, r[2] >= 120 and (math.floor(r[2] / 60) .. ' minutes') or (r[2] .. ' seconds'), r[1])
+end
+
+function engine.refused(id) return refused[id] and now() < refused[id] end
+
 function engine.available(action, player, ja_set)
     ja_set = ja_set or ability_set()
+    if action.shield and engine.has_shield() == false then return false end
     if action.kind == 'ja' or action.kind == 'roll' then
         local ja = util.ability(action.name)
         return ja ~= nil and ja_set[ja.id] == true
@@ -263,6 +296,7 @@ local function try(a, ctx)
     end
 
     if done then
+        last_used = { id = a.id, label = a.label, t = now() }
         ctx.mark('act:' .. a.id)
         if a.once and mob then ctx.state.action_once[a.id] = mob.id end
     end
@@ -276,7 +310,8 @@ function engine.run(ctx, profile, filter)
     -- /DNC) would otherwise be tried, since an ability the character doesn't have has no recast and looks ready
     local ja_set = ability_set()
     for _, a in ipairs(engine.ordered(ctx.player.main_job, profile)) do
-        if (not filter or filter(a)) and engine.enabled(a, profile) and engine.available(a, ctx.player, ja_set) then
+        if (not filter or filter(a)) and engine.enabled(a, profile) and not engine.refused(a.id)
+            and engine.available(a, ctx.player, ja_set) then
             if try(engine.effective(a, profile), ctx) then return true end
         end
     end

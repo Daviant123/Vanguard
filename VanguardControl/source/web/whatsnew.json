@@ -1,5 +1,14 @@
 [
   {
+    "version": "1.53.2",
+    "date": "2026-10-17",
+    "items": [
+      "Shield Bash, Palisade and Reprisal are only used with a shield in your off hand (not while dual-wielding).",
+      "An ability or spell the game refuses (\"That action requires a shield.\", \"Unable to use job ability.\") is paused for a while instead of retried every few seconds; the activity log says so.",
+      "Paladin: Crusade, Phalanx, Enlight II and Reprisal are no longer re-cast while they're still up, and Flash no longer goes off twice in a row."
+    ]
+  },
+  {
     "version": "1.53.1",
     "date": "2026-10-17",
     "items": [

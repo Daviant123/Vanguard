@@ -1,6 +1,6 @@
 _addon.name = 'Vanguard'
 _addon.author = 'Daviant'
-_addon.version = '0.63.1'
+_addon.version = '0.63.2'
 _addon.commands = {'vanguard', 'vg'}
 
 --[[
@@ -1325,6 +1325,9 @@ local buffed_msgs = S{230, 266, 280, 319}
 
 windower.register_event('action message', function(actor_id, target_id, actor_index, target_index, message_id, p1, p2)
     stats.on_message(actor_id, target_id, message_id, p1, p2)
+    local me = windower.ffxi.get_player()
+    local paused = me and engine.on_message(actor_id, message_id, me.id)
+    if paused then log(paused) end
     farm.on_message(actor_id, target_id, message_id)
 end)
 
