@@ -769,6 +769,11 @@ end
 
 function farm.check_stop(player)
     if not S.modules.farm or not S.enabled then return false end
+    -- once a second is plenty (it looks through the inventory); a KO is checked every time
+    if not (player.status == 2 or player.status == 3) then
+        if state.farm_stop_t and now() - state.farm_stop_t < 1 then return false end
+        state.farm_stop_t = now()
+    end
     local why = stop_reason(player)
     if not why then return false end
     farm.finish(player, why)

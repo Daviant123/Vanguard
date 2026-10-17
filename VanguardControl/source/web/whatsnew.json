@@ -1,5 +1,12 @@
 [
   {
+    "version": "1.42.1",
+    "date": "2026-10-16",
+    "items": [
+      "Farming is a little lighter on the game (it checks the bags once a second, not constantly). The Vanguard page on GitHub has a full farming guide."
+    ]
+  },
+  {
     "version": "1.42.0",
     "date": "2026-10-16",
     "items": [

@@ -243,13 +243,36 @@ Farming tab > How to fight: **Pick mobs on their own first** (on) - a mob with o
 them along, so lone mobs are pulled first. **Never pull one with others next to it** waits until one is alone (purple
 on the radar). Mobs attacking you are always fought.
 
-## Farming (rebuilt in 0.36.0 / Vanguard Control 1.26.0)
+## Farming (Farming tab)
 
-Farming tab: a live radar and the run's numbers on top, then **What to fight** (mobs you pick with Look around / only
-what attacks you / anything nearby), **Where** (a camp it returns to, or a recorded route), **How to fight** (pull with,
-rest at), **The team** (others follow and help in one click; wait for the party's HP / MP before each pull), **Finish
-mobs with a weapon skill**, **Stop when** (inventory full, after N kills) and **Trusts**. Then **Start farming**.
-Mobs it can't reach are skipped. **Save this farm** keeps it all as a farm spot for next time.
+**The fastest way:** stand where you want to farm and click **⚡ Quick start: farm what's here**. It farms the most
+common unclaimed mob within 30 yalms, with the camp where you stand. Or:
+
+1. **Quick setups** - one click for an *XP / CP party*, *item farming*, *safe and careful* or *clear everything*.
+2. **What to fight** - *Mobs I pick* (Look around, then **Fight these**; or click a mob on the radar), *Only what
+   attacks us*, or *Anything nearby*. Mobs that nearly KO the farmer are set aside as **too strong** (↺ to fight them
+   again). Optionally **/check** each new kind and skip *Too Weak* (no XP) or *Incredibly Tough* / NMs.
+3. **Where** - *Stay around a camp* (it walks back after each kill; **bring each mob back to camp** and the team waits
+   there) or *Walk a route* you record by walking it. Save several **farm spots** and tick "move on to the next saved
+   spot" to rotate when one runs dry.
+4. **Start farming.**
+
+**On the dashboard:** what it's doing right now, time, kills, kills / hour, XP and CP / hour, bag space, the XP / CP
+chain, loot this run, a kills-per-5-minutes chart and a live **radar** (zoom Fit / 30 / 60 / 120 yalms). The
+**checklist** shows with green ticks and red crosses why it is or isn't pulling (mobs picked, camp set, mobs nearby,
+party ready, resting, bag space, Reraise, food). **Pause** stops for a moment without ending the run.
+
+**All settings:** pull with Provoke / Flash / a ranged attack (used as soon as the mob is in reach, so it's yours
+sooner), walk up or let it come, rest levels, rest at camp while idle, Treasure Hunter (GearSwap TreasureMode), save TP
+on nearly dead mobs; **The team** - others follow and help in one click, wait for everyone's HP / MP before each pull
+(whoever is low is told to rest), keep the XP / CP chain going, sleep extra mobs; **Finish mobs with a weapon skill**;
+**Stop when** - inventory full, after N kills or minutes, when you have N of an item; **when done** - stay, everyone
+warps home or everyone logs out; **Trusts**, sorted by role.
+
+**Safety nets:** it never chases a mob it can't reach (skipped for a while), lets go of a mob someone else claims or one
+it can't hurt, helps a party member who is attacked (the healer first), doesn't sit down to rest while something is
+hitting the party, and stops if it is KO'd or changes zone. The Alarms ring when farming stops or has had nothing to
+fight for 5 minutes. **Past runs** keeps the history of every run.
 
 ## Finish mobs with a weapon skill (new in 0.34.0)
 
