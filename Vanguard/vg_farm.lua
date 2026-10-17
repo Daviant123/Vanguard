@@ -117,9 +117,9 @@ function farm.party_wait(player)
 end
 
 -- low on HP / MP while waiting: rest (the farmer itself), or tell that character to rest (IPC on this PC)
-local function rest_for(player, who)
+local function rest_for(player, who, attacked)
     if who == player.name then
-        if not state.resting and player.status == 0 and not h.recently('farm:rest', 8) then
+        if not attacked and not state.resting and player.status == 0 and not h.recently('farm:rest', 8) then
             h.mark('farm:rest')
             windower.send_command('input /heal on')
             state.resting = true

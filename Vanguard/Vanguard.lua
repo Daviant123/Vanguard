@@ -1,6 +1,6 @@
 _addon.name = 'Vanguard'
 _addon.author = 'Daviant'
-_addon.version = '0.47.0'
+_addon.version = '0.47.1'
 _addon.commands = {'vanguard', 'vg'}
 
 --[[
@@ -841,6 +841,20 @@ end
 ------------------------------------------------------------------------
 -- Rest, MP management, trusts (CurePlease / EasyFarm style)
 ------------------------------------------------------------------------
+-- Something attacking the party right now (a mob our party has claimed, alive, close by)? Then nobody sits down to rest.
+-- (Found by the farming simulator: a mob hitting a low-HP farmer interrupted its rest, and it sat down again, and again.)
+local function under_attack(player)
+    local ids = {}
+    local p = windower.ffxi.get_party() or {}
+    for _, k in ipairs({ 'p0', 'p1', 'p2', 'p3', 'p4', 'p5' }) do if p[k] and p[k].mob then ids[p[k].mob.id] = true end end
+    for _, m in pairs(windower.ffxi.get_mob_array() or {}) do
+        if type(m) == 'table' and m.spawn_type == 16 and (m.hpp or 0) > 0 and m.claim_id and ids[m.claim_id] and util.dist(m) <= 20 then
+            return true
+        end
+    end
+    return false
+end
+
 local function do_rest(player)
     if not settings.modules.rest then return false end
     local v, r = player.vitals, settings.rest
@@ -855,7 +869,7 @@ local function do_rest(player)
         end
         return false
     end
-    if player.status ~= 0 or party_engaged(player) or state.running then return false end
+    if player.status ~= 0 or party_engaged(player) or state.running or under_attack(player) then return false end
     local low_mp = (v.max_mp or 0) > 0 and v.mpp < r.mp_low
     if (v.hpp < r.hp_low or low_mp) and not recently('rest', 6) then
         mark('rest')
@@ -1157,6 +1171,8 @@ local function tick()
     local player = windower.ffxi.get_player()
     if not player then return end
     record_route()
+    -- a rest that ended without us (hit by a mob, moved): stop thinking we're resting
+    if state.resting and player.status ~= 33 and not recently('rest', 3) and not recently('farm:rest', 3) then state.resting = false end
     stats.tick(player)
     farm.loot_tick()
     farm.kill_watch()

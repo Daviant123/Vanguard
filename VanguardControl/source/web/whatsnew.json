@@ -1,5 +1,12 @@
 [
   {
+    "version": "1.37.1",
+    "date": "2026-10-16",
+    "items": [
+      "Fixed: a character low on HP that got attacked kept trying to sit down and rest instead of fighting back. Now nobody rests while a mob is attacking the party."
+    ]
+  },
+  {
     "version": "1.37.0",
     "date": "2026-10-16",
     "items": [
