@@ -1534,6 +1534,8 @@ function farmTab(c, p) {
               <span><b>${run.item.have}</b> / ${run.item.goal || "?"} in the bags</span></div>
               <div class="hpbar" style="height:8px"><div style="background:var(--good);width:${run.item.goal ? Math.min(100, run.item.have * 100 / run.item.goal) : 0}%"></div></div></div>` : ""}
           ${arr(run.loot).length ? `<div style="margin-top:8px"><b style="font-size:12px;color:var(--accent)">Loot this run</b>
+              ${run.value ? `<span title="Auction-house medians from Steward's price list${run.value.unpriced ? `; ${run.value.unpriced} item(s) without a price aren't counted` : ""}">
+                ≈ <b>${fmtN(run.value.gil)}</b> gil${run.secs >= 300 ? ` (${fmtN(Math.round(run.value.gil * 3600 / run.secs))} / hour)` : ""}</span>` : ""}
               ${run.loot.map(l => `<span class="btag" style="font-size:12px">${l.c} × ${esc(l.n)}</span>`).join("")}</div>` : ""}
           <div class="row" style="margin-top:10px;align-items:center">
             <b style="font-size:12px;color:var(--accent)">Farm spots</b>

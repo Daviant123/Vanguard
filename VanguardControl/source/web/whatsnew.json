@@ -1,5 +1,12 @@
 [
   {
+    "version": "1.47.0",
+    "date": "2026-10-17",
+    "items": [
+      "Farming shows roughly what your loot is worth - and gil per hour - using the auction-house prices Steward has looked up (if you use Steward)."
+    ]
+  },
+  {
     "version": "1.46.1",
     "date": "2026-10-17",
     "items": [

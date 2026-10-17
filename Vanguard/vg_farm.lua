@@ -700,6 +700,35 @@ function farm.item_have()
     return inv_counts()[id] or 0
 end
 
+-- loot value (upgrade 17, the gil / hour DreamBot-style clients show): auction-house medians from Steward's price list
+-- (addons/Steward/data/prices.lua, read only, if Steward is there); items it hasn't priced aren't counted
+local prices, prices_t
+function farm.set_prices(t) prices, prices_t = t, now() end
+local function price_list()
+    if prices and prices_t and now() - prices_t < 600 then return prices end
+    local ok, t = pcall(function()
+        local f = io.open(windower.addon_path .. '../Steward/data/prices.lua', 'r')
+        if not f then return nil end
+        local src = f:read('*a') f:close()
+        local chunk = (loadstring or load)(src)
+        return chunk and chunk() or nil
+    end)
+    prices, prices_t = (ok and type(t) == 'table') and t or (prices or {}), now()
+    return prices
+end
+
+function farm.loot_value()
+    local pl = price_list()
+    local total, priced, unpriced = 0, 0, 0
+    for id, n in pairs(state.farm_loot or {}) do
+        local p = pl[id]
+        if type(p) == 'table' and tonumber(p.m) then total, priced = total + n * tonumber(p.m), priced + n
+        else unpriced = unpriced + n end
+    end
+    if priced == 0 then return nil end
+    return { gil = total, priced = priced, unpriced = unpriced }
+end
+
 function farm.loot_list()
     local out = {}
     for id, n in pairs(state.farm_loot or {}) do out[#out + 1] = { n = item_name(id), c = n } end
@@ -773,7 +802,7 @@ function farm.run_stats()
     return { secs = secs, kills = kills, kph = secs >= 120 and math.floor(kills * 3600 / secs + 0.5) or nil,
              every = kills > 0 and math.floor(secs / kills + 0.5) or nil, skipped = state.farm_skipped or 0,
              loot = farm.loot_list(), mobs = farm.report(), chain = farm.chain_info(), free = farm.inv_free(),
-             spark = farm.spark(), busy = state.farm_busy, checks = state.farm_checks,
+             spark = farm.spark(), busy = state.farm_busy, checks = state.farm_checks, value = farm.loot_value(),
              item = have and { n = S.farm.item, have = have, goal = S.farm.item_goal } or nil, paused = r.paused and true or nil }
 end
 
