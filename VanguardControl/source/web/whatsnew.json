@@ -1,5 +1,14 @@
 [
   {
+    "version": "1.37.0",
+    "date": "2026-10-16",
+    "items": [
+      "Farming claims faster: with a pull set (ranged attack, Provoke, a spell), the farmer uses it as soon as the mob is in reach instead of walking up first - so it's yours sooner and comes to you.",
+      "The Farming tab now opens in a Simple view with just what you need; \"All settings\" shows everything.",
+      "Behind the scenes: a farming simulator now plays out whole farming sessions in the tests (walking, walls, claims, rests, routes), so problems like \"not moving to attack\" get caught before they reach you."
+    ]
+  },
+  {
     "version": "1.36.0",
     "date": "2026-10-16",
     "items": [

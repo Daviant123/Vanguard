@@ -264,6 +264,20 @@ local function engage(me, mob)
     if t and farm.judge(t, me, ids, center_of(me)) then
         local go, d = progress(t)
         if not go then return false end
+        -- claim from range (upgrade 7): with a pull set, use it as soon as the mob is within that pull's reach - before
+        -- walking up or engaging - so it's ours sooner (and comes to us)
+        local pr = farm.pull_range()
+        local mine = t.claim_id and t.claim_id ~= 0 and ids[t.claim_id]
+        if pr and not mine and not state.farm_pulled[t.id] then
+            if d > pr then walk_to(me, t, d) return false end
+            state.farm_pulled[t.id] = true
+            h.stop_running()
+            h.face(me, t)
+            windower.send_command(S.farm.pull_cmd)
+            status(('pulling %s (%d yalms)'):format(t.name, math.floor(d + 0.5)))
+            state.busy_until = math.max(state.busy_until or 0, now() + 2)
+            return true
+        end
         -- too far to engage: walk first (the old code sent /attack from 35 yalms every 3 s and never moved)
         if d > ATTACK_RANGE then walk_to(me, t, d) return false end
         if h.recently('farm:attack', 4) then return false end
@@ -295,6 +309,16 @@ local function engage(me, mob)
     windower.send_command('input /targetbnpc')
     state.busy_until = math.max(state.busy_until or 0, now() + 0.8)
     return true
+end
+
+-- how far the pull command reaches (a ranged attack about 24 yalms, a spell 20, an ability like Provoke 16)
+function farm.pull_range()
+    local c = S.farm.pull_cmd or ''
+    if c == '' then return nil end
+    if c:find('/ra ', 1, true) then return 23 end
+    if c:find('/ma ', 1, true) then return 19 end
+    if c:find('/ja ', 1, true) then return 15 end
+    return nil
 end
 
 -- the pull command once per mob, right after engaging while it's still away (before any abilities)

@@ -1423,6 +1423,9 @@ function bringTeam(farmer) {    // everyone else follows and helps the farmer
     else { post(n, "leader " + farmer); post(n, "follow on"); post(n, "assist on"); post(n, "on"); }
   }
 }
+let farmView = "simple";
+try { farmView = localStorage.getItem("vg.farmview") || "simple"; } catch (e) {}
+function setFarmView(v) { farmView = v; try { localStorage.setItem("vg.farmview", v); } catch (e) {} bodyKey = ""; render(); }
 function farmTab(c, p) {
   const s = c.snapshot || {}, x = (p.config || {}).extra || {}, mods = (p.config || {}).modules || s.modules || {};
   const known = (p.config || {}).known || {};
@@ -1458,7 +1461,10 @@ function farmTab(c, p) {
   const statusText = farming ? cap(f.status || "starting") : f.status && f.status.startsWith("stopped: ") ? cap(f.status) : ready ? "Ready" : "Pick what to fight";
   const statusCol = !farming ? "var(--muted)" : /^(waiting|at camp)/.test(f.status || "") ? "var(--tp)" : /^(fighting|going|bringing|walking)/.test(f.status || "") ? "var(--good)" : "var(--text)";
 
+  const all = farmView === "all";
   return `<div class="stack">
+    <div class="row" style="justify-content:flex-end;align-items:center;gap:8px"><span class="hint">Show</span>
+      <div class="seg"><button class="${all ? "" : "on"}" onclick="setFarmView('simple')">Simple</button><button class="${all ? "on" : ""}" onclick="setFarmView('all')">All settings</button></div></div>
     <div class="box" style="border-color:${farming ? "var(--good)" : "var(--line)"}">
       <div class="fdash">
         <div>
@@ -1524,7 +1530,7 @@ function farmTab(c, p) {
       </div></div>`;
     })()}
 
-    <div class="box"><h3>Which mob is worth it</h3>
+    ${all ? `<div class="box"><h3>Which mob is worth it</h3>
       ${arr(run.mobs).length ? `<table class="grid"><thead><tr><th style="text-align:left">Mob</th><th>Kills</th><th>A kill takes</th><th>XP / kill</th><th>CP / kill</th><th>Points a minute</th></tr></thead><tbody>
         ${run.mobs.map((m, i) => `<tr><td style="text-align:left">${i === 0 && run.mobs.length > 1 ? "★ " : ""}<b>${esc(m.n)}</b></td><td>${m.k}</td><td>${m.avg}s</td><td>${fmtN(m.xp)}</td><td>${fmtN(m.cp)}</td>
           <td><b style="color:${i === 0 ? "var(--good)" : "var(--text)"}">${fmtN(m.pm)}</b></td></tr>`).join("")}
@@ -1534,7 +1540,7 @@ function farmTab(c, p) {
         ${arr(run.mobs).length ? `<button style="font-size:11px" onclick="send('farming report')">Clear</button>` : ""}
       </div>
       <div class="hint" style="margin-top:4px">Points a minute = (XP + CP) per minute of fighting. It needs two kills of a kind before it prefers one.</div>
-    </div>
+    </div>` : ""}
 
     <div class="box"><h3>Quick setups</h3>
       <div class="row" style="flex-wrap:wrap;gap:8px">
@@ -1599,7 +1605,9 @@ function farmTab(c, p) {
       </div>
       <div class="hint" style="margin-top:6px">The radar shows the camp area (dashed ring) or the route (blue line).</div>`)}
 
-    ${card(3, "How to fight", `
+    ${!all ? `<div class="box"><div class="row" style="align-items:center"><span class="hint">Pulling, the team, finishing weapon skill, stop conditions and trusts are under</span>
+      <button onclick="setFarmView('all')">All settings</button></div></div>` : ""}
+    ${!all ? "" : card(3, "How to fight", `
       <div class="row">
         <label class="field">Pull with ${sel("farmpull ", pullOpts, pullCur)}</label>
         <label class="field">Then ${sel("set farm.approach ", [{v: "true", l: "walk up to it"}, {v: "false", l: "let it come to me"}], x.farm_approach === false ? "false" : "true")}</label>
@@ -1618,7 +1626,7 @@ function farmTab(c, p) {
         (can't see them, can't get closer) are skipped for a couple of minutes instead of being chased forever. A mob with others standing
         next to it can bring them along: mobs on their own are picked first (purple on the radar = left because it has company).</div>`)}
 
-    ${card(4, "The team", `
+    ${!all ? "" : card(4, "The team", `
       <div class="row" style="align-items:center">
         ${others.length ? `<button class="primary" onclick="bringTeam('${esc(selected)}')">Others follow and help ${esc(selected)}</button>
           <span class="hint">${following.length ? `Following now: ${esc(following.join(", "))}` : "Nobody is following yet"}</span>`
@@ -1638,9 +1646,9 @@ function farmTab(c, p) {
         Something already attacking you is always fought.</div>
       <div class="row" style="margin-top:8px">${chk("Keep the XP / CP chain going (while a chain runs, wait only if HP is under 40% or MP under 15%)", !!x.farm_keep_chain, "set farm.keep_chain true", "set farm.keep_chain false")}</div>` : ""}`)}
 
-    ${finishBox(p)}
+    ${all ? finishBox(p) : ""}
 
-    ${card(5, "Stop when", `
+    ${!all ? "" : card(5, "Stop when", `
       <div class="row" style="flex-wrap:wrap;gap:6px 18px">
         ${chk("The inventory is full", x.farm_stop_full !== false, "set farm.stop_full true", "set farm.stop_full false")}
         <label class="field">After ${sel("set farm.stop_kills ", [{v: 0, l: "no limit"}].concat(nums([10, 25, 50, 100, 200, 500], " kills")), x.farm_stop_kills ?? 0)}</label>
@@ -1657,7 +1665,7 @@ function farmTab(c, p) {
       <div class="hint" style="margin-top:4px">Pick something you already have or that dropped this run; it stops when that many are in the inventory.</div>
       <div class="hint" style="margin-top:6px">It also stops if ${esc(selected)} is KO'd or changes zone. The Alarms ring when farming stops.</div>`)}
 
-    ${card(6, "Trusts (optional)", (() => {
+    ${!all ? "" : card(6, "Trusts (optional)", (() => {
       const picked = String(x.trusts_list || "").split(",").map(t => t.trim()).filter(Boolean);
       const avail = arr(known.trusts).filter(t => !picked.some(q => lc(q) === lc(t))).sort();
       return `<div class="row" style="align-items:flex-start;gap:18px">
