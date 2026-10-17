@@ -224,6 +224,16 @@ function farm.pack_count(mob, ids, mobs)
     return n
 end
 
+-- is this index another party member (not the farmer)?
+function farm.on_party_member(index)
+    local p = windower.ffxi.get_party() or {}
+    local me = windower.ffxi.get_player()
+    for _, k in ipairs({ 'p1', 'p2', 'p3', 'p4', 'p5' }) do
+        if p[k] and p[k].mob and p[k].mob.index == index and (not me or p[k].mob.id ~= me.id) then return true end
+    end
+    return false
+end
+
 local function best_target(me)
     local _, ids = party()
     local center = center_of(me)
@@ -239,6 +249,10 @@ local function best_target(me)
         end
         if verdict then
             local score = util.dist(mob) * farm.pay_factor(mob.name) - (verdict == 'aggro' and 1000 or 0)
+            -- protect the party (upgrade 10): a mob hitting another party member (the healer) comes before one on us
+            if verdict == 'aggro' and mob.target_index and mob.target_index ~= 0 and farm.on_party_member(mob.target_index) then
+                score = score - 1000
+            end
             local n = verdict == 'target' and farm.pack_count(mob, ids, mobs) or 0
             if n > 0 and S.farm.pack_strict then
                 state.farm_packed = state.farm_packed + 1     -- left for now: it has company
@@ -280,7 +294,17 @@ end
 local function engage(me, mob)
     local _, ids = party()
     local t = windower.ffxi.get_mob_by_target('t')
-    if t and farm.judge(t, me, ids, center_of(me)) then
+    -- fight what's targeted only if it's the mob we chose (or one as good: on the list, not attacking someone else);
+    -- otherwise /targetbnpc picked a nearer one - walk closer to ours (found by the team simulator: it took the goblin
+    -- on itself instead of the one hitting the healer)
+    local tv = t and farm.judge(t, me, ids, center_of(me))
+    local chosen_v = farm.judge(mob, me, ids, center_of(me))
+    local tries = (state.farm_go and state.farm_go.id == mob.id) and state.farm_go.tries or 0
+    if tv and t.id ~= mob.id and tries < 4 and (chosen_v == 'aggro' and tv ~= 'aggro' or
+        (mob.target_index and farm.on_party_member(mob.target_index) and not (t.target_index and farm.on_party_member(t.target_index)))) then
+        tv = nil
+    end
+    if t and tv then
         local go, d = progress(t)
         if not go then return false end
         -- claim from range (upgrade 7): with a pull set, use it as soon as the mob is within that pull's reach - before

@@ -1525,7 +1525,15 @@ function farmTab(c, p) {
         [arr(s.buffs).some(b => /^Reraise/.test(b.n)), "Reraise up", "no Reraise on " + selected + " (Upkeep, Team tab)"],
         [arr(s.buffs).some(b => b.n === "Food"), "Food up", "no food on " + selected + " (Upkeep, Team tab)"],
       ];
-      return `<div class="box"><h3>Checklist: why it is (or isn't) pulling</h3><div class="row" style="flex-wrap:wrap;gap:4px 18px">
+      const team = Object.keys(chars).filter(n => chars[n].online).sort((a, b) => (a === selected ? -1 : b === selected ? 1 : a.localeCompare(b)));
+      const teamBox = team.length > 1 ? `<div class="box"><h3>The team right now</h3><div class="row" style="flex-wrap:wrap;gap:10px">
+        ${team.map(n => { const ts = chars[n].snapshot || {};
+          return `<div style="min-width:150px;flex:1;max-width:240px;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:6px 8px">
+            <div class="row" style="justify-content:space-between"><b>${esc(n)}${n === selected ? ' <span class="hint">(farming)</span>' : ""}</b><span class="hint">${esc(ts.job || "")}</span></div>
+            <div class="bars" style="margin-top:4px">${bar(ts.hpp, "var(--hp)", 100, "HP")}${bar(ts.mpp, "var(--mp)", 100, "MP")}</div>
+            <div class="hint" style="margin-top:3px">${esc(ts.status || "")}${ts.target ? ` · ${esc(ts.target)} ${ts.target_hpp}%` : ""}${n !== selected && lc(ts.leader) === lc(selected) ? " · following" : ""}</div></div>`; }).join("")}
+      </div></div>` : "";
+      return teamBox + `<div class="box"><h3>Checklist: why it is (or isn't) pulling</h3><div class="row" style="flex-wrap:wrap;gap:4px 18px">
         ${checks.map(([ok, label, why]) => `<span title="${esc(ok === false ? why : "")}">${ok === null ? "<span class='hint'>•</span>" : ok ? "<b style='color:var(--good)'>✓</b>" : "<b style='color:var(--bad)'>✗</b>"} ${esc(label)}${ok === false ? ` <span class="hint">- ${esc(why)}</span>` : ""}</span>`).join("")}
       </div></div>`;
     })()}
@@ -1813,7 +1821,7 @@ function renderPanel() {
     (chars[n].snapshot || {}).mpp, (chars[n].snapshot || {}).tp, (chars[n].snapshot || {}).status, (chars[n].snapshot || {}).target,
     (chars[n].snapshot || {}).foe]) : 0;
   const bk = JSON.stringify([tab, p, s.leader, Object.keys(chars), team, tab === "app" ? [addon, crashes] : 0, tab === "strat" ? s.strat : 0, tab === "adv" || tab === "farm" ? c.nearby : 0,
-    tab === "farm" ? [farmRuns.length, s.farm, s.enabled, s.stats, s.modules, s.status, Object.keys(chars).map(n => [(chars[n].snapshot || {}).leader, chars[n].online])] : 0,
+    tab === "farm" ? [farmRuns.length, s.farm, s.enabled, s.stats, s.modules, s.status, Object.keys(chars).map(n => { const q = chars[n].snapshot || {}; return [q.leader, chars[n].online, q.hpp, q.mpp, q.status, q.target, q.target_hpp]; })] : 0,
     tab === "team" ? [warpArm, Object.keys(chars).map(n => ((((chars[n].profile || {}).config || {}).known) || {}).warp), stopTimer.until, Math.floor((stopTimer.left || 0) / 60)] : 0]);
   if (bk === bodyKey) return;
   bodyKey = bk;

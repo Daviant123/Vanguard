@@ -1,5 +1,13 @@
 [
   {
+    "version": "1.39.0",
+    "date": "2026-10-16",
+    "items": [
+      "Farming protects the party: between pulls, a mob hitting your healer (or any other party member) is dealt with before one hitting the farmer.",
+      "\"The team right now\" on the Farming tab shows every character's HP, MP and what they're doing, without switching tabs."
+    ]
+  },
+  {
     "version": "1.38.1",
     "date": "2026-10-16",
     "items": [
