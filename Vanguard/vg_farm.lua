@@ -686,9 +686,16 @@ function farm.loot_tick()
     local cur = inv_counts()
     local before = state.farm_inv or cur
     state.farm_loot = state.farm_loot or {}
+    local watched = {}
+    for _, w in ipairs(list(S.farm.watch)) do watched[w:lower()] = true end
     for id, n in pairs(cur) do
         local gained = n - (before[id] or 0)
-        if gained > 0 then state.farm_loot[id] = (state.farm_loot[id] or 0) + gained end
+        if gained > 0 then
+            state.farm_loot[id] = (state.farm_loot[id] or 0) + gained
+            -- rare drop alert (upgrade 19): an item on the watch list - say it (the app's Alarms ring on "Farming: ")
+            local nm = item_name(id)
+            if watched[nm:lower()] then h.log(('Farming: got %s!'):format(nm)) end
+        end
     end
     state.farm_inv = cur
 end

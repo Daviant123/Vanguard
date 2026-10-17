@@ -178,7 +178,7 @@ func (h *hub) alarmFromLog(who, text string) {
 		return
 	}
 	// farming: it stopped (a goal reached, KO'd, full bags, zoned) or has had nothing to fight for 5 minutes
-	if alarmCfg.Farm && (strings.HasPrefix(text, "Farming stopped: ") || strings.HasPrefix(text, "Farming: nothing to fight")) {
+	if alarmCfg.Farm && (strings.HasPrefix(text, "Farming stopped: ") || strings.HasPrefix(text, "Farming: ")) {
 		h.raiseAlarm(who, "farm", strings.TrimPrefix(text, "Farming stopped: "))
 		return
 	}

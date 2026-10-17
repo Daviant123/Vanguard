@@ -1743,6 +1743,13 @@ function farmTab(c, p) {
         ${x.farm_item ? `<label class="field">until I have ${sel("set farm.item_goal ", [1, 3, 5, 10, 12, 20, 30, 50, 99, 100, 200, 500].map(v => ({v, l: v + ""})), x.farm_item_goal || 12)}</label>` : ""}
       </div>
       <div class="hint" style="margin-top:4px">Pick something you already have or that dropped this run; it stops when that many are in the inventory.</div>
+      ${(() => {
+        const watch = String(x.farm_watch || "").split(",").map(t => t.trim()).filter(Boolean);
+        const names = Array.from(new Set(arr(x.inv_items).concat(arr(run.loot).map(l => l.n)))).filter(n => !watch.includes(n)).sort();
+        return `<div class="row" style="margin-top:8px;align-items:center;flex-wrap:wrap"><span class="hint">Ring when one of these drops:</span>
+          ${watch.map(n => `<span class="btag" style="font-size:12px">🔔 ${esc(n)} <a href="#" style="color:var(--bad);text-decoration:none" title="Remove" onclick="send('farmwatch remove ${esc(n)}');return false">×</a></span>`).join("") || `<span class="hint">nothing</span>`}
+          ${sel("farmwatch add ", [{v: "", l: "+ add an item..."}].concat(names.map(n => ({v: n, l: n}))), "")}</div>`;
+      })()}
       <div class="hint" style="margin-top:6px">It also stops if ${esc(selected)} is KO'd or changes zone. The Alarms ring when farming stops.</div>`)}
 
     ${!all ? "" : card(6, "Trusts (optional)", (() => {

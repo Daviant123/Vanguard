@@ -98,7 +98,9 @@ func TestAlarms(t *testing.T) {
 	h.alarmFromLog("CharB", "Farming stopped: 12 Beastmen's Seal in the bags")
 	h.alarmFromLog("CharB", "Farming: nothing to fight for 5 minutes")
 	h.alarmFromLog("CharB", "Farming started")
-	if a := active(); len(a) != 2 || a[0].Kind != "farm" || a[0].Text != "12 Beastmen's Seal in the bags" {
+	h.alarmFromLog("CharB", "Farming key: CTRL+F9")
+	h.alarmFromLog("CharB", "Farming: got Kindred's Crest!")
+	if a := active(); len(a) != 3 || a[0].Kind != "farm" || a[0].Text != "12 Beastmen's Seal in the bags" || a[2].Text != "Farming: got Kindred's Crest!" {
 		t.Errorf("farming stopped / idle ring, starting doesn't: %+v", a)
 	}
 	call("do=ok")

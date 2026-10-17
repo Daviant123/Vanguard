@@ -1,6 +1,6 @@
 _addon.name = 'Vanguard'
 _addon.author = 'Daviant'
-_addon.version = '0.58.0'
+_addon.version = '0.59.0'
 _addon.commands = {'vanguard', 'vg'}
 
 --[[
@@ -126,6 +126,7 @@ local defaults = {
              polite = true,                       -- leave unclaimed mobs another player is standing next to
              hotkey = '',                         -- a key that starts / stops farming from the game window (^f9 ...)
              emergency = '', emergency_hp = 25,   -- under this HP % in a fight: this item / ability (from a menu)
+             watch = '',                          -- rare drop alert: items that ring the app's Alarms when they drop
              packs = true, pack_range = 8, pack_strict = false },
     farmspots = { s0 = '' },
     trials = { t0 = '' }, trial_assist = '',   -- Magian trials (vg_trials): t1 = "kind|goal|ws|mobs|count"      -- saved farm spots (vg_farm): s1, s2, ... = "name|zone|field=value|..." 
@@ -1990,6 +1991,17 @@ windower.register_event('addon command', function(cmd, ...)
         end
         settings.farm.emergency = cmdline
         log(cmdline ~= '' and ('Emergency: ' .. cmdline) or 'No emergency action')
+        save_profile() send_profile()
+    elseif cmd == 'farmwatch' then
+        -- the Farming tab's drop alert: //vg farmwatch add|remove <item> | clear
+        local sub, name = (args[1] or ''):lower(), table.concat(args, ' ', 2)
+        local keep = {}
+        if sub ~= 'clear' then
+            for _, n in ipairs(util.split(settings.farm.watch, ',')) do if n:lower() ~= name:lower() then keep[#keep + 1] = n end end
+        end
+        if sub == 'add' and farm.item_id(name) then keep[#keep + 1] = require('resources').items[farm.item_id(name)].en end
+        settings.farm.watch = table.concat(keep, ',')
+        log('Drop alert for: ' .. (settings.farm.watch ~= '' and settings.farm.watch or 'nothing'))
         save_profile() send_profile()
     elseif cmd == 'farmkey' then
         -- the Farming tab's key menu: //vg farmkey ^f9 | off

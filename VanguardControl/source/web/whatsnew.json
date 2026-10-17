@@ -1,5 +1,12 @@
 [
   {
+    "version": "1.49.0",
+    "date": "2026-10-17",
+    "items": [
+      "Rare drop alert: pick items under Stop when (\"Ring when one of these drops\") and the app rings the moment one drops while you farm."
+    ]
+  },
+  {
     "version": "1.48.0",
     "date": "2026-10-17",
     "items": [
