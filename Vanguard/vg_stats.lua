@@ -67,7 +67,9 @@ function stats.on_message(actor_id, target_id, message_id, p1, p2)
         local mob = windower.ffxi.get_mob_by_id(target_id)
         local ids = party_ids()
         local by_party = ids[actor_id] or (mob and mob.claim_id and ids[mob.claim_id])
-        if mob and mob.is_npc and mob.spawn_type == 16 and by_party then
+        -- (the mob may already be gone by the time the kill message arrives: then our party's word is enough)
+        if (mob and mob.is_npc and mob.spawn_type == 16 and by_party) or (not mob and ids[actor_id]) then
+            mob = mob or { id = target_id, name = '' }
             local t = seen_kill[target_id]
             if not t or now() - t > 60 then          -- one kill per mob (several messages can name it)
                 seen_kill[target_id] = now()

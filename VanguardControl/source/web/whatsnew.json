@@ -1,5 +1,12 @@
 [
   {
+    "version": "1.46.1",
+    "date": "2026-10-17",
+    "items": [
+      "Fixed: kills, XP and CP were never counted in the game (farming showed 0 kills). The game sends those in a message Vanguard wasn't reading. Kills per hour, the mob report, Magian trials, chains and \"stop after N kills\" all work now."
+    ]
+  },
+  {
     "version": "1.46.0",
     "date": "2026-10-17",
     "items": [

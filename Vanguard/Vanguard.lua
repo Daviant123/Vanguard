@@ -1,6 +1,6 @@
 _addon.name = 'Vanguard'
 _addon.author = 'Daviant'
-_addon.version = '0.56.0'
+_addon.version = '0.56.1'
 _addon.commands = {'vanguard', 'vg'}
 
 --[[
@@ -1284,6 +1284,16 @@ end)
 -- Events: party buffs, actions, chat, zoning
 ------------------------------------------------------------------------
 windower.register_event('incoming chunk', function(id, data)
+    -- 0x02D "kill message": "<player> defeats <mob>", "<player> gains N experience / capacity points" (with the chain
+    -- number). These never come through the 'action message' event, so kills / XP / CP / chains read 0 in his real game
+    -- ("farming run saved (0 kills in 24 min)"). Reading what the game sent us - nothing is sent.
+    if id == 0x02D then
+        local actor, target = data:unpack('I', 0x04 + 1), data:unpack('I', 0x08 + 1)
+        local p1, p2 = data:unpack('I', 0x10 + 1), data:unpack('I', 0x14 + 1)
+        local msg = data:unpack('H', 0x18 + 1)
+        stats.on_message(actor, target, msg, p1, p2)
+        return
+    end
     if id == 0x0DC then                               -- party invite: inviter's name at 0x0C
         local player = windower.ffxi.get_player()
         local from = data:sub(0x0C + 1, 0x0C + 16):gsub('%z.*$', '')
