@@ -1,5 +1,13 @@
 [
   {
+    "version": "1.55.0",
+    "date": "2026-10-17",
+    "items": [
+      "Magian trials: pick at what % of the mob's HP the trial weapon skill goes off, right in the trial box (or leave it on Auto, which shows what it learned). Finer steps: 3, 5, 8, 10, 12, 15, 18, 20 % and up.",
+      "Holding off for TP before the killing blow now also works with a % you picked."
+    ]
+  },
+  {
     "version": "1.54.2",
     "date": "2026-10-17",
     "items": [

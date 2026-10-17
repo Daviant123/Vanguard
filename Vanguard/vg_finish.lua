@@ -58,8 +58,8 @@ local function waits() return S.ws.finish_wait or (S.trial_assist and S.trial_as
 
 function finish.wait_line(t)
     local line = finish.line(t)
-    if not waits() or not auto() then return line end
-    return line + math.max(5, line)
+    if not waits() then return line end
+    return line + math.max(5, line)            -- (a % he picks too, not only Auto)
 end
 
 -- Our weapon skill hit something (from the 'action' event): if it's the finisher, measure what it does.

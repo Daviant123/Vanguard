@@ -1320,7 +1320,7 @@ function rxAdd() {
 // ---------- Finishing weapon skill: the killing blow is a set weapon skill (trials like "kill it with Atonement") ----------
 function finishBox(p) {
   const x = (p.config || {}).extra || {}, wl = arr(p.ws_list), f = x.ws_finish || "";
-  const pct = [{v: 0, l: "Auto: when one hit would kill it"}].concat([5, 10, 15, 20, 25, 30, 40, 50].map(v => ({v, l: "HP at or under " + v + "%"})));
+  const pct = [{v: 0, l: "Auto: when one hit would kill it"}].concat([3, 5, 8, 10, 12, 15, 18, 20, 25, 30, 35, 40, 50].map(v => ({v, l: "HP at or under " + v + "%"})));
   const learned = arr(x.ws_finish_learned), auto = (x.ws_finish_at ?? 0) <= 0;
   return `<div class="box"><h3>Finish mobs with a weapon skill</h3>
     <div class="row" style="align-items:flex-end">
@@ -1440,6 +1440,12 @@ function setFarmView(v) { farmView = v; try { localStorage.setItem("vg.farmview"
 // ---------- Magian trials (his request): track trials, "Help finish it" sets farming up for one ----------
 let trialForm = {kind: "kill", goal: 100, ws: "", mobs: ""};
 function trialAdd() { const f = trialForm; send(`trial add ${f.kind}|${f.goal}|${f.kind === "ws" ? f.ws : ""}|${f.mobs}`); }
+// what Auto learned for the trial's mob (the finish box's list), as a number, or null
+function learnedAt(x, mobs) {
+  const l = arr(x.ws_finish_learned).find(e => mobs && lc(e.n).includes(lc(mobs)));
+  return l ? l.at : null;
+}
+
 function trialBox(p, mobNames) {
   const x = (p.config || {}).extra || {}, list = arr(x.trials), wl = arr(p.ws_list);
   const f = trialForm;
@@ -1454,7 +1460,10 @@ function trialBox(p, mobNames) {
             <button style="font-size:11px" title="Start the count again" onclick="send('trial reset ${t.k}')">↺</button>
             <button style="font-size:11px" title="Remove" onclick="send('trial del ${t.k}')">×</button></span></div>
         <div class="hpbar" style="height:8px"><div style="background:var(--good);width:${t.goal ? Math.min(100, t.count * 100 / t.goal) : 0}%"></div></div>
-        ${t.tries ? `<div class="hint" style="margin-top:3px">This session ${esc(t.ws)} landed the kill on ${t.hits || 0} of ${t.tries} (${Math.round((t.hits || 0) * 100 / t.tries)}%)</div>` : ""}</div>`).join("")
+        ${t.tries ? `<div class="hint" style="margin-top:3px">This session ${esc(t.ws)} landed the kill on ${t.hits || 0} of ${t.tries} (${Math.round((t.hits || 0) * 100 / t.tries)}%)</div>` : ""}
+        ${t.kind === "ws" && !t.done ? `<div class="row" style="margin-top:4px;align-items:center">
+          <label class="field">Use ${esc(t.ws)} when the mob's HP is at ${sel("set ws.finish_at ", [{v: 0, l: "Auto (learned" + (learnedAt(x, t.mobs) ? ": " + learnedAt(x, t.mobs) + "%" : "") + ")"}].concat([3, 5, 8, 10, 12, 15, 18, 20, 25, 30, 35, 40, 50].map(v => ({v, l: "or under " + v + "%"}))), x.ws_finish_at ?? 0)}</label>
+          ${x.ws_finish !== t.ws ? `<span class="hint">(applies when "Help finish it" is on)</span>` : ""}</div>` : ""}</div>`).join("")
       : `<div class="hint">No trials yet. Add one below - Vanguard counts the kills that fit it.</div>`}
     <div class="row" style="margin-top:8px;align-items:flex-end;flex-wrap:wrap">
       <label class="field">Trial <select onchange="trialForm.kind=this.value;bodyKey='';render()">${o("kill", "Defeat enemies", f.kind)}${o("ws", "Defeat enemies with a weapon skill", f.kind)}</select></label>
