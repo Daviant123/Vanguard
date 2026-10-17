@@ -1,6 +1,6 @@
 _addon.name = 'Vanguard'
 _addon.author = 'Daviant'
-_addon.version = '0.57.0'
+_addon.version = '0.58.0'
 _addon.commands = {'vanguard', 'vg'}
 
 --[[
@@ -2030,7 +2030,8 @@ windower.register_event('addon command', function(cmd, ...)
         local sub, key = (args[1] or ''):lower(), args[2] or ''
         if sub == 'save' then farm.save_spot()
         elseif sub == 'load' then if farm.load_spot(key) then state.farm_spot = key end
-        elseif sub == 'del' then farm.delete_spot(key) end
+        elseif sub == 'del' then farm.delete_spot(key)
+        elseif sub == 'import' then farm.import_spot(table.concat(args, ' ', 2)) end
         store.save(settings) send_profile()
     elseif cmd == 'radar' then
         -- the Farming tab is open: send the radar for a few seconds

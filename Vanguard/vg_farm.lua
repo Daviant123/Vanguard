@@ -1049,7 +1049,9 @@ function farm.spots()
     for _, k in ipairs(spot_keys()) do
         local name, zid = S.farmspots[k]:match('^([^|]*)|([^|]*)|')
         out[#out + 1] = { k = k, name = name, zone = res.zones[tonumber(zid) or 0] and res.zones[tonumber(zid)].en or '?',
-                          here = tonumber(zid) == zone() }
+                          here = tonumber(zid) == zone(),
+                          -- the whole spot, for "copy to another character" (';' travels as '~': it ends a game command)
+                          raw = S.farmspots[k]:gsub(';', '~') }
     end
     return out
 end
@@ -1087,6 +1089,20 @@ function farm.load_spot(key)
     state.route, state.wp = nil, 1
     h.log('Farm spot loaded: ' .. tostring(name))
     return true
+end
+
+-- a spot copied from another character (upgrade 18): "name|zone|field=value|..." with '~' for ';'
+function farm.import_spot(raw)
+    raw = (raw or ''):gsub('~', ';')
+    local name, zid = raw:match('^([^|]+)|(%d+)|')
+    if not name then return nil end
+    S.farmspots = S.farmspots or {}
+    local key
+    for _, k in ipairs(spot_keys()) do if S.farmspots[k]:match('^([^|]*)|') == name then key = k end end
+    if not key then local n = 1 while S.farmspots['s' .. n] and S.farmspots['s' .. n] ~= '' do n = n + 1 end key = 's' .. n end
+    S.farmspots[key] = raw
+    h.log('Farm spot received: ' .. name)
+    return key
 end
 
 function farm.delete_spot(key)

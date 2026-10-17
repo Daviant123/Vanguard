@@ -1,5 +1,12 @@
 [
   {
+    "version": "1.48.0",
+    "date": "2026-10-17",
+    "items": [
+      "Farm spots can be copied to your other characters: \"copy to...\" next to each saved spot sends its mobs, camp or route and settings over in one click."
+    ]
+  },
+  {
     "version": "1.47.0",
     "date": "2026-10-17",
     "items": [

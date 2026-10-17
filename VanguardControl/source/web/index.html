@@ -1418,6 +1418,12 @@ function radarPoll() {          // the Farming tab is open: ask the selected cha
   radarTimer = setInterval(() => { if (tab === "farm" && selected) ask(); else clearInterval(radarTimer); }, 4000);
   if (selected) ask();
 }
+// copy a saved farm spot to another character (spots are kept per character)
+function copySpot(key, who) {
+  if (!who) return;
+  const sp = arr((((chars[selected] || {}).profile || {}).config || {}).extra?.farm_spots).find(q => q.k === key);
+  if (sp && sp.raw) post(who, "farmspot import " + sp.raw);
+}
 function bringTeam(farmer) {    // everyone else follows and helps the farmer
   for (const n of Object.keys(chars)) {
     if (!chars[n].online) continue;
@@ -1540,7 +1546,9 @@ function farmTab(c, p) {
           <div class="row" style="margin-top:10px;align-items:center">
             <b style="font-size:12px;color:var(--accent)">Farm spots</b>
             ${here.map(q => `<span class="btag" style="font-size:12px"><a href="#" style="color:var(--text);text-decoration:none" title="Load this farm" onclick="send('farmspot load ${q.k}');return false">▸ ${esc(q.name)}</a>
-              <a href="#" style="color:var(--bad);text-decoration:none" title="Delete" onclick="send('farmspot del ${q.k}');return false">×</a></span>`).join("")}
+              <a href="#" style="color:var(--bad);text-decoration:none" title="Delete" onclick="send('farmspot del ${q.k}');return false">×</a></span>
+              ${others.length ? `<select style="font-size:11px;padding:2px 4px" title="Copy this farm spot to another character" onchange="copySpot('${q.k}', this.value); this.value=''">
+                <option value="">copy to...</option>${others.map(n => `<option value="${esc(n)}">${esc(n)}</option>`).join("")}</select>` : ""}`).join("")}
             ${here.length ? "" : `<span class="hint">${elsewhere.length ? `${elsewhere.length} saved in other zones` : "none saved yet"}</span>`}
             <button style="font-size:11px" ${ready ? "" : "disabled"} onclick="send('farmspot save')">Save this farm</button>
           </div>
