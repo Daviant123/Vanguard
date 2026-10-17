@@ -1621,7 +1621,11 @@ function farmTab(c, p) {
         <label class="field">Rest when HP is under ${sel("set rest.hp_low ", nums([0, 20, 30, 40, 50, 60], "%"), x.rest_hp_low ?? 40)}</label>
         <label class="field">...or MP under ${sel("set rest.mp_low ", nums([0, 10, 20, 25, 30, 40, 50], "%"), x.rest_mp_low ?? 25)}</label>
       </div>
-      <div class="row" style="margin-top:8px">${chk("Treasure Hunter: GearSwap tags each mob (TreasureMode Tag) while farming", !!x.farm_th, "set farm.th true", "set farm.th false")}</div>
+      <div class="row" style="margin-top:8px;flex-wrap:wrap;gap:6px 18px">${chk("Treasure Hunter: GearSwap tags each mob (TreasureMode Tag) while farming", !!x.farm_th, "set farm.th true", "set farm.th false")}
+        ${chk("Rest at camp while there's nothing to fight (gets up when a mob comes)", x.farm_rest_idle !== false, "set farm.rest_idle true", "set farm.rest_idle false")}</div>
+      <div class="row" style="margin-top:8px">
+        <label class="field">Save TP: no weapon skill on a mob under ${sel("set ws.min_mob_hpp ", [{v: 1, l: "(always use it)"}].concat([10, 15, 20, 25].map(v => ({v, l: v + "% HP"}))), x.ws_min_hpp ?? 1)}</label>
+      </div>
       <div class="hint" style="margin-top:6px">Weapon skill and abilities: Job &amp; abilities tab. Food and Reraise: Upkeep on the Team tab. Mobs it can't reach
         (can't see them, can't get closer) are skipped for a couple of minutes instead of being chased forever. A mob with others standing
         next to it can bring them along: mobs on their own are picked first (purple on the radar = left because it has company).</div>`)}

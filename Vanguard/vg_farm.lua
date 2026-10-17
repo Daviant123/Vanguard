@@ -776,6 +776,7 @@ function farm.tick(player)
             return false
         end
         if (state.farm_packed or 0) > 0 then status(('at camp, waiting for a mob on its own (%d with others next to them)'):format(state.farm_packed)) return false end
+        if farm.rest_idle(player) then return true end
         status(('at camp, waiting for mobs within %d yalms'):format(S.farm.range))
         return false
     end
@@ -795,6 +796,37 @@ function farm.tick(player)
     h.run_toward(me, wp)
     state.route_moving = true
     return false
+end
+
+------------------------------------------------------------------------
+-- rest while there's nothing to fight (upgrade 8): waiting at camp with HP or MP under 90 % -> /heal; get up as soon
+-- as there's a mob to fight (farm.rest_check, called while resting)
+------------------------------------------------------------------------
+function farm.rest_idle(player)
+    if not S.farm.rest_idle or player.status ~= 0 or state.resting or h.recently('farm:idlerest', 10) then return false end
+    local v = player.vitals or {}
+    local low = (v.hpp or 100) < 90 or ((v.max_mp or 0) > 0 and (v.mpp or 100) < 90)
+    if not low then return false end
+    h.mark('farm:idlerest')
+    h.mark('farm:rest')
+    windower.send_command('input /heal on')
+    state.resting, state.farm_rest_idle = true, true
+    status('resting while there is nothing to fight')
+    return true
+end
+
+function farm.rest_check(player)
+    if not S.modules.farm or not state.farm_rest_idle or player.status ~= 33 then return false end
+    local me = windower.ffxi.get_mob_by_target('me')
+    if not me then return false end
+    local mob = best_target(me)
+    if not mob then status('resting while there is nothing to fight') return false end
+    if h.recently('farm:getup', 3) then return false end
+    h.mark('farm:getup')
+    windower.send_command('input /heal off')
+    state.resting, state.farm_rest_idle = false, false
+    status(('getting up: %s to fight'):format(mob.name))
+    return true
 end
 
 ------------------------------------------------------------------------

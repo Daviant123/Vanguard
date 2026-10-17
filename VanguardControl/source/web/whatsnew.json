@@ -1,5 +1,13 @@
 [
   {
+    "version": "1.38.0",
+    "date": "2026-10-16",
+    "items": [
+      "Farming rests at camp while there's nothing to fight, and gets up the moment a mob turns up - less waiting after fights.",
+      "Save TP: choose \"no weapon skill on a mob under 15% HP\" (How to fight) so TP isn't wasted on a mob that's about to die."
+    ]
+  },
+  {
     "version": "1.37.1",
     "date": "2026-10-16",
     "items": [

@@ -1,6 +1,6 @@
 _addon.name = 'Vanguard'
 _addon.author = 'Daviant'
-_addon.version = '0.47.1'
+_addon.version = '0.48.0'
 _addon.commands = {'vanguard', 'vg'}
 
 --[[
@@ -119,6 +119,7 @@ local defaults = {
              preset = '',                         -- the last one-click preset (party | items | safe | clear)
              th = false,                          -- Treasure Hunter: GearSwap TreasureMode Tag while farming
              rotate = false,                      -- a spot dry for 3 min: move on to the next saved spot in the zone
+             rest_idle = true,                    -- rest at camp while there's nothing to fight (up when a mob comes)
              packs = true, pack_range = 8, pack_strict = false },
     farmspots = { s0 = '' },      -- saved farm spots (vg_farm): s1, s2, ... = "name|zone|field=value|..." 
     -- "Spell>target" pairs. target = me or a party member name. "ja:" prefix = job ability.
@@ -1190,6 +1191,7 @@ local function tick()
     if safety.away(player) then return end
 
     if player.status == 33 then
+        if farm.rest_check(player) then return end                 -- resting at camp: up when a mob shows up
         if not travel.rest_stand(player) then do_rest(player) end
         return
     end
