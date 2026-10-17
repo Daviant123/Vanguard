@@ -1,5 +1,13 @@
 [
   {
+    "version": "1.40.0",
+    "date": "2026-10-16",
+    "items": [
+      "Farming can /check each new kind of mob once before fighting it, and skip the ones that are Too Weak (no XP) or Incredibly Tough / NMs. Turn it on under What to fight (the XP / CP party quick setup does it for you).",
+      "Each kind's check result shows as a coloured tag, and next to it in \"Which mob is worth it\"."
+    ]
+  },
+  {
     "version": "1.39.0",
     "date": "2026-10-16",
     "items": [

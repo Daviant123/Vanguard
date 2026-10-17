@@ -1,6 +1,6 @@
 _addon.name = 'Vanguard'
 _addon.author = 'Daviant'
-_addon.version = '0.49.0'
+_addon.version = '0.50.0'
 _addon.commands = {'vanguard', 'vg'}
 
 --[[
@@ -120,6 +120,7 @@ local defaults = {
              th = false,                          -- Treasure Hunter: GearSwap TreasureMode Tag while farming
              rotate = false,                      -- a spot dry for 3 min: move on to the next saved spot in the zone
              rest_idle = true,                    -- rest at camp while there's nothing to fight (up when a mob comes)
+             check = false, skip_weak = false, skip_tough = false,  -- /check each new kind; skip Too Weak / Incredibly Tough + NMs
              packs = true, pack_range = 8, pack_strict = false },
     farmspots = { s0 = '' },      -- saved farm spots (vg_farm): s1, s2, ... = "name|zone|field=value|..." 
     -- "Spell>target" pairs. target = me or a party member name. "ja:" prefix = job ability.
@@ -1383,6 +1384,7 @@ end)
 
 windower.register_event('incoming text', function(original)
     if settings.modules.triggers then triggers.note_chat(original) end
+    if settings.modules.farm then farm.on_text(original) end
     local inviter = original:match('(%a+) invites you to')
     if inviter then
         local player = windower.ffxi.get_player()

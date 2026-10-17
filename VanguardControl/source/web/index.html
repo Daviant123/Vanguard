@@ -1362,6 +1362,8 @@ function trustSelect(avail) {
 // ---------- Farming tab (rebuilt): dashboard + radar, then what / where / how / team / stop ----------
 // The farming engine is vg_farm.lua: camp + leash, back to camp, a give-up list for mobs it can't reach, waiting for
 // the party (and telling the low one to rest), aggro-only / anything-nearby modes, stop conditions, run stats, spots.
+const CHECK_LABEL = {weak: "Too Weak", easy: "Easy Prey", decent: "Decent Challenge", even: "Even Match", tough: "Tough", vtough: "Very Tough", itough: "Incredibly Tough", nm: "NM (impossible to gauge)", unknown: "?"};
+const CHECK_COL = {weak: "var(--muted)", easy: "var(--muted)", decent: "var(--good)", even: "var(--good)", tough: "var(--tp)", vtough: "var(--tp)", itough: "var(--bad)", nm: "var(--bad)", unknown: "var(--muted)"};
 const RADAR_COL = {strong: "#9b59b6", target: "#4caf7a", aggro: "#e0605a", theirs: "#d4a54a", skipped: "#6b7280", ignored: "#4b5160", no: "#8b92a3", pack: "#a07ad8"};
 let radarZoom = 0;            // 0 = fit what's around; else yalms from the centre to the edge
 try { radarZoom = +localStorage.getItem("vg.radarzoom") || 0; } catch (e) {}
@@ -1540,7 +1542,7 @@ function farmTab(c, p) {
 
     ${all ? `<div class="box"><h3>Which mob is worth it</h3>
       ${arr(run.mobs).length ? `<table class="grid"><thead><tr><th style="text-align:left">Mob</th><th>Kills</th><th>A kill takes</th><th>XP / kill</th><th>CP / kill</th><th>Points a minute</th></tr></thead><tbody>
-        ${run.mobs.map((m, i) => `<tr><td style="text-align:left">${i === 0 && run.mobs.length > 1 ? "★ " : ""}<b>${esc(m.n)}</b></td><td>${m.k}</td><td>${m.avg}s</td><td>${fmtN(m.xp)}</td><td>${fmtN(m.cp)}</td>
+        ${run.mobs.map((m, i) => `<tr><td style="text-align:left">${i === 0 && run.mobs.length > 1 ? "★ " : ""}<b>${esc(m.n)}</b>${run.checks && run.checks[m.n] ? ` <span class="hint" style="color:${CHECK_COL[run.checks[m.n]]}">${CHECK_LABEL[run.checks[m.n]] || ""}</span>` : ""}</td><td>${m.k}</td><td>${m.avg}s</td><td>${fmtN(m.xp)}</td><td>${fmtN(m.cp)}</td>
           <td><b style="color:${i === 0 ? "var(--good)" : "var(--text)"}">${fmtN(m.pm)}</b></td></tr>`).join("")}
       </tbody></table>` : `<div class="hint">Fills in as it kills: how long each kind of mob takes and what it pays, so you can see which one is worth farming.</div>`}
       <div class="row" style="margin-top:8px;align-items:center">
@@ -1582,6 +1584,9 @@ function farmTab(c, p) {
           `<span class="btag" style="font-size:12px">${esc(n)} <a href="#" style="text-decoration:none" title="Fight them again" onclick="send('farmstrong remove ${esc(n)}');return false">↺</a></span>`).join("")}</div></div>` : ""}
       </div>
       <div class="row" style="margin-top:6px">${chk("Set aside mobs that are too strong (took me under 25% HP or over 3 minutes, twice)", x.farm_skip_strong !== false, "set farm.skip_strong true", "set farm.skip_strong false")}</div>
+      <div class="row" style="margin-top:6px;flex-wrap:wrap;gap:6px 18px">${chk("/check each new kind of mob once", !!x.farm_check, "set farm.check true", "set farm.check false")}
+        ${x.farm_check ? chk("skip Too Weak (no XP)", !!x.farm_skip_weak, "set farm.skip_weak true", "set farm.skip_weak false") + chk("skip Incredibly Tough and NMs", !!x.farm_skip_tough, "set farm.skip_tough true", "set farm.skip_tough false") : ""}</div>
+      ${run.checks && Object.keys(run.checks).length ? `<div style="margin-top:4px">${Object.entries(run.checks).map(([n, gr]) => `<span class="btag" style="font-size:11px">${esc(n)}: <b style="color:${CHECK_COL[gr] || "var(--muted)"}">${CHECK_LABEL[gr] || esc(gr)}</b></span>`).join("")}</div>` : ""}
       <div class="row" style="margin-top:8px">
         <label class="field">Claim ${sel("set farm.claim ", [{v: "unclaimed", l: "Only unclaimed ones"}, {v: "party", l: "Only ones we already claimed"}, {v: "any", l: "Any (even other players')"}], x.farm_claim || "unclaimed")}</label>
         ${mode !== "aggro" ? chk("Fight mobs that attack us first", x.farm_aggro !== false, "set farm.aggro_first true", "set farm.aggro_first false") : ""}

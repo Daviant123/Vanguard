@@ -188,6 +188,11 @@ function farm.judge(mob, me, ids, center)
     if matches(mob.name, list(S.farm.strong)) and not (mob.claim_id and mob.claim_id ~= 0 and ids[mob.claim_id]) then
         return nil, 'too strong'
     end
+    local grade = S.farm.check and (state.farm_checks or {})[mob.name]
+    if grade and not (mob.claim_id and mob.claim_id ~= 0 and ids[mob.claim_id]) then
+        if S.farm.skip_weak and grade == 'weak' then return nil, 'too weak' end
+        if S.farm.skip_tough and (grade == 'itough' or grade == 'nm') then return nil, 'too strong' end
+    end
     local claimed_us = mob.claim_id and mob.claim_id ~= 0 and ids[mob.claim_id]
     local claimed_other = mob.claim_id and mob.claim_id ~= 0 and not claimed_us
     if blacklisted(mob.id) then return nil, 'skipped' end
@@ -307,6 +312,20 @@ local function engage(me, mob)
     if t and tv then
         local go, d = progress(t)
         if not go then return false end
+        -- /check each new kind once (upgrade 11), before engaging: the answer decides "too weak" / "too tough"
+        if S.farm.check and not (state.farm_checks or {})[t.name] and d <= 25 then
+            if state.farm_checking == t.name and h.recently('farm:check', 3) then return false end
+            if state.farm_checking == t.name then                -- no answer: don't ask again
+                state.farm_checks = state.farm_checks or {}
+                state.farm_checks[t.name] = 'unknown'
+            else
+                state.farm_checking = t.name
+                h.mark('farm:check')
+                windower.send_command('input /check <t>')
+                status(('checking %s'):format(t.name))
+                return true
+            end
+        end
         -- claim from range (upgrade 7): with a pull set, use it as soon as the mob is within that pull's reach - before
         -- walking up or engaging - so it's ours sooner (and comes to us)
         local pr = farm.pull_range()
@@ -362,6 +381,25 @@ function farm.pull_range()
     if c:find('/ma ', 1, true) then return 19 end
     if c:find('/ja ', 1, true) then return 15 end
     return nil
+end
+
+-- the /check answer, read from the chat line (the English phrases are fixed): too weak / easy prey / decent challenge /
+-- even match / tough / very tough / incredibly tough; "impossible to gauge" (notorious monsters)
+local GRADES = { { 'too weak', 'weak' }, { 'easy prey', 'easy' }, { 'decent challenge', 'decent' }, { 'even match', 'even' },
+    { 'incredibly tough', 'itough' }, { 'very tough', 'vtough' }, { 'tough', 'tough' }, { 'impossible to gauge', 'nm' } }
+function farm.on_text(text)
+    local name = state.farm_checking
+    if not name or not text then return end
+    local low = text:lower()
+    if not low:find(name:lower(), 1, true) then return end
+    for _, g in ipairs(GRADES) do
+        if low:find(g[1], 1, true) then
+            state.farm_checks = state.farm_checks or {}
+            state.farm_checks[name] = g[2]
+            state.farm_checking = nil
+            return
+        end
+    end
 end
 
 -- the pull command once per mob, right after engaging while it's still away (before any abilities)
@@ -695,7 +733,7 @@ function farm.run_stats()
     return { secs = secs, kills = kills, kph = secs >= 120 and math.floor(kills * 3600 / secs + 0.5) or nil,
              every = kills > 0 and math.floor(secs / kills + 0.5) or nil, skipped = state.farm_skipped or 0,
              loot = farm.loot_list(), mobs = farm.report(), chain = farm.chain_info(), free = farm.inv_free(),
-             spark = farm.spark(), busy = state.farm_busy,
+             spark = farm.spark(), busy = state.farm_busy, checks = state.farm_checks,
              item = have and { n = S.farm.item, have = have, goal = S.farm.item_goal } or nil }
 end
 
@@ -917,7 +955,7 @@ end
 ------------------------------------------------------------------------
 local SPOT_FIELDS = { 'targets', 'ignore', 'claim', 'mode', 'range', 'height', 'pull_cmd', 'loop', 'aggro_first',
     'approach', 'route', 'area', 'camp', 'camp_zone', 'back_to_camp', 'wait_party', 'wait_hp', 'wait_mp', 'wait_near',
-    'packs', 'pack_range', 'pack_strict', 'item', 'item_goal', 'pull_back', 'prefer_best', 'keep_chain', 'stop_mins', 'when_done', 'skip_strong', 'strong', 'th' }
+    'packs', 'pack_range', 'pack_strict', 'item', 'item_goal', 'pull_back', 'prefer_best', 'keep_chain', 'stop_mins', 'when_done', 'skip_strong', 'strong', 'th', 'check', 'skip_weak', 'skip_tough' }
 
 local function spot_keys()
     local keys = {}
@@ -982,14 +1020,16 @@ end
 farm.PRESETS = {
     -- an XP / CP party: pull to camp, keep the healer topped up, keep chains, prefer the best payer, avoid packs
     party = { mode = 'list', area = 'camp', pull_back = true, back_to_camp = true, wait_party = true, wait_hp = 70,
-              wait_mp = 40, keep_chain = true, prefer_best = true, packs = true, pack_strict = false, skip_strong = true },
+              wait_mp = 40, keep_chain = true, prefer_best = true, packs = true, pack_strict = false, skip_strong = true,
+              check = true, skip_weak = true, skip_tough = true },
     -- an item: fast, little waiting, stop when the bags fill
     items = { mode = 'list', pull_back = false, back_to_camp = false, wait_party = true, wait_hp = 50, wait_mp = 20,
               keep_chain = false, prefer_best = false, packs = true, pack_strict = false, stop_full = true, skip_strong = true,
               th = true },
     -- careful, on its own: only lone mobs, rest early, set aside anything too strong
     safe = { mode = 'list', area = 'camp', pull_back = false, back_to_camp = true, wait_party = true, wait_hp = 85,
-             wait_mp = 50, aggro_first = true, packs = true, pack_strict = true, skip_strong = true, keep_chain = false },
+             wait_mp = 50, aggro_first = true, packs = true, pack_strict = true, skip_strong = true, keep_chain = false,
+             check = true, skip_tough = true },
     -- clear everything around the camp
     clear = { mode = 'any', area = 'camp', pull_back = false, back_to_camp = true, wait_party = true, wait_hp = 60,
               wait_mp = 30, packs = false, pack_strict = false, skip_strong = true, aggro_first = true },
