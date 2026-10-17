@@ -1,6 +1,6 @@
 _addon.name = 'Vanguard'
 _addon.author = 'Daviant'
-_addon.version = '0.55.0'
+_addon.version = '0.56.0'
 _addon.commands = {'vanguard', 'vg'}
 
 --[[
@@ -125,6 +125,7 @@ local defaults = {
              check = false, skip_weak = false, skip_tough = false,  -- /check each new kind; skip Too Weak / Incredibly Tough + NMs
              polite = true,                       -- leave unclaimed mobs another player is standing next to
              hotkey = '',                         -- a key that starts / stops farming from the game window (^f9 ...)
+             emergency = '', emergency_hp = 25,   -- under this HP % in a fight: this item / ability (from a menu)
              packs = true, pack_range = 8, pack_strict = false },
     farmspots = { s0 = '' },
     trials = { t0 = '' }, trial_assist = '',   -- Magian trials (vg_trials): t1 = "kind|goal|ws|mobs|count"      -- saved farm spots (vg_farm): s1, s2, ... = "name|zone|field=value|..." 
@@ -1966,6 +1967,19 @@ windower.register_event('addon command', function(cmd, ...)
         elseif sub == 'del' then trials.remove(rest)
         elseif sub == 'reset' then trials.reset(rest)
         elseif sub == 'assist' then trials.assist(rest) end
+        save_profile() send_profile()
+    elseif cmd == 'farmemergency' then
+        -- the Farming tab's emergency menu: //vg farmemergency item <name> | ja <name> | none
+        local kind, name = (args[1] or 'none'):lower(), table.concat(args, ' ', 2)
+        local cmdline = ''
+        if kind == 'ja' and util.ability(name) then cmdline = ('input /ja "%s" <me>'):format(util.ability(name).en)
+        elseif kind == 'item' and name ~= '' then
+            for _, it in pairs(require('resources').items) do
+                if type(it) == 'table' and it.en and it.en:lower() == name:lower() then cmdline = ('input /item "%s" <me>'):format(it.en) break end
+            end
+        end
+        settings.farm.emergency = cmdline
+        log(cmdline ~= '' and ('Emergency: ' .. cmdline) or 'No emergency action')
         save_profile() send_profile()
     elseif cmd == 'farmkey' then
         -- the Farming tab's key menu: //vg farmkey ^f9 | off

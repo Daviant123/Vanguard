@@ -1676,6 +1676,19 @@ function farmTab(c, p) {
       </div>
       <div class="row" style="margin-top:8px;flex-wrap:wrap;gap:6px 18px">${chk("Treasure Hunter: GearSwap tags each mob (TreasureMode Tag) while farming", !!x.farm_th, "set farm.th true", "set farm.th false")}
         ${chk("Rest at camp while there's nothing to fight (gets up when a mob comes)", x.farm_rest_idle !== false, "set farm.rest_idle true", "set farm.rest_idle false")}</div>
+      ${(() => {
+        const SAVERS = ["Sentinel", "Invincible", "Rampart", "Chakra", "Second Wind", "Fortify", "Defender", "Divine Seal", "Healing Waltz",
+          "Curing Waltz III", "Curing Waltz IV", "Curing Waltz V", "Sublimation", "Embolden", "Inspiration", "Vallation", "Valiance", "Liement", "One for All", "Mana Wall"];
+        const items = arr(x.inv_items).filter(n => /potion|elixir|ether|vile elixir|icarus|remedy/i.test(n));
+        const ab = SAVERS.filter(n => arr(known.abilities).includes(n));
+        const em = String(x.farm_emergency || ""), m = em.match(/^input \/(item|ja) "(.+)" <me>$/);
+        const cur = m ? (m[1] === "item" ? "item " : "ja ") + m[2] : "none";
+        const opts = [{v: "none", l: "nothing"}].concat(items.map(n => ({v: "item " + n, l: n})), ab.map(n => ({v: "ja " + n, l: n})));
+        if (m && !opts.some(o => o.v === cur)) opts.push({v: cur, l: m[2]});
+        return `<div class="row" style="margin-top:8px">
+          <label class="field">In an emergency use ${sel("farmemergency ", opts, cur)}</label>
+          <label class="field">when HP is under ${sel("set farm.emergency_hp ", [15, 20, 25, 30, 40, 50].map(v => ({v, l: v + "%"})), x.farm_emergency_hp ?? 25)}</label></div>`;
+      })()}
       <div class="row" style="margin-top:8px">
         <label class="field">Save TP: no weapon skill on a mob under ${sel("set ws.min_mob_hpp ", [{v: 1, l: "(always use it)"}].concat([10, 15, 20, 25].map(v => ({v, l: v + "% HP"}))), x.ws_min_hpp ?? 1)}</label>
       </div>

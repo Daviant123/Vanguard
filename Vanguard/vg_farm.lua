@@ -467,6 +467,14 @@ function farm.fight_tick(player)
         state.farm_fight = t.id
         state.farm_fight_info = { name = t.name, t = now(), xp = xp, cp = cp, low = 100, hpp = t.hpp, hurt_t = now(), id = t.id }
     end
+    -- emergency (upgrade 16): HP under farm.emergency_hp in a fight -> the chosen item or ability (once per 20 s)
+    if player.status == 1 and (S.farm.emergency or '') ~= '' and S.farm.emergency_hp > 0
+        and ((player.vitals or {}).hpp or 100) < S.farm.emergency_hp and not h.recently('farm:emergency', 20) then
+        h.mark('farm:emergency')
+        windower.send_command(S.farm.emergency)
+        h.log(('Emergency at %d%% HP: %s'):format((player.vitals or {}).hpp or 0, S.farm.emergency:match('"(.-)"') or S.farm.emergency))
+        state.busy_until = now() + 2
+    end
     local f = state.farm_fight_info
     -- stuck in a fight (upgrade 3): engaged, but its HP hasn't moved for 25 s and it's out of reach - let go of it;
     -- and one that someone else claimed while we were on it

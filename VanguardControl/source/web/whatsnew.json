@@ -1,5 +1,12 @@
 [
   {
+    "version": "1.46.0",
+    "date": "2026-10-17",
+    "items": [
+      "Farming emergency: pick a potion (from your bags) or a defensive ability like Sentinel or Chakra, and the farmer uses it when its HP drops under the % you choose during a fight. Under How to fight."
+    ]
+  },
+  {
     "version": "1.45.0",
     "date": "2026-10-17",
     "items": [
