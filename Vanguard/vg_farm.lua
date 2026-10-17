@@ -410,7 +410,7 @@ local GRADES = { { 'too weak', 'weak' }, { 'easy prey', 'easy' }, { 'decent chal
     { 'incredibly tough', 'itough' }, { 'very tough', 'vtough' }, { 'tough', 'tough' }, { 'impossible to gauge', 'nm' } }
 -- Abyssea time (upgrade 27): his run ended when Visitant time ran out and he was sent out mid-farm. The game's own
 -- warnings ("... visitant status will wear off in 5 minutes", seconds near the end) are passed on as a "Farming: "
--- line, so the app's Alarms ring while there's still time to top it up. Each warning once.
+-- line, so the app's Alarms ring while there's still time to top it up. Each warning once, 10 minutes or less.
 local function time_alert(text)
     if not S.farm.time_alert or not S.enabled then return end
     local low = text:lower()
@@ -418,6 +418,9 @@ local function time_alert(text)
     local n, unit = low:match('(%d+)%s*(minute)')
     if not n then n, unit = low:match('(%d+)%s*(second)') end
     if not n then return end
+    -- only when it's running out (10 minutes or less): the game also says how much is left every time it's
+    -- extended - "107 minutes left" rang the Alarms every minute in his real game
+    if unit == 'minute' and tonumber(n) > 10 then return end
     local key = n .. unit
     if state.farm_time_told == key then return end
     state.farm_time_told = key

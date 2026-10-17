@@ -1,5 +1,12 @@
 [
   {
+    "version": "1.59.1",
+    "date": "2026-10-17",
+    "items": [
+      "Fix: the Abyssea time alarm rang every minute with plenty of time left. It now rings only when 10 minutes or less are left."
+    ]
+  },
+  {
     "version": "1.59.0",
     "date": "2026-10-17",
     "items": [
