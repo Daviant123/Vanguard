@@ -1,6 +1,6 @@
 _addon.name = 'Vanguard'
 _addon.author = 'Daviant'
-_addon.version = '0.45.0'
+_addon.version = '0.46.0'
 _addon.commands = {'vanguard', 'vg'}
 
 --[[
@@ -118,6 +118,7 @@ local defaults = {
              skip_strong = true, strong = '',     -- mobs that nearly KO'd the farmer / took 3+ min twice: set aside
              preset = '',                         -- the last one-click preset (party | items | safe | clear)
              th = false,                          -- Treasure Hunter: GearSwap TreasureMode Tag while farming
+             rotate = false,                      -- a spot dry for 3 min: move on to the next saved spot in the zone
              packs = true, pack_range = 8, pack_strict = false },
     farmspots = { s0 = '' },      -- saved farm spots (vg_farm): s1, s2, ... = "name|zone|field=value|..." 
     -- "Spell>target" pairs. target = me or a party member name. "ja:" prefix = job ability.
@@ -1158,6 +1159,7 @@ local function tick()
     record_route()
     stats.tick(player)
     farm.loot_tick()
+    farm.kill_watch()
     farm.fight_tick(player)
     farm.check_stop(player)
     warp.tick(player)
@@ -1916,7 +1918,7 @@ windower.register_event('addon command', function(cmd, ...)
         -- the Farming tab's spots: //vg farmspot save | load <s1> | del <s1>
         local sub, key = (args[1] or ''):lower(), args[2] or ''
         if sub == 'save' then farm.save_spot()
-        elseif sub == 'load' then farm.load_spot(key)
+        elseif sub == 'load' then if farm.load_spot(key) then state.farm_spot = key end
         elseif sub == 'del' then farm.delete_spot(key) end
         store.save(settings) send_profile()
     elseif cmd == 'radar' then

@@ -1479,6 +1479,9 @@ function farmTab(c, p) {
             <div class="tile"><b>${run.skipped ?? "—"}</b><span>mobs skipped</span></div>
             <div class="tile"><b style="color:${(run.free ?? x.inv_free) === 0 ? "var(--bad)" : "var(--text)"}">${run.free ?? x.inv_free ?? "—"}</b><span>bag spaces free</span></div>
           </div>
+          ${arr(run.spark).some(v => v > 0) ? (() => { const mx = Math.max(...run.spark, 1);
+            return `<div style="margin-top:10px"><div class="hint" style="font-size:11px">Kills per 5 minutes (last hour)</div>
+              <svg width="100%" height="34" viewBox="0 0 240 34" preserveAspectRatio="none">${run.spark.map((v, i) => `<rect x="${i * 20 + 2}" y="${32 - v * 30 / mx}" width="16" height="${v * 30 / mx}" rx="2" fill="${i === 11 ? "#4caf7a" : "#3b7d5c"}"><title>${v} kill${v === 1 ? "" : "s"}</title></rect>`).join("")}</svg></div>`; })() : ""}
           ${run.chain ? `<div class="row" style="margin-top:10px;align-items:center;gap:10px">
               <span class="pill ${run.chain.n >= 1 ? "on" : "off"}" style="font-size:13px">${run.chain.n >= 1 ? `Chain #${run.chain.n}` : "No chain"}</span>
               <span class="hint">${run.chain.since}s since the last kill · best #${run.chain.best}${run.chain.min || run.chain.max ? ` · chain window ${run.chain.min ? `at least ${run.chain.min}s` : ""}${run.chain.min && run.chain.max ? ", " : ""}${run.chain.max ? `under ${run.chain.max}s` : ""}` : ""}</span></div>` : ""}
@@ -1512,6 +1515,9 @@ function farmTab(c, p) {
         [f.status !== "resting", "Not resting", "resting until HP / MP are back"],
         [free == null ? null : (free > 0 || x.farm_stop_full === false), `Bag space: ${free ?? "?"} free`, "the inventory is full"],
         [farming, farming ? "Farming is on" : "Farming is off", "click Start farming"],
+        [run.busy && run.busy.seen ? run.busy.theirs * 2 < run.busy.seen : null, run.busy && run.busy.seen ? `Spot not busy (${run.busy.theirs} of ${run.busy.seen} taken)` : "Spot not busy", "most mobs here are someone else's - try another spot"],
+        [arr(s.buffs).some(b => /^Reraise/.test(b.n)), "Reraise up", "no Reraise on " + selected + " (Upkeep, Team tab)"],
+        [arr(s.buffs).some(b => b.n === "Food"), "Food up", "no food on " + selected + " (Upkeep, Team tab)"],
       ];
       return `<div class="box"><h3>Checklist: why it is (or isn't) pulling</h3><div class="row" style="flex-wrap:wrap;gap:4px 18px">
         ${checks.map(([ok, label, why]) => `<span title="${esc(ok === false ? why : "")}">${ok === null ? "<span class='hint'>•</span>" : ok ? "<b style='color:var(--good)'>✓</b>" : "<b style='color:var(--bad)'>✗</b>"} ${esc(label)}${ok === false ? ` <span class="hint">- ${esc(why)}</span>` : ""}</span>`).join("")}
@@ -1576,7 +1582,8 @@ function farmTab(c, p) {
           <span class="hint">${x.farm_camp ? "" : "(Start farming sets it where you stand)"}</span>
         </div>
         <div class="row" style="margin-top:8px;flex-wrap:wrap;gap:6px 18px">${chk("Go back to camp after each kill", x.farm_back !== false, "set farm.back_to_camp true", "set farm.back_to_camp false")}
-          ${chk("Bring each mob back to camp (the others wait there)", !!x.farm_pull_back, "set farm.pull_back true", "set farm.pull_back false")}</div>
+          ${chk("Bring each mob back to camp (the others wait there)", !!x.farm_pull_back, "set farm.pull_back true", "set farm.pull_back false")}
+          ${chk("When this spot runs dry for 3 minutes, move on to the next saved spot here", !!x.farm_rotate, "set farm.rotate true", "set farm.rotate false")}</div>
         ${x.farm_pull_back ? `<div class="hint" style="margin-top:4px">It pulls, runs back to camp with the mob following, and fights it there. The others wait at camp and join when it arrives
           (they get the camp when you click Start farming).</div>` : ""}`
       : `<div class="row" style="margin-top:8px;align-items:center">

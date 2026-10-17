@@ -211,8 +211,13 @@ local function best_target(me)
     local best, best_score
     local mobs = windower.ffxi.get_mob_array() or {}
     state.farm_packed = 0
+    local seen, theirs = 0, 0                         -- how busy the spot is (mobs on the list someone else has)
     for _, mob in pairs(mobs) do
-        local verdict = farm.judge(mob, me, ids, center)
+        local verdict, why = farm.judge(mob, me, ids, center)
+        if type(mob) == 'table' and mob.spawn_type == 16 and (mob.hpp or 0) > 0 and (S.farm.mode ~= 'list' or matches(mob.name, list(S.farm.targets))) then
+            if verdict or why == 'theirs' then seen = seen + 1 end
+            if why == 'theirs' then theirs = theirs + 1 end
+        end
         if verdict then
             local score = util.dist(mob) * farm.pay_factor(mob.name) - (verdict == 'aggro' and 1000 or 0)
             local n = verdict == 'target' and farm.pack_count(mob, ids, mobs) or 0
@@ -225,6 +230,7 @@ local function best_target(me)
             if score and (not best or score < best_score) then best, best_score = mob, score end
         end
     end
+    state.farm_busy = { theirs = theirs, seen = seen }
     return best
 end
 
@@ -493,6 +499,48 @@ farm.item_id = item_id
 
 local function item_name(id) local it = res.items[id] return it and it.en or ('item ' .. tostring(id)) end
 
+-- kills over time (upgrade 5): a timestamp per kill this run, shown as kills per 5 minutes over the last hour
+function farm.kill_watch()
+    local r = state.farm_run
+    if not r then return end
+    local k = kills_now() - r.kills0
+    r.seen = r.seen or 0
+    while r.seen < k do r.seen = r.seen + 1 r.times = r.times or {} r.times[#r.times + 1] = now() end
+end
+
+function farm.spark()
+    local r = state.farm_run
+    if not r then return nil end
+    local out = {}
+    for i = 1, 12 do out[i] = 0 end
+    local t = now()
+    for _, kt in ipairs(r.times or {}) do
+        local b = 12 - math.floor((t - kt) / 300)
+        if b >= 1 and b <= 12 then out[b] = out[b] + 1 end
+    end
+    return out
+end
+
+-- spot rotation (upgrade 5, MMOMinion's grind markers): nothing to fight here for 3 minutes - load the next saved farm
+-- spot in this zone and walk to its camp
+function farm.rotate()
+    if not S.farm.rotate then return false end
+    local here = {}
+    for _, sp in ipairs(farm.spots()) do if sp.here then here[#here + 1] = sp.k end end
+    if #here < 2 then return false end
+    local cur = 0
+    for i, k in ipairs(here) do if k == state.farm_spot then cur = i end end
+    local nxt = here[cur % #here + 1]
+    if farm.load_spot(nxt) then
+        state.farm_spot = nxt
+        state.farm_idle_since, state.farm_idle_told = now(), nil
+        h.log('This spot ran dry: moving on to ' .. (S.farmspots[nxt]:match('^([^|]*)|') or 'the next spot'))
+        h.save()
+        return true
+    end
+    return false
+end
+
 -- free inventory slots (for the dashboard and the checklist)
 function farm.inv_free()
     local inv = windower.ffxi.get_items('inventory')
@@ -580,6 +628,7 @@ function farm.run_stats()
     return { secs = secs, kills = kills, kph = secs >= 120 and math.floor(kills * 3600 / secs + 0.5) or nil,
              every = kills > 0 and math.floor(secs / kills + 0.5) or nil, skipped = state.farm_skipped or 0,
              loot = farm.loot_list(), mobs = farm.report(), chain = farm.chain_info(), free = farm.inv_free(),
+             spark = farm.spark(), busy = state.farm_busy,
              item = have and { n = S.farm.item, have = have, goal = S.farm.item_goal } or nil }
 end
 
@@ -690,6 +739,7 @@ function farm.tick(player)
     state.farm_go = nil
     -- nothing to fight for 5 minutes: say so once (the app's Alarms ring) - the spot may be camped or the list wrong
     state.farm_idle_since = state.farm_idle_since or now()
+    if now() - state.farm_idle_since >= 180 and farm.rotate() then return false end
     if not state.farm_idle_told and now() - state.farm_idle_since >= 300 then
         state.farm_idle_told = true
         h.log('Farming: nothing to fight for 5 minutes')

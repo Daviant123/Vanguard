@@ -1,5 +1,14 @@
 [
   {
+    "version": "1.36.0",
+    "date": "2026-10-16",
+    "items": [
+      "Farming: spot rotation. Save a few farm spots in a zone and tick \"move on to the next saved spot\" - when one runs dry for 3 minutes, the farmer walks to the next.",
+      "A small chart shows kills per 5 minutes over the last hour, so you can see when a spot slows down.",
+      "The checklist now warns when a spot is busy (most mobs belong to other players) and when Reraise or food is missing."
+    ]
+  },
+  {
     "version": "1.35.0",
     "date": "2026-10-16",
     "items": [
