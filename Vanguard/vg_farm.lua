@@ -421,11 +421,25 @@ local function time_alert(text)
     -- only when it's running out (10 minutes or less): the game also says how much is left every time it's
     -- extended - "107 minutes left" rang the Alarms every minute in his real game
     if unit == 'minute' and tonumber(n) > 10 then return end
-    local key = n .. unit
+    -- the game counts the last 10 seconds one by one: ring for 30 s only (his real game rang 10 times in 10 s)
+    if unit == 'second' then
+        state.farm_time_left = { n = tonumber(n), unit = unit, t = now() }
+        if state.farm_time_told == 'last' then return end
+    end
+    local key = unit == 'second' and 'last' or (n .. unit)
     if state.farm_time_told == key then return end
     state.farm_time_told = key
     state.farm_time_left = { n = tonumber(n), unit = unit, t = now() }
     h.log(('Farming: Abyssea time: %s %s%s left'):format(n, unit, n == '1' and '' or 's'))
+end
+
+-- the last minute of Abyssea time (upgrade 31): being sent out mid-fight wastes the kill, so no new pulls then
+function farm.time_nearly_up()
+    local tl = state.farm_time_left
+    if not tl or not S.farm.time_alert then return false end
+    local secs = tl.unit == 'second' and tl.n or tl.n * 60
+    local left = secs - (now() - tl.t)
+    return left <= 60 and left > -30
 end
 
 function farm.on_text(text)
@@ -1081,6 +1095,10 @@ function farm.tick(player)
         return false
     end
     farm.widen_tick(mob, camp, me)
+    if mob and farm.time_nearly_up() and farm.judge(mob, me, select(2, party()), camp) ~= 'aggro' then
+        status('Abyssea time nearly up: not pulling another mob')
+        return false
+    end
     if mob then
         state.farm_idle_since, state.farm_idle_told = nil, nil
         status(('going for %s (%d yalms)'):format(mob.name, math.floor(util.dist(mob) + 0.5)))

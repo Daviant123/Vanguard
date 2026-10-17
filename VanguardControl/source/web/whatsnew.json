@@ -1,5 +1,13 @@
 [
   {
+    "version": "1.62.0",
+    "date": "2026-10-17",
+    "items": [
+      "Abyssea: in the last minute of Visitant time farming doesn't pull another mob (being sent out mid-fight wastes the kill); mobs already on you are still fought.",
+      "Fix: the Abyssea alarm rang every second for the last 10 seconds. It rings once for the final seconds now."
+    ]
+  },
+  {
     "version": "1.61.0",
     "date": "2026-10-17",
     "items": [
