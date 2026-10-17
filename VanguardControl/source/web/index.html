@@ -1512,6 +1512,8 @@ function farmTab(c, p) {
             <div><div class="fstatus" style="color:${statusCol}">${esc(statusText)}</div>
               <div class="hint">${esc(selected)} ${farming ? `· ${mode === "list" ? esc(tgt.join(", ")) : mode === "aggro" ? "only what attacks us" : "anything nearby"}` : paused ? "· click Resume" : ready ? "· click Start farming" : "· step 1 below"}</div></div>
           </div>
+          <div class="row" style="margin-top:6px;align-items:center"><span class="hint">Start / stop from the game with</span>
+            ${sel("farmkey ", [{v: "off", l: "no key"}, {v: "^f8", l: "Ctrl+F8"}, {v: "^f9", l: "Ctrl+F9"}, {v: "^f10", l: "Ctrl+F10"}, {v: "!f9", l: "Alt+F9"}], x.farm_hotkey || "off")}</div>
           <div class="tiles">
             <div class="tile"><b>${run.secs ? mins(run.secs) : "—"}</b><span>this run</span></div>
             <div class="tile"><b>${run.kills ?? "—"}</b><span>kills</span></div>

@@ -1,6 +1,6 @@
 _addon.name = 'Vanguard'
 _addon.author = 'Daviant'
-_addon.version = '0.54.0'
+_addon.version = '0.55.0'
 _addon.commands = {'vanguard', 'vg'}
 
 --[[
@@ -124,6 +124,7 @@ local defaults = {
              rest_idle = true,                    -- rest at camp while there's nothing to fight (up when a mob comes)
              check = false, skip_weak = false, skip_tough = false,  -- /check each new kind; skip Too Weak / Incredibly Tough + NMs
              polite = true,                       -- leave unclaimed mobs another player is standing next to
+             hotkey = '',                         -- a key that starts / stops farming from the game window (^f9 ...)
              packs = true, pack_range = 8, pack_strict = false },
     farmspots = { s0 = '' },
     trials = { t0 = '' }, trial_assist = '',   -- Magian trials (vg_trials): t1 = "kind|goal|ws|mobs|count"      -- saved farm spots (vg_farm): s1, s2, ... = "name|zone|field=value|..." 
@@ -1481,10 +1482,18 @@ windower.register_event('ipc message', function(msg)
     if who and who:lower() == player.name:lower() then windower.send_command('vg ' .. cmd) end
 end)
 
+-- the farming key (picked in the app): starts / stops / resumes farming from the game window
+local FARM_KEYS = { ['^f8'] = true, ['^f9'] = true, ['^f10'] = true, ['!f9'] = true }
+local function farm_key(on, key)
+    key = key or settings.farm.hotkey
+    if key and FARM_KEYS[key] then windower.send_command(on and ('bind %s vg farming toggle'):format(key) or ('unbind ' .. key)) end
+end
+
 windower.register_event('load', function()
     bridge.start(settings)
     if settings.keys then bind_keys(true) end
     quick.hk_bind_all(true)
+    farm_key(true)
     if windower.ffxi.get_info().logged_in then load_profile() end
     update.on_load()
 end)
@@ -1499,6 +1508,7 @@ windower.register_event('unload', function()
     stop_running() bridge.stop() hud.destroy()
     if settings.keys then bind_keys(false) end
     quick.hk_bind_all(false)
+    farm_key(false)
 end)
 
 ------------------------------------------------------------------------
@@ -1904,6 +1914,13 @@ windower.register_event('addon command', function(cmd, ...)
             stop_running()
             if settings.farm.pull_back then farm.share_camp(windower.ffxi.get_player(), false) end
             log('Farming stopped')
+        elseif sub == 'toggle' then
+            -- the farming key: stop when farming, resume when paused, else start
+            local r = state.farm_run
+            if settings.modules.farm and settings.enabled then windower.send_command('vg farming stop')
+            elseif settings.modules.farm and r and r.paused then windower.send_command('vg farming resume')
+            else windower.send_command('vg farming start') end
+            return
         elseif sub == 'pause' then
             farm.pause(true) log('Farming paused')
         elseif sub == 'resume' then
@@ -1949,6 +1966,14 @@ windower.register_event('addon command', function(cmd, ...)
         elseif sub == 'del' then trials.remove(rest)
         elseif sub == 'reset' then trials.reset(rest)
         elseif sub == 'assist' then trials.assist(rest) end
+        save_profile() send_profile()
+    elseif cmd == 'farmkey' then
+        -- the Farming tab's key menu: //vg farmkey ^f9 | off
+        local key = (args[1] or 'off'):lower()
+        farm_key(false)
+        settings.farm.hotkey = FARM_KEYS[key] and key or ''
+        farm_key(true)
+        log(settings.farm.hotkey ~= '' and ('Farming key: ' .. settings.farm.hotkey:gsub('%^', 'Ctrl+'):gsub('!', 'Alt+'):upper()) or 'No farming key')
         save_profile() send_profile()
     elseif cmd == 'farmitem' then
         -- the Farming tab's "Farm for": //vg farmitem <item name> | none

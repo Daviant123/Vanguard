@@ -1,5 +1,12 @@
 [
   {
+    "version": "1.45.0",
+    "date": "2026-10-17",
+    "items": [
+      "Farming key: pick Ctrl+F9 (or F8, F10, Alt+F9) on the Farming tab, then start, stop and resume farming from the game window with one key press."
+    ]
+  },
+  {
     "version": "1.44.0",
     "date": "2026-10-16",
     "items": [
