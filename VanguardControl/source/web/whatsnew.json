@@ -1,5 +1,13 @@
 [
   {
+    "version": "1.42.0",
+    "date": "2026-10-16",
+    "items": [
+      "Farming shows in the game too: the Vanguard box on screen gets a line with what the farmer is doing, kills, kills per hour, your item goal and the XP / CP chain.",
+      "Behind the scenes: 230 random farming sessions were played out in the simulator (different mobs, settings and spots) - no problems found."
+    ]
+  },
+  {
     "version": "1.41.0",
     "date": "2026-10-16",
     "items": [

@@ -71,13 +71,32 @@ function hud.lines()
     return out
 end
 
+-- Farming (upgrade 13): one line for the farmer - what it's doing, kills, kills / hour, the chain - so it can be
+-- followed from the game window without the app
+function hud.farm_line()
+    if not S.modules.farm then return nil end
+    local ok, f = pcall(require, 'vg_farm')
+    if not ok then return nil end
+    local r = f.run_stats and f.run_stats() or nil
+    local c = f.chain_info and f.chain_info() or nil
+    local parts = { 'Farming: ' .. (S.enabled and (state.farm_status or 'starting') or (r and r.paused and 'paused' or 'stopped')) }
+    if r then
+        parts[#parts + 1] = r.kills .. ' kills'
+        if r.kph then parts[#parts + 1] = r.kph .. '/h' end
+        if r.item then parts[#parts + 1] = ('%d/%d %s'):format(r.item.have, r.item.goal or 0, r.item.n) end
+    end
+    if c and c.n >= 1 then parts[#parts + 1] = 'chain #' .. c.n end
+    return table.concat(parts, '  ')
+end
+
 -- On the leader: draw the box once a second (hidden when nobody reports to me).
 function hud.draw()
     if clock() - last_draw < 1 then return end
     last_draw = clock()
     for name, a in pairs(hud.alts) do if clock() - a.t > 60 then hud.alts[name] = nil end end
     local lines = hud.lines()
-    if not S.alts.hud or #lines == 0 then
+    local fl = hud.farm_line()
+    if not S.alts.hud or (#lines == 0 and not fl) then
         if box then box:hide() end
         return
     end
@@ -85,7 +104,8 @@ function hud.draw()
         box = texts.new('', { pos = { x = S.hud.x, y = S.hud.y }, bg = { alpha = 190, red = 18, green = 20, blue = 26 },
             text = { font = 'Consolas', size = 10 }, flags = { draggable = true }, padding = 4 })
     end
-    local t = { GREEN .. 'Vanguard alts\\cr' }
+    local t = { GREEN .. (#lines > 0 and 'Vanguard alts' or 'Vanguard') .. '\\cr' }
+    if fl then t[#t + 1] = fl:sub(1, 90) end
     for _, l in ipairs(lines) do t[#t + 1] = l.color and (l.color .. l.text .. '\\cr') or l.text end
     box:text(table.concat(t, '\n'))
     box:show()
