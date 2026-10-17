@@ -408,7 +408,25 @@ end
 -- even match / tough / very tough / incredibly tough; "impossible to gauge" (notorious monsters)
 local GRADES = { { 'too weak', 'weak' }, { 'easy prey', 'easy' }, { 'decent challenge', 'decent' }, { 'even match', 'even' },
     { 'incredibly tough', 'itough' }, { 'very tough', 'vtough' }, { 'tough', 'tough' }, { 'impossible to gauge', 'nm' } }
+-- Abyssea time (upgrade 27): his run ended when Visitant time ran out and he was sent out mid-farm. The game's own
+-- warnings ("... visitant status will wear off in 5 minutes", seconds near the end) are passed on as a "Farming: "
+-- line, so the app's Alarms ring while there's still time to top it up. Each warning once.
+local function time_alert(text)
+    if not S.farm.time_alert or not S.enabled then return end
+    local low = text:lower()
+    if not low:find('visitant', 1, true) then return end
+    local n, unit = low:match('(%d+)%s*(minute)')
+    if not n then n, unit = low:match('(%d+)%s*(second)') end
+    if not n then return end
+    local key = n .. unit
+    if state.farm_time_told == key then return end
+    state.farm_time_told = key
+    state.farm_time_left = { n = tonumber(n), unit = unit, t = now() }
+    h.log(('Farming: Abyssea time: %s %s%s left'):format(n, unit, n == '1' and '' or 's'))
+end
+
 function farm.on_text(text)
+    if text then pcall(time_alert, text) end
     local name = state.farm_checking
     if not name or not text then return end
     local low = text:lower()

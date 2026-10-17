@@ -1,5 +1,12 @@
 [
   {
+    "version": "1.58.0",
+    "date": "2026-10-17",
+    "items": [
+      "Farming in Abyssea: when the game warns that your Visitant time is running out, the app's alarm rings (\"Farming: Abyssea time: 5 minutes left\"), so you can top it up before you're sent out. On by default under Stop when."
+    ]
+  },
+  {
     "version": "1.57.0",
     "date": "2026-10-17",
     "items": [
