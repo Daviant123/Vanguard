@@ -324,7 +324,10 @@ local function engage(me, mob)
     local chosen_v = farm.judge(mob, me, ids, center_of(me))
     local tries = (state.farm_go and state.farm_go.id == mob.id) and state.farm_go.tries or 0
     if tv and t.id ~= mob.id and tries < 4 and (chosen_v == 'aggro' and tv ~= 'aggro' or
-        (mob.target_index and farm.on_party_member(mob.target_index) and not (t.target_index and farm.on_party_member(t.target_index)))) then
+        (mob.target_index and farm.on_party_member(mob.target_index) and not (t.target_index and farm.on_party_member(t.target_index))) or
+        -- (also: a lone mob was chosen and /targetbnpc picked one with company - found when the simulator's timing
+        -- changed: it engaged the pack of three it had decided to avoid)
+        (tv == 'target' and chosen_v == 'target' and farm.pack_count(t, ids) > farm.pack_count(mob, ids))) then
         tv = nil
     end
     if t and tv then

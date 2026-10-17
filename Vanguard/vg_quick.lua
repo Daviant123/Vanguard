@@ -101,6 +101,7 @@ function quick.act(player, kind, target, name)
     elseif kind == 'ws' then
         local ws = util.wskill(name)
         if not ws then return nil, 'unknown weapon skill' end
+        if player.status ~= 1 then return nil, 'not fighting (a weapon skill needs to be engaged)' end
         cmd = ('input /ws "%s" %s'):format(ws.en, tgt == '<me>' and '<t>' or tgt)
     elseif kind == 'item' then
         local found

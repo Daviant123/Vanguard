@@ -272,8 +272,11 @@ end
 -- filter(a) -> bool selects which actions this pass may run.
 function engine.run(ctx, profile, filter)
     if not ctx.settings.modules.actions or not profile then return false end
+    -- only what this job / sub job / level can use now: a toggle left on from another sub job (Warcry from /WAR while
+    -- /DNC) would otherwise be tried, since an ability the character doesn't have has no recast and looks ready
+    local ja_set = ability_set()
     for _, a in ipairs(engine.ordered(ctx.player.main_job, profile)) do
-        if (not filter or filter(a)) and engine.enabled(a, profile) then
+        if (not filter or filter(a)) and engine.enabled(a, profile) and engine.available(a, ctx.player, ja_set) then
             if try(engine.effective(a, profile), ctx) then return true end
         end
     end

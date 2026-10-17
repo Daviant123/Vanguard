@@ -174,13 +174,26 @@ end
 local fired_on = {}   -- [rule key] = mob id it fired on (for "once")
 
 -- Returns true if a trigger fired this tick.
+-- A weapon skill can only be used engaged, and anything aimed at the battle target needs one: a rule like
+-- "tp>=1000 -> vg act ws bt Atonement" (no "engaged") kept firing between fights - his report, 2026-10-17 - so such
+-- commands wait until they can work (without using up the rule's cooldown).
+local function can_work(cmd, player, bt)
+    local c = ' ' .. cmd:lower() .. ' '
+    local ws = c:find(' act ws ', 1, true) or c:find('/ws ', 1, true) or c:find('/weaponskill ', 1, true)
+    if ws and player.status ~= 1 then return false end
+    local at_bt = c:find('<bt>', 1, true) or c:find(' act %a+ bt ')
+    if at_bt and not bt then return false end
+    return true
+end
+
 function triggers.run(settings, player, state)
     for key, rule in pairs(settings.triggers) do
         if type(rule) == 'string' and rule ~= '' then
             local conds, cmd, cooldown, once = parse_rule(rule)
             local bt = windower.ffxi.get_mob_by_target('bt')
             local blocked = once and bt and fired_on[key] == bt.id
-            if conds and #conds > 0 and not blocked and (not fired[key] or now() - fired[key] >= cooldown) then
+            if conds and #conds > 0 and not blocked and (not fired[key] or now() - fired[key] >= cooldown)
+                and can_work(cmd, player, bt) then
                 local ok = true
                 for _, c in ipairs(conds) do
                     if not check(c, player) then ok = false break end

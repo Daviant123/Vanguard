@@ -1,5 +1,14 @@
 [
   {
+    "version": "1.52.1",
+    "date": "2026-10-17",
+    "items": [
+      "Fix: abilities your current job / sub job can't use (Warcry or Provoke left switched on from /WAR while you're /DNC) are no longer tried.",
+      "Fix: a reaction with a weapon skill (like \"TP 1000 or more: Atonement\") no longer fires between fights - weapon skills wait until you're engaged, and anything aimed at the enemy waits until there is one.",
+      "Fix: farming that picked a lone mob could still attack one standing in a group when the game's target-nearest landed on it."
+    ]
+  },
+  {
     "version": "1.52.0",
     "date": "2026-10-17",
     "items": [
