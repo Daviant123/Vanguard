@@ -1613,6 +1613,8 @@ function farmTab(c, p) {
         [run.busy && run.busy.seen ? run.busy.theirs * 2 < run.busy.seen : null, run.busy && run.busy.seen ? `Spot not busy (${run.busy.theirs} of ${run.busy.seen} taken)` : "Spot not busy", "most mobs here are someone else's - try another spot"],
         [arr(s.buffs).some(b => /^Reraise/.test(b.n)), "Reraise up", "no Reraise on " + selected + " (Upkeep, Team tab)"],
         [arr(s.buffs).some(b => b.n === "Food"), "Food up", "no food on " + selected + " (Upkeep, Team tab)"],
+        [/^Abyssea/.test(s.zone || "") ? arr(s.buffs).some(b => b.n === "Visitant") : null, "Visitant status (Abyssea)",
+          "no Visitant status - you'll be sent out of Abyssea in a few minutes (a Conflux Surveyor gives it)"],
       ];
       const team = Object.keys(chars).filter(n => chars[n].online).sort((a, b) => (a === selected ? -1 : b === selected ? 1 : a.localeCompare(b)));
       const teamBox = team.length > 1 ? `<div class="box"><h3>The team right now</h3><div class="row" style="flex-wrap:wrap;gap:10px">

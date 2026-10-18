@@ -894,8 +894,20 @@ function farm.inventory_names()
     return out
 end
 
+-- Abyssea without Visitant status (upgrade 36): the game sends you out within minutes - say so when farming starts
+-- there (a "Farming: " line, so the Alarms ring)
+local VISITANT = 285
+function farm.visitant_check(player)
+    local z = res.zones[zone()]
+    if not (z and z.en and z.en:find('^Abyssea')) then return false end
+    for _, b in ipairs((player and player.buffs) or {}) do if b == VISITANT then return false end end
+    h.log("Farming: no Visitant status - you'll be sent out of Abyssea in a few minutes (a Conflux Surveyor gives it)")
+    return true
+end
+
 function farm.start(player, me)
     local xp, cp = points()
+    pcall(farm.visitant_check, player)
     local okt, tr = pcall(require, 'vg_trials')
     state.farm_run = { t = now(), kills0 = kills_now(), xp0 = xp, cp0 = cp, lv0 = player and tonumber(player.main_job_level) or nil,
                        trials0 = okt and tr.counts and tr.counts() or nil }
