@@ -1,5 +1,12 @@
 [
   {
+    "version": "1.70.1",
+    "date": "2026-10-18",
+    "items": [
+      "Vanguard Control looks for its own updates every hour instead of every 6 hours, so new features reach the open window sooner."
+    ]
+  },
+  {
     "version": "1.70.0",
     "date": "2026-10-18",
     "items": [

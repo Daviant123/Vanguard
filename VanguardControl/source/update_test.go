@@ -1,6 +1,7 @@
 package main
 
 import (
+	"time"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -92,5 +93,13 @@ func TestSwapInWhenOldIsInUse(t *testing.T) {
 	}
 	if b, _ := os.ReadFile(filepath.Join(dir, "b.old.exe")); string(b) != "MZ b" {
 		t.Errorf("the usual .old.exe name when it's free, got %q", b)
+	}
+}
+
+// The panel looks for a newer version every hour (it was every 6 hours, and his open window stayed several
+// versions behind while new ones were published).
+func TestUpdateEveryHour(t *testing.T) {
+	if updateEvery != time.Hour {
+		t.Fatalf("update check every %v, want 1h", updateEvery)
 	}
 }

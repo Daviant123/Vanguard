@@ -1,6 +1,6 @@
 // Self-update from the GitHub page (user request 2026-10-15).
 //
-// A few seconds after it starts (and every 6 hours) the panel reads VanguardControl/version.txt on
+// A few seconds after it starts (and every hour) the panel reads VanguardControl/version.txt on
 // github.com/Daviant123/Vanguard. When that is newer than panelVersion it downloads the new
 // "Vanguard Control.exe", swaps it in (Windows lets a running exe be renamed, not overwritten) and
 // restarts itself; the open window carries on with the new version. A file named "noupdate.txt" next
@@ -20,7 +20,10 @@ import (
 	"time"
 )
 
-var panelVersion = "1.70.0" // set by -X for tests; the published version
+var panelVersion = "1.70.1" // set by -X for tests; the published version
+
+// how often the panel looks for a newer version (was 6 hours: his open window stayed several versions behind)
+var updateEvery = time.Hour
 
 var updateBase = "https://raw.githubusercontent.com/Daviant123/Vanguard/main/VanguardControl/" // tests point it elsewhere
 
@@ -168,7 +171,7 @@ func (h *hub) autoUpdate(restart func(exe string)) {
 			if try(latest) {
 				return
 			}
-		case <-time.After(6 * time.Hour):
+		case <-time.After(updateEvery):
 		}
 	}
 }
