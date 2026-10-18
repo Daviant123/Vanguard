@@ -915,7 +915,7 @@ function farm.start(player, me)
     pcall(farm.visitant_check, player)
     local okt, tr = pcall(require, 'vg_trials')
     if okt and tr.weapon_check then pcall(tr.weapon_check, S.farm.mode == 'list' and S.farm.targets or '') end
-    state.farm_run = { t = now(), kills0 = kills_now(), xp0 = xp, cp0 = cp, lv0 = player and tonumber(player.main_job_level) or nil,
+    state.farm_run = { t = now(), kills0 = kills_now(), zone0 = res.zones[zone()] and res.zones[zone()].en or nil, xp0 = xp, cp0 = cp, lv0 = player and tonumber(player.main_job_level) or nil,
                        trials0 = okt and tr.counts and tr.counts() or nil }
     state.farm_inv, state.farm_inv_t, state.farm_loot = inv_counts(), now(), {}
     state.farm_bl, state.farm_skipped, state.farm_go, state.farm_fails = {}, 0, nil, {}
@@ -1029,7 +1029,11 @@ function farm.send_run(player, why)
     local r = farm.run_stats()
     if not r then return end
     local xp, cp = points()
-    local z = res.zones[zone()] and res.zones[zone()].en or '?'
+    -- where the run was (not where it ended up: most of his runs end by being sent out of Abyssea), and the mob it
+    -- killed most (not the first name on the list, which stays "Peapuk" while fighting anything)
+    local z = state.farm_run.zone0 or (res.zones[zone()] and res.zones[zone()].en) or '?'
+    local most
+    for _, m in ipairs(r.mobs or {}) do if not most or m.k > most.k then most = m end end
     local top = {}
     for i, l in ipairs(r.loot or {}) do if i <= 3 then top[#top + 1] = l.c .. ' ' .. l.n end end
     local mins = math.floor(r.secs / 60)
@@ -1038,9 +1042,10 @@ function farm.send_run(player, why)
     h.log(('Run over (%s): %d min, %d kills%s, %d XP, %d CP%s%s'):format(why or 'stopped', mins, r.kills,
         r.kph and (' (' .. r.kph .. ' an hour)') or '', math.max(0, xp - (state.farm_run.xp0 or xp)), math.max(0, cp - (state.farm_run.cp0 or cp)),
         #top > 0 and (', loot: ' .. table.concat(top, ', ')) or '', trial ~= '' and (', Magian trial ' .. trial) or ''))
-    if h.send then pcall(h.send, { type = 'farmrun', name = player and player.name or '?', zone = z, secs = r.secs, kills = r.kills,
+    if h.send and (r.kills > 0 or r.secs >= 60) then pcall(h.send, { type = 'farmrun', name = player and player.name or '?', zone = z, secs = r.secs, kills = r.kills,
         xp = math.max(0, xp - (state.farm_run.xp0 or xp)), cp = math.max(0, cp - (state.farm_run.cp0 or cp)),
-        loot = table.concat(top, ', '), why = why or 'stopped', mobs = list(S.farm.targets)[1] or S.farm.mode,
+        loot = table.concat(top, ', '), why = why or 'stopped',
+        mobs = most and most.n or (S.farm.mode == 'list' and list(S.farm.targets)[1]) or (S.farm.mode == 'aggro' and 'what attacks us' or 'anything nearby'),
         trial = trial ~= '' and trial or nil }) end
     state.farm_run = nil
 end

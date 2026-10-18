@@ -1,5 +1,12 @@
 [
   {
+    "version": "1.70.2",
+    "date": "2026-10-18",
+    "items": [
+      "Fix: Past runs and Best spots showed the wrong place and mob (where you ended up after Abyssea time ran out, and the first mob on the list). Runs are now saved with the zone they started in and the mob killed most; very short runs with no kills aren't saved."
+    ]
+  },
+  {
     "version": "1.70.1",
     "date": "2026-10-18",
     "items": [
