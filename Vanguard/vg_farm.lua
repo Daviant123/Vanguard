@@ -421,6 +421,11 @@ local function time_alert(text)
     -- only when it's running out (10 minutes or less): the game also says how much is left every time it's
     -- extended - "107 minutes left" rang the Alarms every minute in his real game
     if unit == 'minute' and tonumber(n) > 10 then return end
+    -- ...and only at 10, 5 and 1 minutes (the game also says 9, 7, 2 ...: seven alarms in ten minutes in his game)
+    if unit == 'minute' and not ({ ['10'] = true, ['5'] = true, ['1'] = true })[n] then
+        state.farm_time_left = { n = tonumber(n), unit = unit, t = now() }
+        return
+    end
     -- the game counts the last 10 seconds one by one: ring for 30 s only (his real game rang 10 times in 10 s)
     if unit == 'second' then
         state.farm_time_left = { n = tonumber(n), unit = unit, t = now() }

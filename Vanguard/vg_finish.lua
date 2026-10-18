@@ -64,7 +64,8 @@ end
 -- (also whenever the mob is one an open weapon skill trial for this weapon skill wants - upgrade 29: his next trial
 -- (Buzzflies) wasn't on "Help finish it", so the hold-off never ran and 11 of 12 misses were mobs dying first)
 local function waits(t)
-    if S.ws.finish_wait or (S.trial_assist and S.trial_assist ~= '') then return true end
+    local okt, trm = pcall(require, 'vg_trials')
+    if S.ws.finish_wait or (okt and trm.assisting and trm.assisting()) then return true end
     local ok, tr = pcall(require, 'vg_trials')
     return ok and tr.wants and t and t.name and tr.wants(t.name, S.ws.finish) or false
 end
@@ -125,9 +126,9 @@ function finish.ws(player, t)
     if not on(f) or not t or not t.hpp or t.hpp <= 0 then return nil end
     -- only while a Magian trial needs this mob killed with it (upgrade 38): with no trial left he was still holding TP
     -- for Atonement on every Bog Body, at half the kills an hour; otherwise the normal weapon skill rules apply
-    if S.ws.finish_trial_only and not (S.trial_assist and S.trial_assist ~= '' and type(S.trial_assist) == 'string') then
+    if S.ws.finish_trial_only then
         local ok, tr = pcall(require, 'vg_trials')
-        if not (ok and tr.wants and tr.wants(t.name, f)) then return nil end
+        if not (ok and ((tr.assisting and tr.assisting()) or (tr.wants and tr.wants(t.name, f)))) then return nil end
     end
     finish.learn_tick()
     state.finish_seen = { id = t.id, hpp = t.hpp }

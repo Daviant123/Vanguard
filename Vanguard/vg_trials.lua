@@ -238,6 +238,15 @@ function trials.progress(before)
     return table.concat(parts, ', ')
 end
 
+-- "Help finish it" is on for a trial that's still there and not done (the setting can point at a removed trial: his
+-- finisher kept holding TP with no trials left, 2026-10-18)
+function trials.assisting()
+    local k = S.trial_assist
+    if type(k) ~= 'string' or k == '' or type(S.trials) ~= 'table' then return false end
+    local t = decode(S.trials[k])
+    return t ~= nil and t.count < t.goal
+end
+
 function trials.game_line() return state.trial_game end
 
 function trials.init(settings, runtime_state, helpers)

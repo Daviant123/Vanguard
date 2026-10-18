@@ -1,5 +1,13 @@
 [
   {
+    "version": "1.69.1",
+    "date": "2026-10-18",
+    "items": [
+      "Fix: the finishing weapon skill kept holding TP with no trials left (\"Help finish it\" still pointed at a removed trial).",
+      "The Abyssea time alarm rings at 10, 5 and 1 minutes and 30 seconds only."
+    ]
+  },
+  {
     "version": "1.69.0",
     "date": "2026-10-18",
     "items": [
