@@ -965,6 +965,10 @@ local function stop_reason(player)
     if goal > 0 and r and lv >= goal and lv > (state.farm_run.lv0 or lv) then return ('%s reached level %d'):format(player.main_job or 'job', lv) end
     local ok, tr = pcall(require, 'vg_trials')
     if ok and tr.assist_done and tr.assist_done() then S.trial_assist = '' return 'Magian trial done' end
+    if state.trial_finished then
+        state.trial_finished = nil
+        if S.farm.stop_trial then return 'Magian trial done' end
+    end
     if S.farm.stop_full then
         local inv = windower.ffxi.get_items('inventory')
         if inv and inv.max and inv.max > 0 and (inv.count or 0) >= inv.max then return 'the inventory is full' end

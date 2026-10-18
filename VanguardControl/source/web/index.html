@@ -1773,6 +1773,7 @@ function farmTab(c, p) {
       <div class="row" style="flex-wrap:wrap;gap:6px 18px">
         ${chk("The inventory is full", x.farm_stop_full !== false, "set farm.stop_full true", "set farm.stop_full false")}
         ${chk("Ring when Abyssea time is running out", x.farm_time_alert !== false, "set farm.time_alert true", "set farm.time_alert false")}
+        ${chk("A Magian trial I'm farming for is done", x.farm_stop_trial !== false, "set farm.stop_trial true", "set farm.stop_trial false")}
         ${chk("Stop the bot when I change zone", x.pause_on_zone !== false, "set pause_on_zone true", "set pause_on_zone false")}
         ${chk("Stop the bot when I change job", x.stop_on_job !== false, "set stop_on_job true", "set stop_on_job false")}
         ${x.pause_on_zone === false ? chk("Sent out of the zone? Farm again when I come back (within 15 minutes)", !!x.farm_rezone, "set farm.rezone true", "set farm.rezone false") : ""}

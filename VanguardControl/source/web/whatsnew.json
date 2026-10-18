@@ -1,5 +1,12 @@
 [
   {
+    "version": "1.65.0",
+    "date": "2026-10-17",
+    "items": [
+      "Magian trials: when a trial you're farming for is done, farming stops and the app's alarm rings - with or without \"Help finish it\". Can be switched off under Stop when."
+    ]
+  },
+  {
     "version": "1.64.1",
     "date": "2026-10-17",
     "items": [

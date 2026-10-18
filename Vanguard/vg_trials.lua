@@ -126,7 +126,13 @@ function trials.on_kill(mob)
             t.count = t.count + 1
             S.trials[k] = encode(t)
             changed = true
-            if t.count >= t.goal then h.log(('Magian trial done: %d / %d%s'):format(t.count, t.goal, t.ws ~= '' and (' with ' .. t.ws) or '')) end
+            if t.count >= t.goal then
+                -- (upgrade 34: while farming, a "Farming: " line - the app's Alarms ring - and farming stops at its next
+                -- check, "Help finish it" or not: his Buzzfly trial finished and farming went on for 20 minutes)
+                h.log(('%sMagian trial done: %d / %d%s'):format(S.modules.farm and 'Farming: ' or '', t.count, t.goal,
+                    t.ws ~= '' and (' with ' .. t.ws) or ''))
+                if S.modules.farm then state.trial_finished = true end
+            end
         end
     end
     if state.trial_ws then state.trial_ws[mob.id] = nil end
