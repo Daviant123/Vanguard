@@ -1479,6 +1479,7 @@ function trialBox(p, mobNames, run) {
     ${list.length ? list.map(t => `<div style="margin-bottom:8px">
         <div class="row" style="justify-content:space-between;align-items:center">
           <span><b>${t.kind === "ws" ? `Defeat ${t.goal} ${esc(t.mobs || "enemies")} with ${esc(t.ws)}` : `Defeat ${t.goal} ${esc(t.mobs || "enemies")}`}</b>
+            ${t.weapon ? `<span class="hint">(${esc(t.weapon)})</span>` : ""}
             ${t.done ? `<span class="pill on">done</span>` : t.assist ? `<span class="pill on">helping</span>` : ""}</span>
           <span><b>${t.count}</b> / ${t.goal}
             <button style="font-size:11px" class="${t.assist ? "primary" : ""}" ${t.done ? "disabled" : ""} onclick="send('trial assist ${t.k}')">${t.assist ? "Helping ✓" : "Help finish it"}</button>

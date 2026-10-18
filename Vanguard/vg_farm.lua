@@ -909,6 +909,7 @@ function farm.start(player, me)
     local xp, cp = points()
     pcall(farm.visitant_check, player)
     local okt, tr = pcall(require, 'vg_trials')
+    if okt and tr.weapon_check then pcall(tr.weapon_check, S.farm.mode == 'list' and S.farm.targets or '') end
     state.farm_run = { t = now(), kills0 = kills_now(), xp0 = xp, cp0 = cp, lv0 = player and tonumber(player.main_job_level) or nil,
                        trials0 = okt and tr.counts and tr.counts() or nil }
     state.farm_inv, state.farm_inv_t, state.farm_loot = inv_counts(), now(), {}

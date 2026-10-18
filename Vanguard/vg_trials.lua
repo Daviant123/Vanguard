@@ -22,13 +22,23 @@ local S, state, h
 
 local function now() return os.clock() end
 
+-- "kind|goal|ws|mobs|count|weapon" (weapon: the trial weapon, from the main hand when the trial was added - upgrade 37)
 local function decode(v)
-    local kind, goal, ws, mobs, count = (v or ''):match('^([^|]*)|([^|]*)|([^|]*)|([^|]*)|([^|]*)$')
+    local kind, goal, ws, mobs, count, weapon = (v or ''):match('^([^|]*)|([^|]*)|([^|]*)|([^|]*)|([^|]*)|?([^|]*)$')
     if not kind then return nil end
-    return { kind = kind, goal = tonumber(goal) or 0, ws = ws, mobs = mobs, count = tonumber(count) or 0 }
+    return { kind = kind, goal = tonumber(goal) or 0, ws = ws, mobs = mobs, count = tonumber(count) or 0, weapon = weapon or '' }
 end
 
-local function encode(t) return table.concat({ t.kind, tostring(t.goal), t.ws or '', t.mobs or '', tostring(t.count) }, '|') end
+local function encode(t) return table.concat({ t.kind, tostring(t.goal), t.ws or '', t.mobs or '', tostring(t.count), t.weapon or '' }, '|') end
+
+-- the weapon in the main hand (its name), or nil
+function trials.main_weapon()
+    local eq = windower.ffxi.get_items('equipment')
+    if type(eq) ~= 'table' or not eq.main or eq.main == 0 then return nil end
+    local it = windower.ffxi.get_items(eq.main_bag or 0, eq.main)
+    local r = it and it.id and it.id ~= 0 and res.items[it.id]
+    return r and r.en or nil
+end
 
 local function keys()
     local out = {}
@@ -43,7 +53,7 @@ function trials.list()
         local t = decode(S.trials[k])
         if t then
             local rt = state.trial_rate and state.trial_rate[k]
-            out[#out + 1] = { k = k, kind = t.kind, goal = t.goal, ws = t.ws, mobs = t.mobs, count = t.count,
+            out[#out + 1] = { k = k, kind = t.kind, goal = t.goal, ws = t.ws, mobs = t.mobs, count = t.count, weapon = t.weapon ~= '' and t.weapon or nil,
                               hits = rt and rt.hit or nil, tries = rt and rt.all or nil, why = rt and rt.why or nil,
                               assist = S.trial_assist == k or nil, done = t.count >= t.goal and t.goal > 0 or nil }
         end
@@ -66,7 +76,8 @@ function trials.add(spec)
     S.trials = S.trials or {}
     local n = 1
     while S.trials['t' .. n] and S.trials['t' .. n] ~= '' do n = n + 1 end
-    S.trials['t' .. n] = encode({ kind = kind, goal = tonumber(goal), ws = ws, mobs = util.trim(mobs or ''), count = 0 })
+    S.trials['t' .. n] = encode({ kind = kind, goal = tonumber(goal), ws = ws, mobs = util.trim(mobs or ''), count = 0,
+                                  weapon = trials.main_weapon() or '' })
     return 't' .. n
 end
 
@@ -97,6 +108,7 @@ function trials.on_kill(mob)
     local hit = state.trial_ws and state.trial_ws[mob.id]
     local finisher = hit and now() - hit.t <= 3 and hit.n or nil
     local changed = false
+    local main = trials.main_weapon()
     for _, k in ipairs(keys()) do
         local t = decode(S.trials[k])
         -- how often the weapon skill lands the kill this session (shown in the app)
@@ -122,7 +134,9 @@ function trials.on_kill(mob)
             end
             state.trial_rate[k] = rt
         end
-        if t and t.count < t.goal and matches(mob.name, t.mobs) and (t.kind == 'kill' or (finisher and finisher == t.ws)) then
+        -- (not with another weapon in the main hand: the game doesn't count those, so neither does this)
+        local weapon_ok = t and (t.weapon == '' or not main or main:lower() == t.weapon:lower())
+        if t and weapon_ok and t.count < t.goal and matches(mob.name, t.mobs) and (t.kind == 'kill' or (finisher and finisher == t.ws)) then
             t.count = t.count + 1
             S.trials[k] = encode(t)
             changed = true
@@ -169,6 +183,23 @@ function trials.assist_done()
     local k = S.trial_assist
     local t = k and k ~= '' and S.trials and decode(S.trials[k])
     return t and t.goal > 0 and t.count >= t.goal or false
+end
+
+-- Farming starts: a trial that's being farmed for, with its weapon not in the main hand -> say so (the Alarms ring)
+function trials.weapon_check(targets)
+    local main = trials.main_weapon()
+    if not main then return false end
+    for _, k in ipairs(keys()) do
+        local t = decode(S.trials[k])
+        if t and t.weapon ~= '' and t.count < t.goal and t.weapon:lower() ~= main:lower() then
+            local farmed = t.mobs == '' or not targets or targets == '' or targets:lower():find(t.mobs:lower(), 1, true)
+            if farmed then
+                h.log(("Farming: %s isn't in the main hand (it's %s) - kills won't count for the Magian trial"):format(t.weapon, main))
+                return true
+            end
+        end
+    end
+    return false
 end
 
 -- An open weapon skill trial wants this mob killed with this weapon skill?
