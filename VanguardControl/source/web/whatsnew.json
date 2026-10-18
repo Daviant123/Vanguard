@@ -1,5 +1,12 @@
 [
   {
+    "version": "1.73.0",
+    "date": "2026-10-18",
+    "items": [
+      "Past runs starts with today's totals: runs, farming time, kills (and per hour) and the loot found most."
+    ]
+  },
+  {
     "version": "1.72.0",
     "date": "2026-10-18",
     "items": [

@@ -1820,6 +1820,7 @@ function farmTab(c, p) {
 
     ${bestSpots(farmRuns)}
     <div class="box"><h3>Past runs</h3>
+      ${todayLine(farmRuns)}
       ${farmRuns.length ? `<table class="grid"><thead><tr><th style="text-align:left">When</th><th>Who</th><th style="text-align:left">Where</th><th>Time</th><th>Kills</th><th>Kills / hour</th><th>XP</th><th>CP</th><th style="text-align:left">Loot</th><th style="text-align:left">Why it stopped</th><th></th></tr></thead><tbody>
         ${farmRuns.slice().reverse().slice(0, 15).map(r => `<tr><td style="text-align:left">${esc(r.time)}</td><td>${esc(r.who)}</td><td style="text-align:left">${esc(r.zone)}<div class="hint">${esc(r.mobs)}</div></td>
           <td>${mins(r.secs)}</td><td>${r.kills}</td><td>${r.secs >= 120 ? Math.round(r.kills * 3600 / r.secs) : "—"}</td><td>${fmtN(r.xp)}</td><td>${fmtN(r.cp)}</td>
@@ -1850,6 +1851,32 @@ function spotStats(runs) {
     cph: Math.round(g.cp * 3600 / g.secs),
     top: Object.entries(g.loot).sort((a, b) => b[1] - a[1]).slice(0, 2).map(([n, c]) => `${Math.round(c * 3600 / g.secs)} ${n}`)}))
     .sort((a, b) => b.kph - a.kph);
+}
+
+// Today (upgrade 41): the day's runs added up - runs, farming time, kills, kills an hour, the loot found most
+function todayTotals(runs, today) {
+  today = today || new Date().toISOString().slice(0, 10);
+  const list = arr(runs).filter(r => r && String(r.time || "").startsWith(today));
+  if (!list.length) return null;
+  const t = {runs: list.length, secs: 0, kills: 0, xp: 0, cp: 0, loot: {}};
+  for (const r of list) {
+    t.secs += r.secs || 0; t.kills += r.kills || 0; t.xp += r.xp || 0; t.cp += r.cp || 0;
+    for (const part of String(r.loot || "").split(",")) {
+      const m = part.trim().match(/^(\d+)\s+(.+)$/);
+      if (m) t.loot[m[2]] = (t.loot[m[2]] || 0) + (+m[1]);
+    }
+  }
+  t.kph = t.secs >= 120 ? Math.round(t.kills * 3600 / t.secs) : null;
+  t.top = Object.entries(t.loot).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([n, c]) => `${c} ${n}`);
+  return t;
+}
+
+function todayLine(runs) {
+  const d = new Date(), today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  const t = todayTotals(runs, today);
+  if (!t) return "";
+  const m = Math.floor(t.secs / 60), time = m >= 60 ? `${Math.floor(m / 60)}h ${m % 60}m` : `${m}m`;
+  return `<div style="margin-bottom:8px"><b>Today:</b> ${t.runs} run${t.runs > 1 ? "s" : ""}, ${time} farming, ${t.kills} kills${t.kph ? ` (${t.kph} an hour)` : ""}${t.xp ? `, ${fmtN(t.xp)} XP` : ""}${t.cp ? `, ${fmtN(t.cp)} CP` : ""}${t.top.length ? `<span class="hint"> - ${esc(t.top.join(", "))}</span>` : ""}</div>`;
 }
 
 function bestSpots(runs) {
