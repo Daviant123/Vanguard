@@ -1,5 +1,12 @@
 [
   {
+    "version": "1.64.1",
+    "date": "2026-10-17",
+    "items": [
+      "Auto finishing weapon skill can go a little higher when mobs keep dying first: up to 2% above its strongest hit or the highest HP it has killed from."
+    ]
+  },
+  {
     "version": "1.64.0",
     "date": "2026-10-17",
     "items": [

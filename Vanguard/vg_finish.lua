@@ -49,7 +49,10 @@ function finish.line(t)
         if killed_at[t.name] and killed_at[t.name] > line and killed_at[t.name] <= mid then line = killed_at[t.name] end
         -- tuned by its misses, between 3 % and the strongest recent hit (upgrade 30: capped at the typical hit it
         -- couldn't rise far enough - his Buzzfly run: 24 died first, 3 didn't-kill)
-        local top = sorted[#sorted]
+        -- (upgrade 33: also a hit that killed from higher up, +2 - his Buzzflies measured 12-13 % but one Atonement
+        -- killed from 15 %, and the misses were still mostly mobs dying first with the line stuck at 13 %; going a bit
+        -- too high shows up as "didn't kill" and comes back down)
+        local top = math.max(sorted[#sorted], killed_at[t.name] or 0) + 2
         return math.max(3, math.min(top, line + (adjust[t.name] or 0)))
     end
     return killed_at[t.name] or 30                    -- nothing learned yet: a careful first guess, learned from
