@@ -1,5 +1,12 @@
 [
   {
+    "version": "1.70.0",
+    "date": "2026-10-18",
+    "items": [
+      "Farming: when only 3 inventory spaces are left, it can ask Steward to tidy the bags (one sort pass) so farming goes on. Tick it under Stop when."
+    ]
+  },
+  {
     "version": "1.69.1",
     "date": "2026-10-18",
     "items": [

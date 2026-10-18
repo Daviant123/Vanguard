@@ -1,6 +1,6 @@
 _addon.name = 'Vanguard'
 _addon.author = 'Daviant'
-_addon.version = '0.77.1'
+_addon.version = '0.78.0'
 _addon.commands = {'vanguard', 'vg'}
 
 --[[
@@ -124,6 +124,7 @@ local defaults = {
              rotate = false,                      -- a spot dry for 3 min: move on to the next saved spot in the zone
              rest_idle = true,                    -- rest at camp while there's nothing to fight (up when a mob comes)
              check = false, skip_weak = false, skip_tough = false,  -- /check each new kind; skip Too Weak / Incredibly Tough + NMs
+             make_room = false,                   -- bags nearly full: ask Steward to tidy them (//stw sort bags)
              stop_trial = true,                   -- a Magian trial it's farming for is done: stop
              rezone = false,                      -- zoned out while farming: back in the same zone within 15 min -> farm again
              time_alert = true,                   -- ring when the game says Abyssea (Visitant) time is running out

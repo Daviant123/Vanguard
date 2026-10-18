@@ -1776,6 +1776,7 @@ function farmTab(c, p) {
     ${!all ? "" : card(5, "Stop when", `
       <div class="row" style="flex-wrap:wrap;gap:6px 18px">
         ${chk("The inventory is full", x.farm_stop_full !== false, "set farm.stop_full true", "set farm.stop_full false")}
+        ${chk("...but first, when only 3 spaces are left, ask Steward to tidy the bags", !!x.farm_make_room, "set farm.make_room true", "set farm.make_room false")}
         ${chk("Ring when Abyssea time is running out", x.farm_time_alert !== false, "set farm.time_alert true", "set farm.time_alert false")}
         ${chk("A Magian trial I'm farming for is done", x.farm_stop_trial !== false, "set farm.stop_trial true", "set farm.stop_trial false")}
         ${chk("Stop the bot when I change zone", x.pause_on_zone !== false, "set pause_on_zone true", "set pause_on_zone false")}

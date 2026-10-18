@@ -996,6 +996,20 @@ local function stop_reason(player)
     return nil
 end
 
+-- Bags nearly full (upgrade 39): ask Steward (his inventory addon) for one tidy-up pass - it moves things out of the
+-- inventory into the other bags by its own rules - so farming goes on instead of stopping at "the inventory is full".
+-- A normal addon command; at most once every 10 minutes.
+function farm.make_room()
+    if not S.farm.make_room then return false end
+    local free = farm.inv_free()
+    if not free or free > 3 then return false end
+    if state.farm_room_t and now() - state.farm_room_t < 600 then return false end
+    state.farm_room_t = now()
+    windower.send_command('stw sort bags')
+    h.log(('Bags nearly full (%d free): asking Steward to tidy them'):format(free))
+    return true
+end
+
 function farm.check_stop(player)
     if not S.modules.farm or not S.enabled then return false end
     -- once a second is plenty (it looks through the inventory); a KO is checked every time
@@ -1003,6 +1017,7 @@ function farm.check_stop(player)
         if state.farm_stop_t and now() - state.farm_stop_t < 1 then return false end
         state.farm_stop_t = now()
     end
+    pcall(farm.make_room)
     local why = stop_reason(player)
     if not why then return false end
     farm.finish(player, why)
