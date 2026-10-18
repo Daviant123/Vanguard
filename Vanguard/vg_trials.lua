@@ -129,8 +129,9 @@ function trials.on_kill(mob)
             if t.count >= t.goal then
                 -- (upgrade 34: while farming, a "Farming: " line - the app's Alarms ring - and farming stops at its next
                 -- check, "Help finish it" or not: his Buzzfly trial finished and farming went on for 20 minutes)
-                h.log(('%sMagian trial done: %d / %d%s'):format(S.modules.farm and 'Farming: ' or '', t.count, t.goal,
-                    t.ws ~= '' and (' with ' .. t.ws) or ''))
+                -- (when farming stops for it, its "Farming stopped: Magian trial done" rings - one alarm, not two)
+                h.log(('%sMagian trial done: %d / %d%s'):format((S.modules.farm and not S.farm.stop_trial) and 'Farming: ' or '',
+                    t.count, t.goal, t.ws ~= '' and (' with ' .. t.ws) or ''))
                 if S.modules.farm then state.trial_finished = true end
             end
         end
@@ -178,6 +179,29 @@ function trials.wants(name, ws)
         if t and t.kind == 'ws' and t.count < t.goal and t.ws:lower() == ws:lower() and matches(name, t.mobs) then return true end
     end
     return false
+end
+
+-- {key: count} now, for a farming run's before / after
+function trials.counts()
+    local out = {}
+    for _, k in ipairs(keys()) do
+        local t = decode(S.trials[k])
+        if t then out[k] = t.count end
+    end
+    return out
+end
+
+-- "Buzzfly +100 (100/100)" for the trials that moved since `before` (a counts() table)
+function trials.progress(before)
+    local parts = {}
+    for _, k in ipairs(keys()) do
+        local t = decode(S.trials[k])
+        local gained = t and t.count - ((before or {})[k] or t.count)
+        if t and gained > 0 then
+            parts[#parts + 1] = ('%s +%d (%d/%d)'):format(t.mobs ~= '' and t.mobs or 'any mob', gained, t.count, t.goal)
+        end
+    end
+    return table.concat(parts, ', ')
 end
 
 function trials.game_line() return state.trial_game end

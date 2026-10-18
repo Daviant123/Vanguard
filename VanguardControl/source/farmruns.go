@@ -23,6 +23,7 @@ type farmRun struct {
 	CP    int    `json:"cp"`
 	Loot  string `json:"loot"`
 	Why   string `json:"why"`
+	Trial string `json:"trial,omitempty"` // Magian trial progress made in the run ("Buzzfly +100 (100/100)")
 }
 
 var farmRunMu sync.Mutex
@@ -47,7 +48,7 @@ func (h *hub) addFarmRun(msg map[string]any) {
 	num := func(k string) int { f, _ := msg[k].(float64); return int(f) }
 	str := func(k string) string { v, _ := msg[k].(string); return v }
 	r := farmRun{Time: time.Now().Format("2006-01-02 15:04"), Who: str("name"), Zone: str("zone"), Mobs: str("mobs"),
-		Secs: num("secs"), Kills: num("kills"), XP: num("xp"), CP: num("cp"), Loot: str("loot"), Why: str("why")}
+		Secs: num("secs"), Kills: num("kills"), XP: num("xp"), CP: num("cp"), Loot: str("loot"), Why: str("why"), Trial: str("trial")}
 	farmRunMu.Lock()
 	defer farmRunMu.Unlock()
 	list := append(loadFarmRuns(), r)

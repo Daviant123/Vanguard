@@ -1,5 +1,13 @@
 [
   {
+    "version": "1.65.1",
+    "date": "2026-10-18",
+    "items": [
+      "A farming run's summary and Past runs now show what it did for your Magian trial, e.g. \"Buzzfly +100 (100/100)\".",
+      "Fix: a finished Magian trial rang the alarm twice."
+    ]
+  },
+  {
     "version": "1.65.0",
     "date": "2026-10-17",
     "items": [
