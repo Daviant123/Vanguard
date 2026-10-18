@@ -1813,6 +1813,7 @@ function farmTab(c, p) {
     })())}
     </div>
 
+    ${bestSpots(farmRuns)}
     <div class="box"><h3>Past runs</h3>
       ${farmRuns.length ? `<table class="grid"><thead><tr><th style="text-align:left">When</th><th>Who</th><th style="text-align:left">Where</th><th>Time</th><th>Kills</th><th>Kills / hour</th><th>XP</th><th>CP</th><th style="text-align:left">Loot</th><th style="text-align:left">Why it stopped</th></tr></thead><tbody>
         ${farmRuns.slice().reverse().slice(0, 15).map(r => `<tr><td style="text-align:left">${esc(r.time)}</td><td>${esc(r.who)}</td><td style="text-align:left">${esc(r.zone)}<div class="hint">${esc(r.mobs)}</div></td>
@@ -1823,6 +1824,39 @@ function farmTab(c, p) {
       : `<div class="hint">Each farming run is kept here when it ends: how long, kills, XP / CP, loot and why it stopped.</div>`}
     </div>
   </div>`;
+}
+
+// Best spots (upgrade 35, DreamBot-style per-location stats): past runs grouped by zone and mob - kills an hour over all
+// the time spent there, XP / CP an hour, the loot most found, and how many runs. Runs under 5 minutes are left out.
+function spotStats(runs) {
+  const by = {};
+  for (const r of arr(runs)) {
+    if (!r || (r.secs || 0) < 300) continue;
+    const key = (r.zone || "?") + " | " + (r.mobs || "?");
+    const g = by[key] || (by[key] = {zone: r.zone || "?", mobs: r.mobs || "?", runs: 0, secs: 0, kills: 0, xp: 0, cp: 0, loot: {}});
+    g.runs++; g.secs += r.secs; g.kills += r.kills || 0; g.xp += r.xp || 0; g.cp += r.cp || 0;
+    for (const part of String(r.loot || "").split(",")) {
+      const m = part.trim().match(/^(\d+)\s+(.+)$/);
+      if (m) g.loot[m[2]] = (g.loot[m[2]] || 0) + (+m[1]);
+    }
+  }
+  return Object.values(by).map(g => ({...g, kph: Math.round(g.kills * 3600 / g.secs), xph: Math.round(g.xp * 3600 / g.secs),
+    cph: Math.round(g.cp * 3600 / g.secs),
+    top: Object.entries(g.loot).sort((a, b) => b[1] - a[1]).slice(0, 2).map(([n, c]) => `${Math.round(c * 3600 / g.secs)} ${n}`)}))
+    .sort((a, b) => b.kph - a.kph);
+}
+
+function bestSpots(runs) {
+  const list = spotStats(runs);
+  if (list.length < 2) return "";
+  const mins = v => { const m = Math.floor((v || 0) / 60); return m >= 60 ? `${Math.floor(m / 60)}h ${m % 60}m` : `${m}m`; };
+  return `<div class="box"><h3>Best spots</h3>
+    <table class="grid"><thead><tr><th style="text-align:left">Where</th><th>Runs</th><th>Time</th><th>Kills / hour</th><th>XP / hour</th><th>CP / hour</th><th style="text-align:left">Loot / hour</th></tr></thead><tbody>
+      ${list.slice(0, 8).map((g, i) => `<tr><td style="text-align:left">${i === 0 ? "★ " : ""}${esc(g.zone)}<div class="hint">${esc(g.mobs)}</div></td>
+        <td>${g.runs}</td><td>${mins(g.secs)}</td><td><b>${g.kph}</b></td><td>${fmtN(g.xph)}</td><td>${fmtN(g.cph)}</td>
+        <td style="text-align:left" class="hint">${esc(g.top.join(", ") || "—")}</td></tr>`).join("")}
+    </tbody></table>
+    <div class="hint" style="margin-top:4px">From your past runs (5 minutes or longer), all characters.</div></div>`;
 }
 
 function advTab(p) {

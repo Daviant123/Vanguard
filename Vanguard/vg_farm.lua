@@ -1041,6 +1041,8 @@ end
 -- again on its own when he's back in that zone within 15 minutes (15 s after arriving, to load and buff).
 local REZONE_MINS = 15
 
+function farm.settings_mode() return S.farm.mode end   -- (for the tests)
+
 function farm.on_zone(new_id, old_id)
     state.farm_pops, state.farm_respawn = nil, nil        -- ids belong to the old zone (the per-kind times stay)
     local rz = state.farm_rezone
