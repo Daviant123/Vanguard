@@ -1041,7 +1041,7 @@ function farm.on_zone(new_id, old_id)
     if not S.modules.farm then return end
     local was_on = S.enabled
     farm.finish(windower.ffxi.get_player(), 'changed zone')
-    if S.farm.rezone and was_on and old_id and tonumber(old_id) and tonumber(old_id) ~= 0 then
+    if S.farm.rezone and not S.pause_on_zone and was_on and old_id and tonumber(old_id) and tonumber(old_id) ~= 0 then
         state.farm_rezone = { zone = tonumber(old_id), t = now() }
         local z = res.zones[tonumber(old_id)]
         h.log(('Farming starts again if you come back to %s within %d minutes'):format(z and z.en or 'this zone', REZONE_MINS))
@@ -1055,7 +1055,7 @@ function farm.rezone_due()
     local rz = state.farm_rezone
     if not rz or not rz.at or now() < rz.at then return false end
     state.farm_rezone = nil
-    if not S.farm.rezone or S.modules.farm or zone() ~= rz.zone then return false end
+    if not S.farm.rezone or S.pause_on_zone or S.modules.farm or zone() ~= rz.zone then return false end
     h.log('Back in the zone: farming carries on')
     return true
 end

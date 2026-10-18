@@ -1,5 +1,12 @@
 [
   {
+    "version": "1.64.0",
+    "date": "2026-10-17",
+    "items": [
+      "Vanguard stops when you change zone or change job (main or sub) - farming too. Press Start / Run again when you want it. Both can be switched off under Farming > Stop when."
+    ]
+  },
+  {
     "version": "1.63.1",
     "date": "2026-10-17",
     "items": [

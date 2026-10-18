@@ -1,6 +1,6 @@
 _addon.name = 'Vanguard'
 _addon.author = 'Daviant'
-_addon.version = '0.72.2'
+_addon.version = '0.73.0'
 _addon.commands = {'vanguard', 'vg'}
 
 --[[
@@ -81,7 +81,8 @@ local defaults = {
     profiles = {},
     -- Saved per-job menu choices from the panel (buff grid, songs, geo, enfeebles, modules).
     menus = {},
-    pause_on_zone = false,
+    pause_on_zone = true,   -- stop the bot on a zone change (his request 2026-10-17: "when it changes zones i want you to stop the bot")
+    stop_on_job = true,     -- ...and when the job or sub job changes (same request)
     -- formation: spread (fan behind the leader), line (single file) or off (plain follow)
     follow = { distance = 2.5, max_distance = 40, formation = 'spread', trail = true },
     party = { accept = true },          -- accept party invites from the leader / other Vanguard characters
@@ -123,7 +124,7 @@ local defaults = {
              rotate = false,                      -- a spot dry for 3 min: move on to the next saved spot in the zone
              rest_idle = true,                    -- rest at camp while there's nothing to fight (up when a mob comes)
              check = false, skip_weak = false, skip_tough = false,  -- /check each new kind; skip Too Weak / Incredibly Tough + NMs
-             rezone = true,                       -- zoned out while farming: back in the same zone within 15 min -> farm again
+             rezone = false,                      -- zoned out while farming: back in the same zone within 15 min -> farm again
              time_alert = true,                   -- ring when the game says Abyssea (Visitant) time is running out
              stop_level = 0,                      -- stop when this character's main job reaches this level (0 = no)
              widen = 0,                           -- quiet spot: search 10 yalms further every 30 s, up to this (0 = off)
@@ -1447,6 +1448,7 @@ windower.register_event('incoming text', function(original)
 end)
 
 windower.register_event('zone change', function(new_id, old_id)
+    local was_running = settings.enabled
     stop_running()
     warp.on_zone()
     farm.on_zone(new_id, old_id)
@@ -1456,9 +1458,11 @@ windower.register_event('zone change', function(new_id, old_id)
     state.farm_pulled, state.route, state.wp, state.resting = {}, nil, 1, false
     state.action_once = {}
     state.zone_push_until, state.zone_push = nil, nil
-    if settings.pause_on_zone and settings.enabled then
+    if settings.pause_on_zone and was_running then
         settings.enabled = false
-        log('Paused after zoning (pause_on_zone)')
+        settings.modules.farm = false
+        store.save(settings)
+        log('Stopped: changed zone (press Start / Run again when you want it)')
     end
 end)
 
@@ -1528,6 +1532,17 @@ windower.register_event('load', function()
 end)
 windower.register_event('login', function() coroutine.schedule(function() load_profile() end, 5) end)
 windower.register_event('job change', function()
+    -- his request: stop the bot when the job changes (main or sub)
+    if settings.stop_on_job and (settings.enabled or settings.modules.farm) then
+        local player = windower.ffxi.get_player()
+        if settings.modules.farm then farm.send_run(player, 'changed job') farm.treasure(false) end
+        settings.enabled, settings.modules.farm = false, false
+        stop_running()
+        store.save(settings)
+        log('Stopped: changed job (press Start / Run again when you want it)')
+        coroutine.schedule(function() load_profile() settings.modules.farm = false end, 2)
+        return
+    end
     coroutine.schedule(function() load_profile() end, 2)
 end)
 windower.register_event('unload', function()
