@@ -69,7 +69,9 @@ end
 function finish.wait_line(t)
     local line = finish.line(t)
     if not waits(t) then return line end
-    return line + math.max(5, line)            -- (a % he picks too, not only Auto)
+    -- (a % he picks too, not only Auto) - 5 to 10 % above the line: line + line held off from 60 % on a kind of mob
+    -- not learned yet (the 30 % first guess), found by the fuzz test
+    return line + math.min(10, math.max(5, line))
 end
 
 -- Our weapon skill hit something (from the 'action' event): if it's the finisher, measure what it does.

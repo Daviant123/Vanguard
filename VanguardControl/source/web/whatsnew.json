@@ -1,5 +1,12 @@
 [
   {
+    "version": "1.63.1",
+    "date": "2026-10-17",
+    "items": [
+      "Fix: before the trial weapon skill, Vanguard could stop attacking much too early on a new kind of mob (from 60%). It now holds off only 5-10% above the point where the weapon skill goes off."
+    ]
+  },
+  {
     "version": "1.63.0",
     "date": "2026-10-17",
     "items": [
