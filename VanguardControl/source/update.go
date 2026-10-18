@@ -20,7 +20,7 @@ import (
 	"time"
 )
 
-var panelVersion = "1.70.2" // set by -X for tests; the published version
+var panelVersion = "1.71.0" // set by -X for tests; the published version
 
 // how often the panel looks for a newer version (was 6 hours: his open window stayed several versions behind)
 var updateEvery = time.Hour

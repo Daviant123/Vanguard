@@ -62,8 +62,22 @@ func (h *hub) addFarmRun(msg map[string]any) {
 
 func (h *hub) handleFarmRuns(w http.ResponseWriter, r *http.Request) {
 	farmRunMu.Lock()
-	if r.URL.Query().Get("do") == "clear" {
+	q := r.URL.Query()
+	if q.Get("do") == "clear" {
 		os.WriteFile(farmRunPath(), []byte("[]"), 0o644)
+	}
+	// one run out of the history (its × in Past runs): the run with this time and character
+	if q.Get("do") == "del" {
+		list := loadFarmRuns()
+		keep := list[:0]
+		for _, run := range list {
+			if !(run.Time == q.Get("time") && run.Who == q.Get("who")) {
+				keep = append(keep, run)
+			}
+		}
+		if b, err := json.Marshal(keep); err == nil {
+			os.WriteFile(farmRunPath(), b, 0o644)
+		}
 	}
 	list := loadFarmRuns()
 	farmRunMu.Unlock()

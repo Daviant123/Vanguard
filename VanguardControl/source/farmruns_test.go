@@ -32,3 +32,19 @@ func TestFarmRuns(t *testing.T) {
 		t.Error("clear empties the history")
 	}
 }
+
+// The × on one run in Past runs takes just that run out of the history.
+func TestFarmRunDelete(t *testing.T) {
+	os.Remove(farmRunPath())
+	defer os.Remove(farmRunPath())
+	os.WriteFile(farmRunPath(), []byte(`[{"time":"2026-10-18 07:20","who":"CharA","zone":"Tahrongi Canyon","kills":66},
+		{"time":"2026-10-18 05:14","who":"CharA","zone":"Mhaura","kills":38}]`), 0o644)
+	h := testHub(t)
+	rec := httptest.NewRecorder()
+	h.handleFarmRuns(rec, httptest.NewRequest("GET", "/api/farmruns?do=del&time=2026-10-18+07%3A20&who=CharA", nil))
+	var list []farmRun
+	json.Unmarshal(rec.Body.Bytes(), &list)
+	if len(list) != 1 || list[0].Zone != "Mhaura" {
+		t.Fatalf("only the 07:20 run is taken out, got %+v", list)
+	}
+}

@@ -1820,10 +1820,11 @@ function farmTab(c, p) {
 
     ${bestSpots(farmRuns)}
     <div class="box"><h3>Past runs</h3>
-      ${farmRuns.length ? `<table class="grid"><thead><tr><th style="text-align:left">When</th><th>Who</th><th style="text-align:left">Where</th><th>Time</th><th>Kills</th><th>Kills / hour</th><th>XP</th><th>CP</th><th style="text-align:left">Loot</th><th style="text-align:left">Why it stopped</th></tr></thead><tbody>
+      ${farmRuns.length ? `<table class="grid"><thead><tr><th style="text-align:left">When</th><th>Who</th><th style="text-align:left">Where</th><th>Time</th><th>Kills</th><th>Kills / hour</th><th>XP</th><th>CP</th><th style="text-align:left">Loot</th><th style="text-align:left">Why it stopped</th><th></th></tr></thead><tbody>
         ${farmRuns.slice().reverse().slice(0, 15).map(r => `<tr><td style="text-align:left">${esc(r.time)}</td><td>${esc(r.who)}</td><td style="text-align:left">${esc(r.zone)}<div class="hint">${esc(r.mobs)}</div></td>
           <td>${mins(r.secs)}</td><td>${r.kills}</td><td>${r.secs >= 120 ? Math.round(r.kills * 3600 / r.secs) : "—"}</td><td>${fmtN(r.xp)}</td><td>${fmtN(r.cp)}</td>
-          <td style="text-align:left" class="hint">${esc(r.loot || "—")}</td><td style="text-align:left" class="hint">${esc(r.why)}${r.trial ? `<br>Magian: ${esc(r.trial)}` : ""}</td></tr>`).join("")}
+          <td style="text-align:left" class="hint">${esc(r.loot || "—")}</td><td style="text-align:left" class="hint">${esc(r.why)}${r.trial ? `<br>Magian: ${esc(r.trial)}` : ""}</td>
+          <td><button style="font-size:11px" title="Take this run out of the history" onclick="farmRunsDo('do=del&time=${encodeURIComponent(r.time)}&who=${encodeURIComponent(r.who)}')">×</button></td></tr>`).join("")}
       </tbody></table>
       <div class="row" style="margin-top:6px"><button style="font-size:11px" onclick="farmRunsDo('do=clear')">Clear the history</button></div>`
       : `<div class="hint">Each farming run is kept here when it ends: how long, kills, XP / CP, loot and why it stopped.</div>`}
