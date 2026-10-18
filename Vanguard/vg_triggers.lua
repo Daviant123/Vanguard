@@ -185,7 +185,13 @@ local function can_work(cmd, player, bt)
     -- a finishing weapon skill is set (vg_finish): it owns the TP - a reaction firing the same weapon skill (or any,
     -- when TP is saved for the finisher) would spend it before the mob is low enough to die from it
     local fin = settings_ref and settings_ref.ws and settings_ref.ws.finish or ''
-    if ws and fin ~= '' and fin:lower() ~= 'none' then
+    -- (with "only when a Magian trial needs that mob", only while one does)
+    local active = true
+    if ws and settings_ref and settings_ref.ws and settings_ref.ws.finish_trial_only and not (type(settings_ref.trial_assist) == 'string' and settings_ref.trial_assist ~= '') then
+        local ok, tr = pcall(require, 'vg_trials')
+        active = ok and tr.wants and bt and bt.name and tr.wants(bt.name, fin) or false
+    end
+    if ws and active and fin ~= '' and fin:lower() ~= 'none' then
         if c:find(fin:lower(), 1, true) or settings_ref.ws.finish_save or (tonumber(settings_ref.ws.finish_at) or 25) <= 0 then return false end
     end
     local at_bt = c:find('<bt>', 1, true) or c:find(' act %a+ bt ')

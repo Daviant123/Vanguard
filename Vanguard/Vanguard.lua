@@ -1,6 +1,6 @@
 _addon.name = 'Vanguard'
 _addon.author = 'Daviant'
-_addon.version = '0.76.2'
+_addon.version = '0.77.0'
 _addon.commands = {'vanguard', 'vg'}
 
 --[[
@@ -140,7 +140,7 @@ local defaults = {
     buffs = { list = '' },
     -- finish*: the weapon skill that lands the kill (vg_finish): at mob HP% finish_at, saving TP, others stop attacking
     ws = { name = '', tp = 1000, min_mob_hpp = 1, max_range = 6,
-           finish = '', finish_at = 0, learned = '', finish_save = true, finish_others = true, finish_wait = false },
+           finish = '', finish_at = 0, learned = '', finish_trial_only = true, finish_save = true, finish_others = true, finish_wait = false },
     -- Ordered chain steps "Character:Weapon Skill". Each character only fires its own steps.
     sc = { steps = '', open_tp = 1000, window_min = 3, window_max = 8 },
     -- "Element:Spell|Fallback|Fallback" pairs.

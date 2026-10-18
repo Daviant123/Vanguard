@@ -1330,6 +1330,7 @@ function finishBox(p) {
     ${f && auto ? `<div class="hint" style="margin-top:6px">${learned.length ? "Learned: " + learned.map(l => `${esc(l.n)} from ${l.at}%`).join(", ")
       : `It watches how much one ${esc(f)} takes from each kind of mob and saves TP until the mob is that low. The first one of a kind goes at 30%.`}</div>` : ""}
     ${f ? `<div class="row" style="margin-top:8px;flex-wrap:wrap;gap:6px 18px">
+      ${chk("Only when a Magian trial needs that mob (otherwise weapon skills as usual)", x.ws_finish_trial_only !== false, "set ws.finish_trial_only true", "set ws.finish_trial_only false")}
       ${chk("Save TP for it (no other weapon skill)", x.ws_finish_save !== false, "set ws.finish_save true", "set ws.finish_save false")}
       ${chk("The other characters stop attacking it then", x.ws_finish_others !== false, "set ws.finish_others true", "set ws.finish_others false")}
       ${chk("If it gets low before TP is ready, stop attacking until TP is 1000", !!x.ws_finish_wait, "set ws.finish_wait true", "set ws.finish_wait false")}

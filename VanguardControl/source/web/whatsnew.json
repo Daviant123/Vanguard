@@ -1,5 +1,12 @@
 [
   {
+    "version": "1.69.0",
+    "date": "2026-10-18",
+    "items": [
+      "Finishing weapon skill: now only while a Magian trial needs that mob - with no trial, weapon skills go off as usual (TP isn't held back). Untick \"Only when a Magian trial needs that mob\" for the old way."
+    ]
+  },
+  {
     "version": "1.68.2",
     "date": "2026-10-18",
     "items": [

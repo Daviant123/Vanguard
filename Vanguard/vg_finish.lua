@@ -123,6 +123,12 @@ end
 function finish.ws(player, t)
     local f = S.ws.finish
     if not on(f) or not t or not t.hpp or t.hpp <= 0 then return nil end
+    -- only while a Magian trial needs this mob killed with it (upgrade 38): with no trial left he was still holding TP
+    -- for Atonement on every Bog Body, at half the kills an hour; otherwise the normal weapon skill rules apply
+    if S.ws.finish_trial_only and not (S.trial_assist and S.trial_assist ~= '' and type(S.trial_assist) == 'string') then
+        local ok, tr = pcall(require, 'vg_trials')
+        if not (ok and tr.wants and tr.wants(t.name, f)) then return nil end
+    end
     finish.learn_tick()
     state.finish_seen = { id = t.id, hpp = t.hpp }
     local line = finish.line(t)
