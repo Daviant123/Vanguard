@@ -1458,7 +1458,20 @@ function trialMisses(t) {
   return `<div class="hint" style="margin-top:2px">Missed: ${parts.join(", ")}. ${tip}</div>`;
 }
 
-function trialBox(p, mobNames) {
+// how long the trial has left at this pace (DreamBot-style "time to level"): kills an hour x how often a kill counts
+function trialEta(t, run) {
+  const left = Math.max(0, (t.goal || 0) - (t.count || 0));
+  const kph = +(run && run.kph) || 0;
+  if (!left || !kph || t.done) return "";
+  const rate = t.kind === "ws" ? (t.tries >= 5 ? (t.hits || 0) / t.tries : null) : 1;
+  if (rate === null) return `<div class="hint" style="margin-top:2px">${left} to go - a time estimate shows after a few kills</div>`;
+  if (rate <= 0) return `<div class="hint" style="margin-top:2px">${left} to go - none of this session's kills have counted yet</div>`;
+  const kills = Math.ceil(left / rate), mins = Math.round(kills * 60 / kph);
+  const when = mins >= 60 ? `${Math.floor(mins / 60)} h ${mins % 60} min` : `${Math.max(1, mins)} min`;
+  return `<div class="hint" style="margin-top:2px">At this pace: about ${when} to go (about ${kills} more kills)</div>`;
+}
+
+function trialBox(p, mobNames, run) {
   const x = (p.config || {}).extra || {}, list = arr(x.trials), wl = arr(p.ws_list);
   const f = trialForm;
   const o = (v, l, cur) => `<option value="${esc(v)}" ${String(v) === String(cur) ? "selected" : ""}>${esc(l)}</option>`;
@@ -1474,6 +1487,7 @@ function trialBox(p, mobNames) {
         <div class="hpbar" style="height:8px"><div style="background:var(--good);width:${t.goal ? Math.min(100, t.count * 100 / t.goal) : 0}%"></div></div>
         ${t.tries ? `<div class="hint" style="margin-top:3px">This session ${esc(t.ws)} landed the kill on ${t.hits || 0} of ${t.tries} (${Math.round((t.hits || 0) * 100 / t.tries)}%)</div>` : ""}
         ${trialMisses(t)}
+        ${trialEta(t, run)}
         ${t.kind === "ws" && !t.done ? `<div class="row" style="margin-top:4px;align-items:center">
           <label class="field">Use ${esc(t.ws)} when the mob's HP is at ${sel("set ws.finish_at ", [{v: 0, l: "Auto (learned" + (learnedAt(x, t.mobs) ? ": " + learnedAt(x, t.mobs) + "%" : "") + ")"}].concat([3, 5, 8, 10, 12, 15, 18, 20, 25, 30, 35, 40, 50].map(v => ({v, l: "or under " + v + "%"}))), x.ws_finish_at ?? 0)}</label>
           ${x.ws_finish !== t.ws ? `<span class="hint">(applies when "Help finish it" is on)</span>` : ""}</div>` : ""}</div>`).join("")
@@ -1625,7 +1639,7 @@ function farmTab(c, p) {
       <div class="hint" style="margin-top:4px">Points a minute = (XP + CP) per minute of fighting. It needs two kills of a kind before it prefers one.</div>
     </div>` : ""}
 
-    ${trialBox(p, Array.from(new Set(tgt.concat(mobs.map(m => m.n), arr(run.mobs).map(m => m.n), arr((f.radar || {}).mobs).map(m => m.n)))).filter(Boolean).sort())}
+    ${trialBox(p, Array.from(new Set(tgt.concat(mobs.map(m => m.n), arr(run.mobs).map(m => m.n), arr((f.radar || {}).mobs).map(m => m.n)))).filter(Boolean).sort(), farming ? run : null)}
 
     <div class="box"><h3>Quick setups</h3>
       <div class="row" style="flex-wrap:wrap;gap:8px">

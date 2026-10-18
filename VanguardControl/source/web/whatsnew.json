@@ -1,5 +1,12 @@
 [
   {
+    "version": "1.63.0",
+    "date": "2026-10-17",
+    "items": [
+      "Magian trials: while you farm, the trial box says how long is left at this pace - e.g. \"about 1 h 11 min to go (about 120 more kills)\" - from your kills an hour and how often a kill counts."
+    ]
+  },
+  {
     "version": "1.62.0",
     "date": "2026-10-17",
     "items": [
