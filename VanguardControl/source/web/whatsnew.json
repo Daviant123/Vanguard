@@ -1,5 +1,13 @@
 [
   {
+    "version": "1.74.0",
+    "date": "2026-10-18",
+    "items": [
+      "Vanguard Control.exe has its own icon now (the gold shield) and shows its name and version in Windows.",
+      "New download: one zip at the top of the GitHub page - unzip it and double-click the exe, nothing to install."
+    ]
+  },
+  {
     "version": "1.73.1",
     "date": "2026-10-18",
     "items": [

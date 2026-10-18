@@ -8,18 +8,22 @@ sing, roll, bubble and enfeeble on their own, and you run them all from one desk
 
 Vanguard is free and always will be: no paid features, subscriptions, keys, ads or donations.
 
-## Install (the app does it)
+## Download - nothing to install
 
-1. Download this page (green **Code** button > **Download ZIP**) and unzip it. Open the **VanguardControl** folder and
-   run `Vanguard Control.exe` (Windows may warn about an unknown app the first time: More info > Run anyway).
-2. The app finds your Windower folder (or asks you to pick it), installs the Vanguard addon into
+### [⬇ Download Vanguard (zip)](https://github.com/Daviant123/Vanguard/raw/main/Vanguard.zip)
+
+1. Unzip it anywhere (your Desktop is fine) and double-click **Vanguard Control.exe** (the gold shield). That's all:
+   there's no installer. Windows may warn about an unknown app the first time: **More info** > **Run anyway**.
+2. The app finds your Windower folder (or asks you to pick it), puts the Vanguard addon into
    `Windower\addons\Vanguard` and sets it to load when the game starts.
 3. Start the game (or, if it's already running, type `//lua load vanguard` once in each game window). Your characters
    appear in the app: click the one you play, **Set up party**, **Start all**.
 
+Tip: right-click the exe > **Send to** > **Desktop (create shortcut)** for an icon on your desktop.
+
 ## Updates (automatic)
 
-The app checks this page when it starts and every 6 hours. A newer version downloads by itself, restarts the app,
+The app checks this page when it starts and every hour. A newer version downloads by itself, restarts the app,
 updates the addon and reloads it on your characters. Your settings are never touched. To turn it off, put an empty
 file named `noupdate.txt` next to the exe (you can still use **Check for updates** in the app).
 Without the app: copy the **Vanguard** folder into `Windower\addons\`; `//vg update install` updates it.
