@@ -24,6 +24,9 @@ local function now() return os.clock() end
 
 -- "kind|goal|ws|mobs|count|weapon" (weapon: the trial weapon, from the main hand when the trial was added - upgrade 37)
 local function decode(v)
+    -- (a removed trial is saved empty, and Windower's config library reads an empty setting back as a table, not '':
+    -- decoding that crashed the main loop every tick - his crash report #1, 2026-10-18)
+    if type(v) ~= 'string' then return nil end
     local kind, goal, ws, mobs, count, weapon = (v or ''):match('^([^|]*)|([^|]*)|([^|]*)|([^|]*)|([^|]*)|?([^|]*)$')
     if not kind then return nil end
     return { kind = kind, goal = tonumber(goal) or 0, ws = ws, mobs = mobs, count = tonumber(count) or 0, weapon = weapon or '' }
@@ -75,7 +78,7 @@ function trials.add(spec)
     end
     S.trials = S.trials or {}
     local n = 1
-    while S.trials['t' .. n] and S.trials['t' .. n] ~= '' do n = n + 1 end
+    while type(S.trials['t' .. n]) == 'string' and S.trials['t' .. n] ~= '' do n = n + 1 end   -- (a removed one is free again)
     S.trials['t' .. n] = encode({ kind = kind, goal = tonumber(goal), ws = ws, mobs = util.trim(mobs or ''), count = 0,
                                   weapon = trials.main_weapon() or '' })
     return 't' .. n
@@ -181,7 +184,7 @@ end
 -- for farming's stop conditions: the trial it's helping with is done
 function trials.assist_done()
     local k = S.trial_assist
-    local t = k and k ~= '' and S.trials and decode(S.trials[k])
+    local t = type(k) == 'string' and k ~= '' and type(S.trials) == 'table' and decode(S.trials[k])
     return t and t.goal > 0 and t.count >= t.goal or false
 end
 

@@ -1,5 +1,12 @@
 [
   {
+    "version": "1.68.1",
+    "date": "2026-10-18",
+    "items": [
+      "Fix: after removing a Magian trial, farming hit an error every second (crash report #1) and its stop checks didn't run."
+    ]
+  },
+  {
     "version": "1.68.0",
     "date": "2026-10-18",
     "items": [
