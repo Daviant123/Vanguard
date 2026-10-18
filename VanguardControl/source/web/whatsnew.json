@@ -1,5 +1,12 @@
 [
   {
+    "version": "1.68.2",
+    "date": "2026-10-18",
+    "items": [
+      "Fix: pet jobs no longer try to call their pet (Activate, Call Beast, summons) over and over in towns, where pets aren't allowed."
+    ]
+  },
+  {
     "version": "1.68.1",
     "date": "2026-10-18",
     "items": [

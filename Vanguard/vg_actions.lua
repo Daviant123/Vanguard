@@ -231,6 +231,14 @@ local function buff_up(a, buffs)
     return id ~= nil and util.has_buff(buffs, id)
 end
 
+-- Can pets be called in this zone? (res.zones' can_pet; unknown zones count as yes)
+function engine.pets_allowed()
+    local info = windower.ffxi.get_info()
+    local z = info and info.zone and require('resources').zones[info.zone]
+    if not z then return true end
+    return z.can_pet == true
+end
+
 local function conditions_ok(a, ctx)
     local p, v = ctx.player, ctx.player.vitals
     local w = a.when
@@ -247,6 +255,9 @@ local function conditions_ok(a, ctx)
     if a.pet then
         local pet = windower.ffxi.get_mob_by_target('pet')
         if a.pet == 'none' and pet then return false end
+        -- calling a pet where pets aren't allowed (towns: the game's can_pet) was retried every few seconds - seen on
+        -- his PUP in Aht Urhgan Whitegate, 2026-10-18
+        if a.pet == 'none' and not engine.pets_allowed() then return false end
         if a.pet == 'present' and not pet then return false end
     end
     return true
