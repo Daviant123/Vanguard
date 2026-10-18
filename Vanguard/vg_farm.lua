@@ -1316,7 +1316,7 @@ end
 
 function farm.load_spot(key)
     local v = S.farmspots and S.farmspots[key]
-    if not v or v == '' then return false end
+    if type(v) ~= 'string' or v == '' then return false end      -- (a removed spot reads back as an empty table)
     local name = v:match('^([^|]*)|')
     local i = 0
     for part in v:gmatch('[^|]+') do

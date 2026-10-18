@@ -1,5 +1,12 @@
 [
   {
+    "version": "1.73.1",
+    "date": "2026-10-18",
+    "items": [
+      "Fix: after removing a reaction or a farm spot, listing reactions or loading spots could hit an error (the same cause as crash report #1)."
+    ]
+  },
+  {
     "version": "1.73.0",
     "date": "2026-10-18",
     "items": [

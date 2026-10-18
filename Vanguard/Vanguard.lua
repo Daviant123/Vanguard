@@ -1,6 +1,6 @@
 _addon.name = 'Vanguard'
 _addon.author = 'Daviant'
-_addon.version = '0.79.1'
+_addon.version = '0.79.2'
 _addon.commands = {'vanguard', 'vg'}
 
 --[[
@@ -1881,7 +1881,8 @@ windower.register_event('addon command', function(cmd, ...)
             store.save(settings) send_profile()
         else
             for k, v in pairs(settings.triggers) do
-                if v ~= '' then windower.add_to_chat(207, ('  %s: %s'):format(k, v)) end
+                -- (a removed reaction comes back from settings.xml as an empty table - see vg_trials' decode)
+                if type(v) == 'string' and v ~= '' then windower.add_to_chat(207, ('  %s: %s'):format(k, v)) end
             end
         end
     elseif cmd == 'all' then
