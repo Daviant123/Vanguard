@@ -397,7 +397,7 @@ end
 -- how far the pull command reaches (a ranged attack about 24 yalms, a spell 20, an ability like Provoke 16)
 function farm.pull_range()
     local c = S.farm.pull_cmd or ''
-    if c == '' then return nil end
+    if c == '' or state.farm_no_pull then return nil end
     if c:find('/ra ', 1, true) then return 23 end
     if c:find('/ma ', 1, true) then return 19 end
     if c:find('/ja ', 1, true) then return 15 end
@@ -481,6 +481,15 @@ local GIVE_UP = { [4] = 'out of range', [5] = "can't see it", [12] = 'someone el
     [154] = 'out of range', [198] = 'too far away', [217] = "can't see it", [219] = "can't see it", [328] = 'too far away',
     [446] = "can't attack it" }
 function farm.on_message(actor_id, target_id, message_id)
+    -- out of ammo for a /ra pull (upgrade 40): "You do not have an appropriate ranged weapon equipped." - every pull
+    -- after that failed; now the rest of the run pulls by walking up and attacking, and it says so (the Alarms ring)
+    if S.modules.farm and message_id == 216 and not state.farm_no_pull and (S.farm.pull_cmd or ''):find('/ra', 1, true) then
+        local me = windower.ffxi.get_player()
+        if me and actor_id == me.id then
+            state.farm_no_pull = true
+            h.log('Farming: out of ammo (or no ranged weapon) for the /ra pull - walking up and attacking instead')
+        end
+    end
     if not S.modules.farm or not GIVE_UP[message_id] then return end
     local p = windower.ffxi.get_player()
     if not p or actor_id ~= p.id then return end
@@ -912,6 +921,7 @@ end
 
 function farm.start(player, me)
     local xp, cp = points()
+    state.farm_no_pull = nil
     pcall(farm.visitant_check, player)
     local okt, tr = pcall(require, 'vg_trials')
     if okt and tr.weapon_check then pcall(tr.weapon_check, S.farm.mode == 'list' and S.farm.targets or '') end
