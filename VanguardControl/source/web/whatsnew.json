@@ -1,5 +1,12 @@
 [
   {
+    "version": "1.80.2",
+    "date": "2026-10-19",
+    "items": [
+      "Bard: a Pianissimo song (say Ballad on a healer) that a party song refresh knocks off that member is sung again within seconds - the bard now checks the member's buff icons. It used to stay off much longer (25-40 % of the time with short songs in the bard simulator)."
+    ]
+  },
+  {
     "version": "1.80.1",
     "date": "2026-10-19",
     "items": [

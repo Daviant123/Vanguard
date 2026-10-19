@@ -547,6 +547,13 @@ function bard.member_needs(spell, name, player, buffs)
         h.log(('Songs: %s is already on %s - picking up from there'):format(spell.en, name))
     end
     state.pseen[pk] = true
+    -- the member's buff icons say it's gone (a party song refresh knocked it off - a member holds only 2 songs sung
+    -- without the harp, so the two take turns): sing it again now instead of waiting for our estimate (found by the
+    -- bard fuzz test: the Ballad was off 25-40 % of the time with short songs, 2026-10-19)
+    if x and buffs and spell.status and not util.has_buff(buffs, spell.status) and clock() - x.at > 6 then
+        pm(name)[spell.en:lower()] = nil
+        x = nil
+    end
     if not x then return true end
     if x.ends - clock() <= (tonumber(S.songs.refresh_before) or 30) then return true end
     if util.has_buff(player.buffs, 348) and not x.troub then return true end
