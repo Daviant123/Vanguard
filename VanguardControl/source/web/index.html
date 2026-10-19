@@ -1148,7 +1148,7 @@ function songsTab(p) {
   const pian = bi.pianissimo || {};
   const pianOf = n => { const k = Object.keys(pian).find(k => lc(k) === lc(n)); return k ? arr(pian[k]) : []; };
   const slotSel = [{v: "0", l: `Automatic (${bi.instrument && bi.instrument !== "none" ? bi.instrument + ": " : ""}${bi.auto ? base : "?"} songs)`},
-                   {v: "2", l: "2 songs"}, {v: "3", l: "3 songs"}, {v: "4", l: "4 songs"}, {v: "5", l: "5 songs"}];
+                   {v: "2", l: "2 songs"}, {v: "3", l: "3 songs"}, {v: "4", l: "4 songs"}];   // the 5th: Clarion Call (Job & abilities)
   return `<div class="stack">
     <div class="master">${modChk("Sing these songs", mods, "songs")}
       ${chk("NiTro when the party is fighting (Nightingale + Troubadour)", x.nitro, "set songs.nitro true", "set songs.nitro false")}
@@ -1156,7 +1156,7 @@ function songsTab(p) {
     <div class="cols">
       <div class="box"><h3>Song slots: ${slots}${slots > base ? " (Clarion Call +1)" : ""}</h3>
         <label class="field">How many songs ${sel("set songs.slots ", slotSel, String(x.song_slots || 0))}</label>
-        <div class="hint" style="margin-top:4px">Found from the instrument in your inventory / wardrobes: Daurdabla 4, Terpander or Blurred Harp 3, otherwise 2.</div>
+        <div class="hint" style="margin-top:4px">Found from the instrument in your inventory / wardrobes: Daurdabla 4, Terpander or Blurred Harp 3, otherwise 2. A 5th song needs Clarion Call: tick it under Job &amp; abilities and it goes up right before the songs.</div>
       </div>
       <div class="box"><h3>Songs (in order)</h3><div class="slots" style="grid-template-columns:1fr">
         ${Array.from({length: 5}, (_, i) => `<label class="field">Song ${i + 1}${i < slots ? (i >= base ? " (Clarion Call)" : "")

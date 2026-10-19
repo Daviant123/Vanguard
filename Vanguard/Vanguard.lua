@@ -1,6 +1,6 @@
 _addon.name = 'Vanguard'
 _addon.author = 'Daviant'
-_addon.version = '0.81.0'
+_addon.version = '0.81.1'
 _addon.commands = {'vanguard', 'vg'}
 
 --[[
@@ -790,10 +790,19 @@ end
 ------------------------------------------------------------------------
 -- Songs, Geomancy, enfeebles, dispel
 ------------------------------------------------------------------------
+-- "In a fight": I'm engaged, the leader is, anyone in the party is, or the party has a claimed mob (<bt>). It used to
+-- be only me or the leader - a bard set to "Nobody (I lead)" standing back never saw a fight, so NiTro, Clarion Call
+-- and the other "in a fight" abilities never went off (2026-10-18)
 local function party_engaged(player)
     if player.status == 1 then return true end
     local l = leader_mob(player)
-    return l and l.status == 1
+    if l and l.status == 1 then return true end
+    local pt = windower.ffxi.get_party() or {}
+    for _, k in ipairs({ 'p1', 'p2', 'p3', 'p4', 'p5' }) do
+        local m = pt[k] and pt[k].mob
+        if m and m.status == 1 and (m.distance or 0) < 900 then return true end
+    end
+    return battle_target() ~= nil
 end
 
 local function do_songs(player)
@@ -1200,6 +1209,19 @@ bard.init(settings, state, {
     party_members = party_members, ja_ready = ja_ready,
     nitro = function(p, due) return support.nitro(p, due) end,
     nitro_wait = function(p) return support.nitro_wait(p) end,
+    -- Clarion Call for the songs: only if ticked in the abilities, its "when" holds and it's ready; true = used now
+    clarion_ok = function(p)
+        if not state.profile or util.has_buff(p.buffs, 499) or amnesia(p) then return false end
+        for _, a in ipairs(jobs.actions_for(p.main_job)) do
+            if a.id == 'clarion_call' and engine.enabled(a, state.profile) then
+                local w = engine.effective(a, state.profile).when
+                if w ~= 'always' and not party_engaged(p) then return false end
+                local ja = ja_ready('Clarion Call', p)
+                return ja and use_ja(ja, '<me>') or false
+            end
+        end
+        return false
+    end,
 })
 strat.init(settings, state, {
     log = log, recently = recently, use_ja = use_ja, cast = cast, party_members = party_members,

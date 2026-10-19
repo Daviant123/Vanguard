@@ -1,5 +1,15 @@
 [
   {
+    "version": "1.77.1",
+    "date": "2026-10-18",
+    "items": [
+      "Bard: Nightingale, Troubadour and Clarion Call now go off when anyone in the party is fighting. A bard that leads (\"Nobody (I lead)\") and stands back used to never see a fight, so they never went off.",
+      "Bard: Clarion Call (ticked under Job & abilities) goes up right before the songs when your list has a 5th song.",
+      "Bard: \"How many songs\" stops at 4 - the 5th song needs Clarion Call. Set to 5 without it, the 5th song kept knocking another one off and the bard sang the same songs over and over.",
+      "Bard: a song that drops off right after it lands isn't sung again for a minute, with a message saying so, instead of looping."
+    ]
+  },
+  {
     "version": "1.77.0",
     "date": "2026-10-18",
     "items": [

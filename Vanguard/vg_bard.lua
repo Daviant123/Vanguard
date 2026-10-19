@@ -49,6 +49,9 @@ function bard.forget() cache.t = -100 end
 function bard.slots(player)
     local base = tonumber(S.songs.slots) or 0
     if base < 2 then base = bard.instrument() end
+    -- an instrument gives at most 4; the 5th only while Clarion Call is up. "5 songs" picked by hand without it had the
+    -- bard singing a 5th song that knocked another off, round and round (2026-10-18)
+    base = math.min(base, 4)
     local extra = util.has_buff(player.buffs, 499) and 1 or 0          -- Clarion Call
     return base + extra, base
 end
@@ -132,7 +135,24 @@ function bard.on_song(spell, player)
     end
     m[key] = { name = spell.en, status = spell.status, at = clock(), ends = clock() + length(key, troub), troub = troub,
                sv = util.has_buff(player.buffs, 52) }
+    state.song_sung = state.song_sung or {}
+    state.song_sung[key] = clock()
 end
+
+-- Sung less than 15 s ago and gone again: the game isn't keeping it (more songs than slots, another bard's songs...).
+-- Not sung again for a minute, and said, instead of looping (seen 2026-10-18: the same 3 songs every 6 s for minutes).
+local function bounced(name, player)
+    local k = name:lower()
+    local t = (state.song_sung or {})[k]
+    if not t or clock() - t > 15 or on(name) then return false end
+    state.song_hold = state.song_hold or {}
+    if not state.song_hold[k] or clock() > state.song_hold[k] then
+        state.song_hold[k] = clock() + 60
+        h.log(('Songs: %s dropped off right after it was sung - waiting a minute (check "How many songs" and the dummy songs)'):format(name))
+    end
+    return true
+end
+local function held(name) local t = (state.song_hold or {})[name:lower()] return t and clock() < t end
 
 -- a song effect wore off us or was dispelled ('action message' 64 / 204 / 206 / 350 / 531, param = the buff)
 function bard.on_lost(buff_id)
@@ -277,7 +297,9 @@ function bard.sing(player)
         return sp and util.can_cast(sp, player) and sp
     end
     local due = {}
-    for _, name in ipairs(wanted) do if needs(name, troub_up) then due[#due + 1] = name end end
+    for _, name in ipairs(wanted) do
+        if needs(name, troub_up) and not held(name) and not bounced(name, player) then due[#due + 1] = name end
+    end
     -- the redo is over when every song it covered was sung again (or after 3 minutes, e.g. out of range all along)
     if state.redo_at then
         local left = false
@@ -305,6 +327,11 @@ function bard.sing(player)
         return false
     end
     if h.nitro(player, true) then return true end
+    -- Clarion Call (ticked in the abilities) right before the songs when the list has a song for its extra slot
+    if slots == base and (#list(S.songs.list) > base or (S.songs.clarion_song or '') ~= '') and h.clarion_ok and h.clarion_ok(player) then
+        h.log('Clarion Call: +1 song')
+        return true
+    end
     -- NiTro nearly ready and the due songs are still up for longer than that: wait for it instead of singing them
     -- plain now (they'd only last half as long as under Troubadour)
     local wait = h.nitro_wait and h.nitro_wait(player)

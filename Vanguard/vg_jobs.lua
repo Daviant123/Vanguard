@@ -255,7 +255,7 @@ jobs.BRD = {
         A('marcato', 'Marcato (with Songs on: used by the songs)', 'Support', 'ja', 'Marcato', {when = 'combat', songs_managed = true}),
         A('soul_voice', 'Soul Voice (2-hour)', 'Support', 'ja', 'Soul Voice', {}),
         -- +1 song while it's up: the songs list's next song (or songs.clarion_song) is sung in the extra slot (vg_bard)
-        A('clarion_call', 'Clarion Call (+1 song: set a song for the extra slot)', 'Support', 'ja', 'Clarion Call', {when = 'combat', buff = 'Clarion Call'}),
+        A('clarion_call', 'Clarion Call (+1 song: with Songs on, used right before the songs)', 'Support', 'ja', 'Clarion Call', {when = 'combat', buff = 'Clarion Call', songs_managed = true}),
     },
 }
 
