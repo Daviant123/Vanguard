@@ -1,6 +1,6 @@
 _addon.name = 'Vanguard'
 _addon.author = 'Daviant'
-_addon.version = '0.82.5'
+_addon.version = '0.82.6'
 _addon.commands = {'vanguard', 'vg'}
 
 --[[
@@ -836,6 +836,9 @@ local function do_geo(player)
                 for _, m in ipairs(party_members(20)) do
                     if m.name:lower() == who:lower() then
                         target_has = util.has_buff(buffs_of(m, player) or {}, 612)
+                        -- carrying another Indi than the one picked now: entrust the new one
+                        local was = (state.indi_on or {})[m.name:lower()]
+                        if target_has and was and was:lower() ~= spell:lower() then target_has = false end
                     end
                 end
                 if not target_has and util.ability_ready(ent) and util.spell_ready(util.spell(spell), player)
@@ -845,9 +848,13 @@ local function do_geo(player)
             end
         end
     end
-    -- Indi: keep "Colure Active" on self.
-    if settings.geo.indi ~= '' and not util.has_buff(player.buffs, 612) then
-        if try_cast(settings.geo.indi, '<me>', 'indi', player) then return true end
+    -- Indi: keep "Colure Active" on self - and the Indi picked in the app: another one picked replaces the one up
+    -- (it used to wait for the old one to wear off, minutes; 2026-10-19 GEO round)
+    local indi_on = state.indi_on or {}
+    local mine = util.has_buff(player.buffs, 612) and indi_on.me
+    if settings.geo.indi ~= '' and (not util.has_buff(player.buffs, 612)
+        or (mine and mine:lower() ~= settings.geo.indi:lower())) then
+        if try_cast(settings.geo.indi, '<me>', mine and ('indi: ' .. mine .. ' -> ' .. settings.geo.indi) or 'indi', player) then return true end
     end
     -- Geo: keep a luopan out.
     if settings.geo.geo ~= '' and not windower.ffxi.get_mob_by_target('pet') then
@@ -1449,6 +1456,14 @@ windower.register_event('action', function(act)
                     for _, t in ipairs(act.targets or {}) do
                         local mb = t.id ~= player.id and windower.ffxi.get_mob_by_id(t.id)
                         if mb and (not mb.is_npc or mb.spawn_type == 14) then bard.on_member_song(spell, mb.name, player) end
+                    end
+                end
+                if spell.type == 'Geomancy' and spell.en:sub(1, 5) == 'Indi-' and first then   -- which Indi is on whom
+                    state.indi_on = state.indi_on or {}
+                    if first.id == player.id then state.indi_on.me = spell.en
+                    else
+                        local mb = windower.ffxi.get_mob_by_id(first.id)
+                        if mb then state.indi_on[mb.name:lower()] = spell.en end
                     end
                 end
                 if spell.type == 'Geomancy' and spell.en:sub(1, 4) == 'Geo-' then          -- where the luopan went down

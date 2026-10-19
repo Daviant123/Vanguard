@@ -1,5 +1,12 @@
 [
   {
+    "version": "1.78.6",
+    "date": "2026-10-19",
+    "items": [
+      "Geomancer: picking another Indi spell (or another Entrust spell) in the app takes effect right away - the new one is cast over the old. It used to wait for the old Indi to wear off, which could take minutes."
+    ]
+  },
+  {
     "version": "1.78.5",
     "date": "2026-10-19",
     "items": [
