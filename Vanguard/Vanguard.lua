@@ -1,6 +1,6 @@
 _addon.name = 'Vanguard'
 _addon.author = 'Daviant'
-_addon.version = '0.82.4'
+_addon.version = '0.82.5'
 _addon.commands = {'vanguard', 'vg'}
 
 --[[
@@ -1398,6 +1398,19 @@ windower.register_event('action message', function(actor_id, target_id, actor_in
     local me = windower.ffxi.get_player()
     -- one of our songs wore off us / was dispelled (vg_bard keeps its song slots like Singer)
     if me and target_id == me.id and song_gone_msgs[message_id] then bard.on_lost(p1) end
+    -- a debuff of ours wore off a mob (Elegy, Dia, Slow...): cast it again. Once landed it used to count as done for
+    -- that mob for good, so on a long fight it was never put back (2026-10-19 BARD round)
+    local rec = song_gone_msgs[message_id] and state.debuffs[target_id]
+    if rec then
+        for name, r in pairs(rec) do
+            local sp = util.spell(name)
+            if sp and sp.status == p1 and r.landed then
+                r.landed, r.tries, r.resisted = false, 0, nil
+                local mob = windower.ffxi.get_mob_by_id(target_id)
+                log(('%s wore off %s - casting it again'):format(sp.en, mob and mob.name or 'the mob'))
+            end
+        end
+    end
     if me and target_id ~= me.id and (song_gone_msgs[message_id] or ko_msgs[message_id]) then
         local mb = windower.ffxi.get_mob_by_id(target_id)
         if mb and (not mb.is_npc or mb.spawn_type == 14) then

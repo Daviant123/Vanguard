@@ -1,5 +1,12 @@
 [
   {
+    "version": "1.78.5",
+    "date": "2026-10-19",
+    "items": [
+      "Debuffs (Carnage Elegy and other bard songs, Dia, Slow...): when one wears off the mob in a long fight, it's cast again. Once it had landed it used to count as done for that mob for good."
+    ]
+  },
+  {
     "version": "1.78.4",
     "date": "2026-10-19",
     "items": [
