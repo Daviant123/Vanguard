@@ -1,6 +1,6 @@
 _addon.name = 'Vanguard'
 _addon.author = 'Daviant'
-_addon.version = '0.87.3'
+_addon.version = '0.87.4'
 _addon.commands = {'vanguard', 'vg'}
 
 --[[
@@ -1524,7 +1524,18 @@ windower.register_event('action', function(act)
     end
     if act.actor_id == player.id then
         if act.category == 8 then
-            if act.param == 28787 then state.busy_until = now() + 1 end       -- interrupted
+            -- casting begins (24931): remember which spell; interrupted (28787): say so - a song sung again right after
+            -- looked like a bug in his log (Honor March three times in 16 s while his bard was fighting), 2026-10-19
+            if act.param == 24931 and first_action then state.casting_spell = first_action.param end
+            if act.param == 28787 then
+                state.busy_until = now() + 1
+                local sp = res.spells[(first_action and first_action.param ~= 0 and first_action.param) or state.casting_spell or 0]
+                if sp and not recently('interrupted:' .. sp.en, 3) then
+                    mark('interrupted:' .. sp.en)
+                    log(('%s was interrupted%s'):format(sp.en, sp.type == 'BardSong' and ' - singing it again' or ''))
+                end
+                state.casting_spell = nil
+            end
         elseif act.category == 4 then
             state.busy_until = now() + 2.5
             local spell = res.spells[act.param]

@@ -1,5 +1,12 @@
 [
   {
+    "version": "1.83.4",
+    "date": "2026-10-19",
+    "items": [
+      "Interrupted spells are in the log now (\"Honor March was interrupted - singing it again\"). A song sung again a few seconds later is usually this - getting hit while singing - and it used to look like a bug."
+    ]
+  },
+  {
     "version": "1.83.3",
     "date": "2026-10-19",
     "items": [
