@@ -250,10 +250,12 @@ jobs.BRD = {
     },
     debuffs = {support = 'Carnage Elegy', support_caster = 'Carnage Elegy'},
     actions = {
-        A('nightingale', 'Nightingale', 'Support', 'ja', 'Nightingale', {when = 'combat'}),
-        A('troubadour', 'Troubadour', 'Support', 'ja', 'Troubadour', {when = 'combat'}),
-        A('marcato', 'Marcato', 'Support', 'ja', 'Marcato', {when = 'combat'}),
+        A('nightingale', 'Nightingale (with Songs on: used by the songs)', 'Support', 'ja', 'Nightingale', {when = 'combat', songs_managed = true}),
+        A('troubadour', 'Troubadour (with Songs on: used by the songs)', 'Support', 'ja', 'Troubadour', {when = 'combat', songs_managed = true}),
+        A('marcato', 'Marcato (with Songs on: used by the songs)', 'Support', 'ja', 'Marcato', {when = 'combat', songs_managed = true}),
         A('soul_voice', 'Soul Voice (2-hour)', 'Support', 'ja', 'Soul Voice', {}),
+        -- +1 song while it's up: the songs list's next song (or songs.clarion_song) is sung in the extra slot (vg_bard)
+        A('clarion_call', 'Clarion Call (+1 song: set a song for the extra slot)', 'Support', 'ja', 'Clarion Call', {when = 'combat', buff = 'Clarion Call'}),
     },
 }
 

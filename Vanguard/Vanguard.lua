@@ -1,6 +1,6 @@
 _addon.name = 'Vanguard'
 _addon.author = 'Daviant'
-_addon.version = '0.80.2'
+_addon.version = '0.81.0'
 _addon.commands = {'vanguard', 'vg'}
 
 --[[
@@ -1309,7 +1309,10 @@ local function tick()
             or do_buffs(player)
         return
     end
-    local _ = do_raise(player) or do_heal(player) or do_status(player) or strat.arts(player) or mages.crowd(player)
+    -- a bard's songs come right after raise / cures / status removal (Singer's order): behind steps, Elegy and the rest
+    -- the Troubadour minute ran out before the songs were done (2026-10-18)
+    local function bard_first() return player.main_job == 'BRD' and (do_songs(player) or support.pianissimo(player)) end
+    local _ = do_raise(player) or do_heal(player) or do_status(player) or bard_first() or strat.arts(player) or mages.crowd(player)
         or do_assist(player) or farm.pull(player) or support.double_up(ctx, engine) or mages.bar(player)
         or engine.run(ctx, pr, pre_ws_filter) or do_skillchain(player) or do_ws(player)
         or do_burst(player) or mages.sch(player) or engine.run(ctx, pr, normal_filter) or do_mana(player)
@@ -1368,10 +1371,13 @@ end)
 local landed_msgs = S{2, 236, 237, 252, 264, 268, 271}
 local resist_msgs = S{85, 284, 653, 654, 655, 656}
 local buffed_msgs = S{230, 266, 280, 319}
+local song_gone_msgs = { [64] = true, [204] = true, [206] = true, [350] = true, [531] = true }
 
 windower.register_event('action message', function(actor_id, target_id, actor_index, target_index, message_id, p1, p2)
     stats.on_message(actor_id, target_id, message_id, p1, p2)
     local me = windower.ffxi.get_player()
+    -- one of our songs wore off us / was dispelled (vg_bard keeps its song slots like Singer)
+    if me and target_id == me.id and song_gone_msgs[message_id] then bard.on_lost(p1) end
     local paused = me and engine.on_message(actor_id, message_id, me.id)
     if paused then log(paused) end
     farm.on_message(actor_id, target_id, message_id)
@@ -1399,14 +1405,7 @@ windower.register_event('action', function(act)
             if spell then
                 local on_me = false
                 for _, t in ipairs(act.targets or {}) do if t.id == player.id then on_me = true end end
-                if spell.type == 'BardSong' and on_me then
-                    state.songs[spell.en:lower()] = now()
-                    state.song_len = state.song_len or {}
-                    -- Troubadour doubles song duration (NiTro)
-                    state.song_len[spell.en:lower()] = settings.songs.duration * (util.has_buff(player.buffs, 348) and 2 or 1)
-                    state.song_troub = state.song_troub or {}
-                    state.song_troub[spell.en:lower()] = util.has_buff(player.buffs, 348)
-                end
+                if spell.type == 'BardSong' and on_me then bard.on_song(spell, player) end
                 if first and first_action and state.debuffs[first.id] then
                     local rec = state.debuffs[first.id][spell.en]
                     if rec then

@@ -83,28 +83,80 @@ function bard.in_range()
     return true
 end
 
--- still up by Vanguard's timer
-local function up_raw(name)
-    local last = state.songs[name:lower()]
-    local len = (state.song_len or {})[name:lower()] or S.songs.duration
-    return last and clock() - last < len
+------------------------------------------------------------------------
+-- The bard's own songs on itself, kept like Ivaar's Singer does (2026-10-18 rework, his request "the songs need to be
+-- fixed ... so that it works well"): a song that lands is added; with every slot full it replaces the one with the
+-- least time left (the game's rule - bg-wiki's bard guides), the same song sung again replaces itself; the game's
+-- "wears off" messages and its buff timers take songs away and correct their times. Another bard's songs on us don't
+-- count (each bard has its own slots). state.mysongs[name] = { name, status, at, ends, troub, sv } (os.clock times).
+------------------------------------------------------------------------
+local function mine()
+    state.mysongs = state.mysongs or {}
+    local t = clock()
+    for k, x in pairs(state.mysongs) do if x.ends <= t then state.mysongs[k] = nil end end
+    return state.mysongs
 end
--- sung before a NiTro (or //vg resing): to be sung again. It stays that way until it is - Troubadour running out
--- part way used to leave the rest as they were (2 ten-minute songs and 2 five-minute ones, 2026-10-18)
-local function stale(name)
-    local last = state.songs[name:lower()]
-    return state.redo_at ~= nil and last ~= nil and last < state.redo_at
+local function count(m) local n = 0 for _ in pairs(m) do n = n + 1 end return n end
+-- the song with the least time left (of one buff, if given)
+local function shortest(m, status)
+    local best, key
+    for k, x in pairs(m) do
+        if (not status or x.status == status) and (not best or x.ends < best) then best, key = x.ends, k end
+    end
+    return key
 end
-local function active(name) return up_raw(name) and not stale(name) end
+local function on(name) return mine()[name:lower()] end
+
+-- how long a song sung now lasts: learned from the game's timer for that song, else the "Songs last" setting
+local function length(key, troub)
+    local base = (state.song_base or {})[key] or tonumber(S.songs.duration) or 240
+    return base * (troub and 2 or 1)
+end
+
+-- one of our songs landed on us (the 'action' event, Vanguard.lua)
+function bard.on_song(spell, player)
+    local m = mine()
+    local key = spell.en:lower()
+    local troub = util.has_buff(player.buffs, 348)
+    if not m[key] and count(m) >= (bard.slots(player)) then
+        -- a dummy goes first: they're the short ones (sung without duration gear); the game's timers correct it if not
+        local dummy = {}
+        for _, d in ipairs(list(S.songs.dummy)) do dummy[d:lower()] = true end
+        for _, w in ipairs(list(S.songs.list)) do dummy[w:lower()] = nil end
+        local gone, best
+        for k, x in pairs(m) do
+            local rank = (dummy[k] and 0 or 1e9) + x.ends
+            if not best or rank < best then gone, best = k, rank end
+        end
+        if gone then m[gone] = nil end
+    end
+    m[key] = { name = spell.en, status = spell.status, at = clock(), ends = clock() + length(key, troub), troub = troub,
+               sv = util.has_buff(player.buffs, 52) }
+end
+
+-- a song effect wore off us or was dispelled ('action message' 64 / 204 / 206 / 350 / 531, param = the buff)
+function bard.on_lost(buff_id)
+    local m = mine()
+    local key = shortest(m, buff_id)
+    if key then m[key] = nil end
+end
+
+-- What's on now, for the app / tests: { {name, left, troub}, ... }, least time left first
+function bard.current()
+    local out = {}
+    for _, x in pairs(mine()) do out[#out + 1] = { name = x.name, left = math.floor(x.ends - clock()), troub = x.troub } end
+    table.sort(out, function(a, b) return a.left < b.left end)
+    return out
+end
 
 ------------------------------------------------------------------------
--- Songs already up that Vanguard didn't sing (sung by hand before Vanguard was on, by another addon, or before a
--- reload): picked up where they are instead of all sung again (user request 2026-10-18). The game sends this
--- character's buffs with their end times (incoming 0x063, part 9); Vanguard only reads it, nothing is sent.
+-- The game's timers for our own buffs (incoming 0x063, part 9 - read only, nothing is sent): the real length of each
+-- song (gear, merits, Troubadour), songs gone without a message, and songs already up that Vanguard didn't sing (by
+-- hand, another addon, before a reload) - picked up where they are (his request 2026-10-18).
 ------------------------------------------------------------------------
 local WRAP = 4294967296 / 60                       -- the game's buff clock wraps every ~2.27 years
 local ends = {}                                    -- [buff id] = { os.time() it ends, ... }
-local seen_buffs, ends_at = false, -100                           -- a buff packet came (the game sends one on every buff change)
+local seen_buffs, ends_at = false, -100            -- a buff packet came (the game sends one on every buff change)
 function bard.on_buff_packet(data)
     if type(data) ~= 'string' or #data < 0xC8 or data:byte(0x05) ~= 0x09 then return end
     local now = os.time()
@@ -129,91 +181,110 @@ function bard.read_last_buffs()
     if ok and data then bard.on_buff_packet(data) end
 end
 
-local function adopt(player, wanted)
-    local count = {}
-    for _, b in pairs(player.buffs or {}) do count[b] = (count[b] or 0) + 1 end
-    local groups = {}                              -- songs giving the same buff (Victory / Honor / Advancing March)
-    for _, name in ipairs(wanted) do
-        local sp = util.spell(name)
-        if sp and sp.status then
-            groups[sp.status] = groups[sp.status] or {}
-            table.insert(groups[sp.status], name)
-        end
-    end
+local function reconcile(player, wanted)
+    local m = mine()
+    local have = {}
+    for _, b in pairs(player.buffs or {}) do have[b] = (have[b] or 0) + 1 end
     local now = os.time()
-    for status, names in pairs(groups) do
-        local have = count[status] or 0
-        local up, missing = {}, {}
-        for _, n in ipairs(names) do if up_raw(n) then up[#up + 1] = n else missing[#missing + 1] = n end end
-        -- the real length of a song Vanguard just sang (gear, merits and Troubadour change it): from the game's timer
-        if ends[status] and #up > 0 then
-            local fresh, left = {}, {}
-            for _, n in ipairs(up) do
-                local last = state.songs[n:lower()]
-                if clock() - last < 30 and ends_at >= last and state.song_learned[n:lower()] ~= last then fresh[#fresh + 1] = n end
-            end
-            if #fresh > 0 then
-                for _, t in ipairs(ends[status]) do left[#left + 1] = t - now end
-                table.sort(left, function(a, b) return a > b end)
-                table.sort(fresh, function(a, b) return state.songs[a:lower()] > state.songs[b:lower()] end)
-                for i, n in ipairs(fresh) do
-                    if left[i] then
-                        local last = state.songs[n:lower()]
-                        state.song_len[n:lower()] = (clock() - last) + left[i]
-                        state.song_learned[n:lower()] = last
+    local by = {}
+    for k, x in pairs(m) do
+        if x.status then by[x.status] = by[x.status] or {} table.insert(by[x.status], k) end
+    end
+    for status, keys in pairs(by) do
+        -- the real time of songs just sung (the newest song has the longest timer)
+        if ends[status] then
+            local lefts = {}
+            for _, t in ipairs(ends[status]) do lefts[#lefts + 1] = t - now end
+            table.sort(lefts, function(a, b) return a > b end)
+            table.sort(keys, function(a, b) return m[a].at > m[b].at end)
+            for i, k in ipairs(keys) do
+                local x = m[k]
+                if lefts[i] and not x.learned and clock() - x.at < 30 and ends_at >= x.at then
+                    local real = (clock() - x.at) + lefts[i]
+                    if real > 30 and real < 3600 then
+                        x.ends, x.learned = clock() + lefts[i], true
+                        state.song_base = state.song_base or {}
+                        state.song_base[k] = real / (x.troub and 2 or 1)
                     end
                 end
             end
         end
-        if have < #up and seen_buffs then
-            -- fewer of these buffs than songs Vanguard thinks are up: one wore off early or was dispelled - forget
-            -- the oldest (not one sung in the last few seconds: the buff shows a moment after the song)
-            table.sort(up, function(a, b) return state.songs[a:lower()] < state.songs[b:lower()] end)
-            for i = 1, #up - have do
-                if clock() - state.songs[up[i]:lower()] > 6 then state.songs[up[i]:lower()] = nil end
+        -- fewer of these buffs than our songs: one wore off / was dispelled without a message we saw
+        local n = have[status] or 0
+        if seen_buffs and n < #keys then
+            table.sort(keys, function(a, b) return m[a].ends < m[b].ends end)
+            for i = 1, #keys - n do
+                if clock() - m[keys[i]].at > 6 then m[keys[i]] = nil end
             end
-        elseif have > #up and #missing > 0 then
-            -- up, but not sung by Vanguard: take the timers of the buffs not matched to songs Vanguard sang
-            local left = {}
-            for _, t in ipairs(ends[status] or {}) do left[#left + 1] = t - now end
-            for _, n in ipairs(up) do
-                local mine = (state.song_len[n:lower()] or S.songs.duration) - (clock() - state.songs[n:lower()])
-                local best
-                for i, l in ipairs(left) do if not best or math.abs(l - mine) < math.abs(left[best] - mine) then best = i end end
-                if best then table.remove(left, best) end
+        end
+    end
+    -- songs in the list that are up but weren't sung by Vanguard: picked up with the game's time left
+    local groups = {}
+    for _, name in ipairs(wanted) do
+        local sp = util.spell(name)
+        if sp and sp.status then groups[sp.status] = groups[sp.status] or {} table.insert(groups[sp.status], sp.en) end
+    end
+    local room = (bard.slots(player)) - count(m)
+    for status, names in pairs(groups) do
+        local ours, missing = 0, {}
+        for _, x in pairs(m) do if x.status == status then ours = ours + 1 end end
+        for _, n in ipairs(names) do if not m[n:lower()] then missing[#missing + 1] = n end end
+        local extra = (have[status] or 0) - ours
+        if extra > 0 and #missing > 0 and room > 0 then
+            local lefts = {}
+            for _, t in ipairs(ends[status] or {}) do lefts[#lefts + 1] = t - now end
+            for _, x in pairs(m) do                    -- take out the timers that are our own songs
+                if x.status == status then
+                    local mine_left, best = x.ends - clock(), nil
+                    for i, l in ipairs(lefts) do if not best or math.abs(l - mine_left) < math.abs(lefts[best] - mine_left) then best = i end end
+                    if best then table.remove(lefts, best) end
+                end
             end
-            table.sort(left)                       -- the shortest first: never later than the song really ends
-            for i = 1, math.min(have - #up, #missing) do
+            table.sort(lefts)                          -- the shortest first: never later than the song really ends
+            for i = 1, math.min(extra, #missing, room) do
                 local n = missing[i]
-                local len = S.songs.duration
-                local rest = left[i] and math.min(left[i], len) or len / 2   -- no timer from the game: assume half
-                if left[i] and left[i] > len then len, rest = left[i], left[i] end        -- sung under Troubadour
-                state.songs[n:lower()] = clock() - (len - rest)
-                state.song_len[n:lower()] = len
-                state.song_troub[n:lower()] = rest > S.songs.duration * 1.1
+                local len = tonumber(S.songs.duration) or 240
+                local rest = lefts[i] or len / 2       -- no timer from the game yet: assume half
+                m[n:lower()] = { name = n, status = status, at = clock() - math.max(0, len - rest), ends = clock() + rest,
+                                 troub = rest > len * 1.1, learned = true }
+                room = room - 1
                 h.log(('Songs: %s is already up (%s) - picking up from there'):format(n,
-                    left[i] and ('%ds left'):format(math.floor(rest)) or 'time left unknown'))
+                    lefts[i] and ('%ds left'):format(math.floor(rest)) or 'time left unknown'))
             end
         end
     end
 end
 
--- One song (or Marcato / a dummy) if something is due. Returns true when it acted.
+-- Does this song need singing now? Not on; running low ("Sing again this long before they wear"); Troubadour is up
+-- and it wasn't sung under it (as Singer); or sung before a NiTro / "Sing all songs again now" that isn't finished.
+local function needs(name, troub_up)
+    local x = on(name)
+    if not x then return true end
+    if x.ends - clock() <= (tonumber(S.songs.refresh_before) or 30) then return true end
+    if troub_up and not x.troub then return true end
+    if state.redo_at and x.at < state.redo_at then return true end
+    return false
+end
+
+-- One song (or Marcato / NiTro / a dummy) if something is due. Returns true when it acted.
 function bard.sing(player)
-    state.song_len, state.song_troub, state.song_learned = state.song_len or {}, state.song_troub or {}, state.song_learned or {}
     local wanted, slots, base = bard.wanted(player)
     if #wanted == 0 then return false end
-    adopt(player, wanted)
-    local due = {}
-    for _, name in ipairs(wanted) do
-        local last = state.songs[name:lower()]
-        local keep = (state.song_len[name:lower()] or S.songs.duration) - S.songs.refresh_before
-        if not last or clock() - last > keep or stale(name) then due[#due + 1] = name end
+    reconcile(player, wanted)
+    local troub_up = util.has_buff(player.buffs, 348)
+    local function singable(name)
+        local sp = util.spell(name)
+        return sp and util.can_cast(sp, player) and sp
     end
+    local due = {}
+    for _, name in ipairs(wanted) do if needs(name, troub_up) then due[#due + 1] = name end end
     -- the redo is over when every song it covered was sung again (or after 3 minutes, e.g. out of range all along)
     if state.redo_at then
         local left = false
-        for _, name in ipairs(due) do if stale(name) and util.can_cast(util.spell(name) or {}, player) then left = true end end
+        for _, name in ipairs(due) do
+            local x = on(name)
+            if x and x.at < state.redo_at and singable(name) then left = true end
+        end
         if not left or clock() - state.redo_at > 180 then state.redo_at = nil end
     end
     if #due == 0 then
@@ -222,9 +293,8 @@ function bard.sing(player)
         if state.nitro_until then return h.nitro(player, true) end
         if h.nitro_wait and h.nitro_wait(player) == 0 then
             for _, name in ipairs(wanted) do
-                if active(name) and not state.song_troub[name:lower()] and util.can_cast(util.spell(name) or {}, player) then
-                    return h.nitro(player, true)
-                end
+                local x = on(name)
+                if x and not x.troub and singable(name) then return h.nitro(player, true) end
             end
         end
         return false
@@ -241,9 +311,9 @@ function bard.sing(player)
     if wait and wait > 0 then
         local soonest = math.huge
         for _, name in ipairs(due) do
-            local last = state.songs[name:lower()]
-            if not last or stale(name) then soonest = 0 break end
-            soonest = math.min(soonest, (state.song_len[name:lower()] or S.songs.duration) - (clock() - last))
+            local x = on(name)
+            if not x or (state.redo_at and x.at < state.redo_at) then soonest = 0 break end
+            soonest = math.min(soonest, x.ends - clock())
         end
         if wait < soonest - 8 then
             if not h.recently('nitro_wait', 30) then h.mark('nitro_wait') h.log(('Songs: waiting %ds for NiTro'):format(math.ceil(wait))) end
@@ -263,30 +333,18 @@ function bard.sing(player)
     end
     local real = {}
     for _, name in ipairs(wanted) do if can_sing(name) then real[#real + 1] = name end end
-    -- Dummy songs (Singer's order): with 3+ slots and K dummies (at most slots - 2), the first slots - K real songs,
-    -- then the dummies (last one first) in the slots still free, then the remaining real songs go over them. Worked out
-    -- from the songs this bard can actually sing (it used to count songs, and one real song that couldn't be sung threw
-    -- the count off - the dummies were skipped).
     local dummies = {}
     for _, d in ipairs(list(S.songs.dummy)) do if can_sing(d) then dummies[#dummies + 1] = d end end
-    local k = math.min(#dummies, slots - 2)
-    if base > 2 and k > 0 and #real > slots - k then
-        local first = slots - k
-        local ready, up, later_due = true, 0, false
-        -- a slot only needs a dummy when its song is gone: songs still on (even ones due again, as after NiTro)
-        -- are sung over themselves, so a NiTro refresh is 4 songs, not 6, and fits in Troubadour
-        for i, name in ipairs(real) do
-            if i <= first then
-                if active(name) then up = up + 1 else ready = false end
-            elseif up_raw(name) then up = up + 1
-            else later_due = true end
-        end
-        for i = 1, k do if up_raw(dummies[i]) then up = up + 1 end end
-        if ready and later_due and up < slots then
-            for i = k, 1, -1 do
-                if not active(dummies[i]) then
-                    if h.try_cast(dummies[i], '<me>', 'dummy song (opens a slot)', player) then return true end
-                end
+    -- Dummy songs, exactly as Singer: the harp's extra slots only open while they hold a song, so when our songs on
+    -- us number slots - i (and the list has more to sing), dummy i goes in first - with 4 slots and 2 dummies: the
+    -- first 2 songs, dummy 2, dummy 1, then the 3rd and 4th songs replace the dummies (least time left). With every
+    -- slot still full (a refresh, NiTro) no dummies: each song replaces itself.
+    local cur = count(mine())
+    if base > 2 and cur < slots and #real > cur then
+        for i = 1, math.min(#dummies, slots - 2) do
+            if base - i >= 0 and cur == slots - i then
+                local sp = util.spell(dummies[i])
+                if sp and util.spell_ready(sp, player) and h.try_cast(sp.en, '<me>', 'dummy song (opens a slot)', player) then return true end
             end
         end
     end

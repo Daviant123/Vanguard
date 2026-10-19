@@ -321,7 +321,10 @@ function engine.run(ctx, profile, filter)
     -- /DNC) would otherwise be tried, since an ability the character doesn't have has no recast and looks ready
     local ja_set = ability_set()
     for _, a in ipairs(engine.ordered(ctx.player.main_job, profile)) do
-        if (not filter or filter(a)) and engine.enabled(a, profile) and not engine.refused(a.id)
+        -- Nightingale / Troubadour / Marcato belong to the songs while Songs is on (NiTro right before the songs, Marcato
+        -- right before its song): used on their own they went off at random and the songs missed them (2026-10-18)
+        local songs_own = a.songs_managed and ctx.settings.modules.songs and (ctx.settings.songs.list or '') ~= ''
+        if not songs_own and (not filter or filter(a)) and engine.enabled(a, profile) and not engine.refused(a.id)
             and engine.available(a, ctx.player, ja_set) then
             if try(engine.effective(a, profile), ctx) then return true end
         end

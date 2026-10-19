@@ -1,5 +1,16 @@
 [
   {
+    "version": "1.77.0",
+    "date": "2026-10-18",
+    "items": [
+      "Bard songs reworked after Ivaar's Singer and the bg-wiki bard guides. The bard now keeps track of exactly which of its songs are on: a new song with every slot full replaces the one with the least time left (a dummy first), the same song replaces itself, and songs that wear off or get dispelled are sung again (with a dummy first when the harp's slot closed).",
+      "Bard: dummy songs only when a harp slot is empty - a refresh or NiTro with all songs still on just sings each song over itself.",
+      "Bard: songs now come right after raises, cures and status removal - before steps, sambas, Elegy and other abilities - so the Troubadour minute isn't used up by other things.",
+      "Bard: Nightingale, Troubadour and Marcato ticked in the ability list are left to the songs while Songs is on (they used to go off on their own and the songs missed them). If you use Nightingale + Troubadour by hand, every song is sung again under them.",
+      "Bard: Clarion Call is in the ability list (off until you tick it): +1 song while it's up."
+    ]
+  },
+  {
     "version": "1.76.0",
     "date": "2026-10-18",
     "items": [

@@ -220,6 +220,10 @@ Settings are now saved safely with several characters running (one character's s
 - **Bard NiTro.** In a fight, as soon as Nightingale + Troubadour are ready and your songs weren't sung under them:
   NiTro + Marcato, then all songs fresh (they last twice as long; it knows). Songs due with NiTro only seconds away:
   it waits for NiTro. `//vg set songs.nitro false` to save them for yourself.
+- **How songs are kept up** (after Ivaar's Singer): the bard knows which of its songs are on - a new song with every
+  slot full replaces the one with the least time left (a dummy first), a song that wears off is sung again (a dummy
+  first if its harp slot closed), a refresh with all songs on sings each over itself (no dummies). Songs come right
+  after raises / cures / status removal. Nightingale, Troubadour and Marcato are used by the songs while Songs is on.
 - **Songs already on.** Songs that are up when Vanguard starts (sung by hand, another addon, a reload) are picked up
   with the time the game says they have left; a song dispelled or worn off early is sung again right away. Song
   lengths come from the game's own timers, so refreshes land just before songs really end.
