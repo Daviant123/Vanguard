@@ -1,5 +1,12 @@
 [
   {
+    "version": "1.78.2",
+    "date": "2026-10-19",
+    "items": [
+      "Geomancer: Life Cycle waits for the luopan to run low (under 50 % HP) instead of going off on a full-HP luopan, where it did nothing. Change the % in the ability list (\"luopan HP <\")."
+    ]
+  },
+  {
     "version": "1.78.1",
     "date": "2026-10-19",
     "items": [

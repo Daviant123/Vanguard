@@ -31,7 +31,7 @@ link.SECTIONS = SECTIONS
 
 -- Ability fields the app may change.
 link.OPT_KEYS = { hpp_below = 'number', mpp_below = 'number', mpp_above = 'number', tp_min = 'number',
-                  tp_max = 'number', party_below = 'number', cooldown = 'number', when = 'string' }
+                  tp_max = 'number', party_below = 'number', cooldown = 'number', when = 'string', pet_hpp_below = 'number' }
 local WHEN = { always = true, combat = true, engaged = true, idle = true }
 
 local function copy(v)
@@ -100,7 +100,7 @@ end
 -- //vg actopt <id> <key> <value|default>
 function link.actopt(pr, id, key, value)
     if not pr or not id or not link.OPT_KEYS[key or ''] then
-        h.log('Usage: //vg actopt <ability id> hpp_below|mpp_below|mpp_above|tp_min|tp_max|party_below|cooldown|when <value|default>')
+        h.log('Usage: //vg actopt <ability id> hpp_below|mpp_below|mpp_above|tp_min|tp_max|party_below|pet_hpp_below|cooldown|when <value|default>')
         return false
     end
     pr.opts = pr.opts or {}

@@ -442,7 +442,8 @@ jobs.GEO = {
         A('blaze', 'Blaze of Glory (before Geo)', 'Support', 'ja', 'Blaze of Glory', {pet = 'none', when = 'combat'}),
         A('ecliptic', 'Ecliptic Attrition', 'Support', 'ja', 'Ecliptic Attrition', {pet = 'present', when = 'combat'}),
         A('dematerialize', 'Dematerialize (protect luopan)', 'Support', 'ja', 'Dematerialize', {pet = 'present', when = 'combat'}),
-        A('life_cycle', 'Life Cycle', 'Support', 'ja', 'Life Cycle', {pet = 'present', when = 'combat', cooldown = 600}),
+        -- a luopan loses HP over time: Life Cycle tops it up when it runs low (used at once on a full luopan, it was wasted)
+        A('life_cycle', 'Life Cycle (luopan running low)', 'Support', 'ja', 'Life Cycle', {pet = 'present', when = 'combat', pet_hpp_below = 50}),
         A('radial_arcana', 'Radial Arcana at low MP', 'Recovery', 'ja', 'Radial Arcana', {pet = 'present', mpp_below = 25, when = 'always'}),
     },
 }

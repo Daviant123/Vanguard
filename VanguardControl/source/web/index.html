@@ -284,7 +284,7 @@ function jobTab(c, p) {
 
 // Each ability's thresholds: edit them like CurePlease; the job's recommended value is in the tooltip.
 const LIMIT_LABEL = {party_below: "party HP <", hpp_below: "my HP <", mpp_below: "MP <", mpp_above: "MP >",
-  tp_min: "TP \u2265", tp_max: "TP <", cooldown: "every", when: ""};
+  tp_min: "TP \u2265", tp_max: "TP <", pet_hpp_below: "luopan HP <", cooldown: "every", when: ""};
 const WHEN_OPTS = [["always", "always"], ["combat", "party fighting"], ["engaged", "I'm fighting"], ["idle", "out of combat"]];
 function limits(a) {
   return arr(a.limits).map(l => {

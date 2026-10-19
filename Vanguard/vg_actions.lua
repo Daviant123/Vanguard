@@ -132,7 +132,7 @@ function engine.effective(a, profile)
     return setmetatable(t, { __index = a })
 end
 
-local LIMITS = { 'party_below', 'hpp_below', 'mpp_below', 'mpp_above', 'tp_min', 'tp_max' }
+local LIMITS = { 'party_below', 'hpp_below', 'mpp_below', 'mpp_above', 'tp_min', 'tp_max', 'pet_hpp_below' }
 
 -- All actions this character can use, with their on/off state and editable thresholds.
 function engine.list(profile, player)
@@ -252,6 +252,10 @@ local function conditions_ok(a, ctx)
     if a.tp_max and v.tp >= a.tp_max then return false end
     if a.party_below and lowest_party_hpp(ctx) >= a.party_below then return false end
     if a.no_pld and ctx.pld_in_party and ctx.pld_in_party(p) then return false end
+    if a.pet_hpp_below then                                       -- e.g. Life Cycle only for a luopan running low
+        local pet = windower.ffxi.get_mob_by_target('pet')
+        if not pet or (pet.hpp or 100) >= a.pet_hpp_below then return false end
+    end
     if a.pet then
         local pet = windower.ffxi.get_mob_by_target('pet')
         if a.pet == 'none' and pet then return false end
