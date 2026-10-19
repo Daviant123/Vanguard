@@ -439,7 +439,8 @@ jobs.GEO = {
     },
     debuffs = {support = 'Dia II', support_caster = 'Dia II'},
     actions = {
-        A('blaze', 'Blaze of Glory (before Geo)', 'Support', 'ja', 'Blaze of Glory', {pet = 'none', when = 'combat'}),
+        -- boosts the next luopan: only when the Geo spell can follow at once (set, ready, MP, a mob for an enemy bubble)
+        A('blaze', 'Blaze of Glory (before Geo)', 'Support', 'ja', 'Blaze of Glory', {pet = 'none', when = 'combat', geo_next = true}),
         A('ecliptic', 'Ecliptic Attrition', 'Support', 'ja', 'Ecliptic Attrition', {pet = 'present', when = 'combat'}),
         A('dematerialize', 'Dematerialize (protect luopan)', 'Support', 'ja', 'Dematerialize', {pet = 'present', when = 'combat'}),
         -- a luopan loses HP over time: Life Cycle tops it up when it runs low (used at once on a full luopan, it was wasted)

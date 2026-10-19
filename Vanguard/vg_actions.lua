@@ -252,6 +252,12 @@ local function conditions_ok(a, ctx)
     if a.tp_max and v.tp >= a.tp_max then return false end
     if a.party_below and lowest_party_hpp(ctx) >= a.party_below then return false end
     if a.no_pld and ctx.pld_in_party and ctx.pld_in_party(p) then return false end
+    if a.geo_next then                                            -- Blaze of Glory: only right before a Geo spell
+        local g = ctx.settings.geo or {}
+        local sp = (g.geo or '') ~= '' and util.spell(g.geo)
+        if not ctx.settings.modules.geo or not sp or not util.spell_ready(sp, p) or ctx.silenced(p) then return false end
+        if util.targets(sp, 'Enemy') and g.geo_target == 'bt' and not ctx.battle_target() then return false end
+    end
     if a.pet_hpp_below then                                       -- e.g. Life Cycle only for a luopan running low
         local pet = windower.ffxi.get_mob_by_target('pet')
         if not pet or (pet.hpp or 100) >= a.pet_hpp_below then return false end

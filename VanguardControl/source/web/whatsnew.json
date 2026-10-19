@@ -1,5 +1,12 @@
 [
   {
+    "version": "1.78.4",
+    "date": "2026-10-19",
+    "items": [
+      "Geomancer: Blaze of Glory only goes off when the Geo spell can follow right away (a Geo spell is set, it's ready, you have the MP, and there's a mob for an enemy bubble). It used to go off whenever there was no luopan in a fight and was often wasted."
+    ]
+  },
+  {
     "version": "1.78.3",
     "date": "2026-10-19",
     "items": [
