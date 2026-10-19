@@ -1,5 +1,12 @@
 [
   {
+    "version": "1.81.2",
+    "date": "2026-10-19",
+    "items": [
+      "Bard: Marcato is no longer wasted on a dummy song. If a dummy became needed right after Marcato (an interrupted cast or a dispel at that moment), the dummy used Marcato up; now the Marcato song goes first and the dummy right after."
+    ]
+  },
+  {
     "version": "1.81.1",
     "date": "2026-10-19",
     "items": [

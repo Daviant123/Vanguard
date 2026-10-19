@@ -506,12 +506,22 @@ function bard.sing(player)
     -- first 2 songs, dummy 2, dummy 1, then the 3rd and 4th songs replace the dummies (least time left). With every
     -- slot still full (a refresh, NiTro) no dummies: each song replaces itself.
     local cur = count(mine())
-    if base > 2 and cur < slots and #real > cur then
+    -- Marcato is up: its song goes first - a dummy now would use Marcato up (found by the bard fuzz test, 2026-10-19)
+    local marcato_up = util.has_buff(player.buffs, 231)
+    local ms_name = S.songs.marcato_song ~= '' and S.songs.marcato_song or wanted[1]
+    local ms_due = false
+    for _, n in ipairs(due) do if ms_name and n:lower() == ms_name:lower() then ms_due = true end end
+    if base > 2 and cur < slots and #real > cur and not (marcato_up and ms_due) then
         for i = 1, math.min(#dummies, slots - 2) do
             if base - i >= 0 and cur == slots - i then
                 local sp = util.spell(dummies[i])
                 if sp and util.spell_ready(sp, player) and h.try_cast(sp.en, '<me>', 'dummy song (opens a slot)', player) then return true end
             end
+        end
+    end
+    if marcato_up and ms_name then                       -- the Marcato song to the front, the rest in their order
+        for i, n in ipairs(due) do
+            if n:lower() == ms_name:lower() and i > 1 then table.remove(due, i) table.insert(due, 1, n) break end
         end
     end
     for _, name in ipairs(due) do
