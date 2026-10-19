@@ -1,5 +1,12 @@
 [
   {
+    "version": "1.79.1",
+    "date": "2026-10-19",
+    "items": [
+      "Geomancer: the luopan goes where the spell can go. Enemy bubbles (Frailty, Malaise...) always go on the mob; a party bubble (Geo-Regen, Geo-Haste...) with \"Place the luopan on\" left on the first choice goes on the leader (or on you). Picking a party bubble without changing the target used to have the game refuse it every few seconds. The first choice is now called \"Automatic\"."
+    ]
+  },
+  {
     "version": "1.79.0",
     "date": "2026-10-19",
     "items": [

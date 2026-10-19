@@ -1,6 +1,6 @@
 _addon.name = 'Vanguard'
 _addon.author = 'Daviant'
-_addon.version = '0.82.9'
+_addon.version = '0.83.0'
 _addon.commands = {'vanguard', 'vg'}
 
 --[[
@@ -874,7 +874,7 @@ local function do_geo(player)
     end
     -- Geo: keep a luopan out.
     if settings.geo.geo ~= '' and not windower.ffxi.get_mob_by_target('pet') then
-        local tgt = settings.geo.geo_target
+        local tgt = support.geo_place(player, util.spell(settings.geo.geo))
         if tgt == 'bt' then
             if party_engaged(player) and battle_target() then
                 if support.geo_hate(player, util.spell(settings.geo.geo), battle_target()) then return true end

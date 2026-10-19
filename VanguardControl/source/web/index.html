@@ -1226,7 +1226,7 @@ function geoTab(p) {
   const party = arr(p.party);
   const indi = [{v: "", l: "— none —"}].concat(arr(m.indi).map(s => ({v: s, l: s})));
   const geo = [{v: "", l: "— none —"}].concat(arr(m.geo).map(s => ({v: s, l: s})));
-  const targets = [{v: "bt", l: "Enemy (battle target)"}, {v: "me", l: "Me"}].concat(party.slice(1).map(n => ({v: n, l: n})));
+  const targets = [{v: "bt", l: "Automatic (enemy bubbles on the mob, party bubbles on the leader)"}, {v: "me", l: "Me"}].concat(party.slice(1).map(n => ({v: n, l: n})));
   const [entSpell, entWho] = (cfg.entrust || "").split(">").map(x => (x || "").trim());
   return `<div class="stack">
     <div class="master">${modChk("Keep bubbles up", mods, "geo")}</div>

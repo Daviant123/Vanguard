@@ -187,6 +187,21 @@ function support.geo_hate(player, spell, mob)
     return false
 end
 
+-- Where the luopan goes for this Geo spell: an enemy bubble always on the battle target ('bt'); a party bubble on the
+-- member picked, or - with "Enemy" picked (the default) - on the leader if near, else on me. Picking Geo-Regen with
+-- the target left on "Enemy" (or Geo-Frailty on "Me") had the game refuse it every few seconds (2026-10-19 GEO round).
+function support.geo_place(player, spell)
+    local tgt = S.geo.geo_target or 'bt'
+    if spell and util.targets(spell, 'Enemy') then return 'bt' end
+    if tgt == 'me' or tgt == '' then return 'me' end
+    if tgt ~= 'bt' then return tgt end
+    local lead = S.leader ~= '' and S.leader:lower() ~= player.name:lower() and S.leader
+    if lead then
+        for _, m in ipairs(h.party_members(20)) do if m.name:lower() == lead:lower() then return m.name end end
+    end
+    return 'me'
+end
+
 -- Is the luopan out of use? Its bubble reaches about 6' around it (bg-wiki), and it stays where it was put down. It
 -- used to be recalled only 15' from the fight, so after a mob died the next one 7-15' away sat outside the bubble the
 -- whole fight, and a bubble on a member who walked off was never moved (2026-10-18). Returns why, or nil.
@@ -208,8 +223,8 @@ function support.luopan_off(player, pet, bt)
         return nil
     end
     -- a bubble for the party, put down on me or a member: moved when that one is out of its reach
-    local who = S.geo.geo_target
-    local m = (who == 'me' or who == 'bt' or who == '') and windower.ffxi.get_mob_by_target('me') or windower.ffxi.get_mob_by_name(who)
+    local who = support.geo_place(player, spell)
+    local m = who == 'me' and windower.ffxi.get_mob_by_target('me') or windower.ffxi.get_mob_by_name(who)
     if m and d(pet, m) > REACH + 1 and h.party_engaged(player) then
         return ("%s is %d' from the luopan"):format(m.name, math.floor(d(pet, m)))
     end
