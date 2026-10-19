@@ -1,6 +1,6 @@
 _addon.name = 'Vanguard'
 _addon.author = 'Daviant'
-_addon.version = '0.79.5'
+_addon.version = '0.80.0'
 _addon.commands = {'vanguard', 'vg'}
 
 --[[
@@ -1199,6 +1199,7 @@ bard.init(settings, state, {
     log = log, recently = recently, mark = mark, try_cast = try_cast, use_ja = use_ja, amnesia = amnesia,
     party_members = party_members, ja_ready = ja_ready,
     nitro = function(p, due) return support.nitro(p, due) end,
+    nitro_wait = function(p) return support.nitro_wait(p) end,
 })
 strat.init(settings, state, {
     log = log, recently = recently, use_ja = use_ja, cast = cast, party_members = party_members,
@@ -1341,6 +1342,7 @@ windower.register_event('incoming chunk', function(id, data)
         stats.on_message(actor, target, msg, p1, p2)
         return
     end
+    if id == 0x063 then bard.on_buff_packet(data) return end   -- our buffs with their end times (songs already up)
     if id == 0x0DC then                               -- party invite: inviter's name at 0x0C
         local player = windower.ffxi.get_player()
         local from = data:sub(0x0C + 1, 0x0C + 16):gsub('%z.*$', '')
@@ -1402,6 +1404,8 @@ windower.register_event('action', function(act)
                     state.song_len = state.song_len or {}
                     -- Troubadour doubles song duration (NiTro)
                     state.song_len[spell.en:lower()] = settings.songs.duration * (util.has_buff(player.buffs, 348) and 2 or 1)
+                    state.song_troub = state.song_troub or {}
+                    state.song_troub[spell.en:lower()] = util.has_buff(player.buffs, 348)
                 end
                 if first and first_action and state.debuffs[first.id] then
                     local rec = state.debuffs[first.id][spell.en]
@@ -1558,7 +1562,7 @@ windower.register_event('load', function()
     if settings.keys then bind_keys(true) end
     quick.hk_bind_all(true)
     farm_key(true)
-    if windower.ffxi.get_info().logged_in then load_profile() end
+    if windower.ffxi.get_info().logged_in then load_profile() bard.read_last_buffs() end
     update.on_load()
 end)
 windower.register_event('login', function() coroutine.schedule(function() load_profile() end, 5) end)

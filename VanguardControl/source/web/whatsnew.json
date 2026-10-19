@@ -1,5 +1,14 @@
 [
   {
+    "version": "1.75.0",
+    "date": "2026-10-18",
+    "items": [
+      "Bard: songs that are already up when Vanguard starts (sung by hand, by another addon, or before a reload) are picked up with the time the game says they have left, instead of all being sung again. A song that wears off early or is dispelled is sung again right away.",
+      "Bard: NiTro (Nightingale + Troubadour) is used as soon as it's ready in a fight when your songs weren't sung under it, so they last the full doubled time. When songs come due and NiTro is only seconds away, the bard waits for it instead of singing them plain.",
+      "Bard: each song's real length is read from the game (song gear, merits, Troubadour), so songs are refreshed just before they really run out."
+    ]
+  },
+  {
     "version": "1.74.2",
     "date": "2026-10-18",
     "items": [

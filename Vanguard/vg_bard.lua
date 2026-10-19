@@ -83,30 +83,168 @@ function bard.in_range()
     return true
 end
 
-local function active(name)
+-- still up by Vanguard's timer
+local function up_raw(name)
     local last = state.songs[name:lower()]
     local len = (state.song_len or {})[name:lower()] or S.songs.duration
     return last and clock() - last < len
 end
+-- sung before NiTro started while Troubadour is up: to be sung again, so it lasts twice as long
+local troub_up = false
+local function stale(name)
+    local last = state.songs[name:lower()]
+    return troub_up and state.nitro_at and last ~= nil and last < state.nitro_at
+end
+local function active(name) return up_raw(name) and not stale(name) end
+
+------------------------------------------------------------------------
+-- Songs already up that Vanguard didn't sing (sung by hand before Vanguard was on, by another addon, or before a
+-- reload): picked up where they are instead of all sung again (user request 2026-10-18). The game sends this
+-- character's buffs with their end times (incoming 0x063, part 9); Vanguard only reads it, nothing is sent.
+------------------------------------------------------------------------
+local WRAP = 4294967296 / 60                       -- the game's buff clock wraps every ~2.27 years
+local ends = {}                                    -- [buff id] = { os.time() it ends, ... }
+local seen_buffs, ends_at = false, -100                           -- a buff packet came (the game sends one on every buff change)
+function bard.on_buff_packet(data)
+    if type(data) ~= 'string' or #data < 0xC8 or data:byte(0x05) ~= 0x09 then return end
+    local now = os.time()
+    local out = {}
+    for i = 0, 31 do
+        local id = data:unpack('H', 0x08 + 2 * i + 1)
+        local raw = data:unpack('I', 0x48 + 4 * i + 1)
+        if id and id ~= 0 and id ~= 255 and raw and raw > 0 then
+            local t = 1009810800 + raw / 60
+            t = t + math.floor((now - t) / WRAP + 0.5) * WRAP          -- the wrap that lands nearest to now
+            if t > now and t - now < 3600 then
+                out[id] = out[id] or {}
+                out[id][#out[id] + 1] = t
+            end
+        end
+    end
+    ends, seen_buffs, ends_at = out, true, clock()
+end
+-- after a reload: the last buff packet the game sent
+function bard.read_last_buffs()
+    local ok, data = pcall(function() return windower.packets and windower.packets.last_incoming and windower.packets.last_incoming(0x063) end)
+    if ok and data then bard.on_buff_packet(data) end
+end
+
+local function adopt(player, wanted)
+    local count = {}
+    for _, b in pairs(player.buffs or {}) do count[b] = (count[b] or 0) + 1 end
+    local groups = {}                              -- songs giving the same buff (Victory / Honor / Advancing March)
+    for _, name in ipairs(wanted) do
+        local sp = util.spell(name)
+        if sp and sp.status then
+            groups[sp.status] = groups[sp.status] or {}
+            table.insert(groups[sp.status], name)
+        end
+    end
+    local now = os.time()
+    for status, names in pairs(groups) do
+        local have = count[status] or 0
+        local up, missing = {}, {}
+        for _, n in ipairs(names) do if up_raw(n) then up[#up + 1] = n else missing[#missing + 1] = n end end
+        -- the real length of a song Vanguard just sang (gear, merits and Troubadour change it): from the game's timer
+        if ends[status] and #up > 0 then
+            local fresh, left = {}, {}
+            for _, n in ipairs(up) do
+                local last = state.songs[n:lower()]
+                if clock() - last < 30 and ends_at >= last and state.song_learned[n:lower()] ~= last then fresh[#fresh + 1] = n end
+            end
+            if #fresh > 0 then
+                for _, t in ipairs(ends[status]) do left[#left + 1] = t - now end
+                table.sort(left, function(a, b) return a > b end)
+                table.sort(fresh, function(a, b) return state.songs[a:lower()] > state.songs[b:lower()] end)
+                for i, n in ipairs(fresh) do
+                    if left[i] then
+                        local last = state.songs[n:lower()]
+                        state.song_len[n:lower()] = (clock() - last) + left[i]
+                        state.song_learned[n:lower()] = last
+                    end
+                end
+            end
+        end
+        if have < #up and seen_buffs then
+            -- fewer of these buffs than songs Vanguard thinks are up: one wore off early or was dispelled - forget
+            -- the oldest (not one sung in the last few seconds: the buff shows a moment after the song)
+            table.sort(up, function(a, b) return state.songs[a:lower()] < state.songs[b:lower()] end)
+            for i = 1, #up - have do
+                if clock() - state.songs[up[i]:lower()] > 6 then state.songs[up[i]:lower()] = nil end
+            end
+        elseif have > #up and #missing > 0 then
+            -- up, but not sung by Vanguard: take the timers of the buffs not matched to songs Vanguard sang
+            local left = {}
+            for _, t in ipairs(ends[status] or {}) do left[#left + 1] = t - now end
+            for _, n in ipairs(up) do
+                local mine = (state.song_len[n:lower()] or S.songs.duration) - (clock() - state.songs[n:lower()])
+                local best
+                for i, l in ipairs(left) do if not best or math.abs(l - mine) < math.abs(left[best] - mine) then best = i end end
+                if best then table.remove(left, best) end
+            end
+            table.sort(left)                       -- the shortest first: never later than the song really ends
+            for i = 1, math.min(have - #up, #missing) do
+                local n = missing[i]
+                local len = S.songs.duration
+                local rest = left[i] and math.min(left[i], len) or len / 2   -- no timer from the game: assume half
+                if left[i] and left[i] > len then len, rest = left[i], left[i] end        -- sung under Troubadour
+                state.songs[n:lower()] = clock() - (len - rest)
+                state.song_len[n:lower()] = len
+                state.song_troub[n:lower()] = rest > S.songs.duration * 1.1
+                h.log(('Songs: %s is already up (%s) - picking up from there'):format(n,
+                    left[i] and ('%ds left'):format(math.floor(rest)) or 'time left unknown'))
+            end
+        end
+    end
+end
 
 -- One song (or Marcato / a dummy) if something is due. Returns true when it acted.
 function bard.sing(player)
-    state.song_len = state.song_len or {}
+    state.song_len, state.song_troub, state.song_learned = state.song_len or {}, state.song_troub or {}, state.song_learned or {}
     local wanted, slots, base = bard.wanted(player)
     if #wanted == 0 then return false end
+    troub_up = util.has_buff(player.buffs, 348)
+    adopt(player, wanted)
     local due = {}
     for _, name in ipairs(wanted) do
         local last = state.songs[name:lower()]
         local keep = (state.song_len[name:lower()] or S.songs.duration) - S.songs.refresh_before
-        if not last or clock() - last > keep then due[#due + 1] = name end
+        if not last or clock() - last > keep or stale(name) then due[#due + 1] = name end
     end
-    if #due == 0 then return false end
+    if #due == 0 then
+        -- NiTro as soon as it's ready in a fight when the songs up weren't sung under Troubadour: they're all sung
+        -- again and last twice as long (his request 2026-10-18: "strive to use Nightingale, Troubadour in sync")
+        if state.nitro_until then return h.nitro(player, true) end
+        if h.nitro_wait and h.nitro_wait(player) == 0 then
+            for _, name in ipairs(wanted) do
+                if active(name) and not state.song_troub[name:lower()] and util.can_cast(util.spell(name) or {}, player) then
+                    return h.nitro(player, true)
+                end
+            end
+        end
+        return false
+    end
     local ok, who = bard.in_range()
     if not ok then
         if not h.recently('song_range', 20) then h.mark('song_range') h.log(('Songs: waiting for %s to come within 10\''):format(who)) end
         return false
     end
     if h.nitro(player, true) then return true end
+    -- NiTro nearly ready and the due songs are still up for longer than that: wait for it instead of singing them
+    -- plain now (they'd only last half as long as under Troubadour)
+    local wait = h.nitro_wait and h.nitro_wait(player)
+    if wait and wait > 0 then
+        local soonest = math.huge
+        for _, name in ipairs(due) do
+            local last = state.songs[name:lower()]
+            if not last or stale(name) then soonest = 0 break end
+            soonest = math.min(soonest, (state.song_len[name:lower()] or S.songs.duration) - (clock() - last))
+        end
+        if wait < soonest - 8 then
+            if not h.recently('nitro_wait', 30) then h.mark('nitro_wait') h.log(('Songs: waiting %ds for NiTro'):format(math.ceil(wait))) end
+            return false
+        end
+    end
     -- songs this bard can't sing (not learned, or not a song): skipped, and said once in a while - a friend's bard
     -- sang 3 of 4 songs and no dummies without a word about why (2026-10-18)
     local function can_sing(name)

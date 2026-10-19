@@ -217,8 +217,12 @@ Settings are now saved safely with several characters running (one character's s
 - **Geomancer.** Casts Dia II first so Geo-Frailty / Malaise work (the guide: the GEO must be on the mob's hate list).
   `//vg set geo.entrust auto` entrusts Indi-Haste (or Indi-Fury) to you. Radial Arcana also when 2+ party members are
   under 40% MP (`geo.party_mp`).
-- **Bard NiTro.** In a fight with songs due: Nightingale + Troubadour + Marcato, then all songs fresh (they last twice
-  as long; it knows). `//vg set songs.nitro false` to save them for yourself.
+- **Bard NiTro.** In a fight, as soon as Nightingale + Troubadour are ready and your songs weren't sung under them:
+  NiTro + Marcato, then all songs fresh (they last twice as long; it knows). Songs due with NiTro only seconds away:
+  it waits for NiTro. `//vg set songs.nitro false` to save them for yourself.
+- **Songs already on.** Songs that are up when Vanguard starts (sung by hand, another addon, a reload) are picked up
+  with the time the game says they have left; a song dispelled or worn off early is sung again right away. Song
+  lengths come from the game's own timers, so refreshes land just before songs really end.
 - **Pianissimo songs.** `//vg pianissimo Mage's Ballad III > CharB|CharC` sings Ballad to just those two;
   add more lines (e.g. `Sentinel's Scherzo > CharA`). `//vg pianissimo` shows them, `//vg pianissimo clear` empties.
   Got a Terpander / Daurdabla? Just put 3 or 4 songs in the song list.

@@ -236,7 +236,7 @@ function support.nitro(player, songs_due)
         if night and not troub then
             local t = ja_ready('Troubadour', p)
             if t then
-                state.songs, state.song_len = {}, {}             -- sing every song again under NiTro
+                state.nitro_at = clock()                         -- every song sung before this is sung again (vg_bard)
                 return h.use_ja(t, '<me>')
             end
             return true
@@ -254,6 +254,17 @@ function support.nitro(player, songs_due)
     state.nitro_until = clock() + 6
     h.log('NiTro: Nightingale + Troubadour, then all songs fresh')
     return h.use_ja(n, '<me>')
+end
+
+-- Seconds until Nightingale and Troubadour are both ready (0 = now); nil when NiTro isn't wanted / possible now
+-- (off, not a bard, no fight, the abilities not learned, Amnesia, Troubadour already up).
+function support.nitro_wait(player)
+    if not S.songs.nitro or player.main_job ~= 'BRD' or S.songs.list == '' or not h.party_engaged(player) then return nil end
+    if util.has_buff(player.buffs, 348) or h.amnesia(player) then return nil end
+    local n, t = has_ja('Nightingale'), has_ja('Troubadour')
+    if not n or not t then return nil end
+    local recasts = windower.ffxi.get_ability_recasts() or {}
+    return math.max(tonumber(recasts[n.recast_id]) or 0, tonumber(recasts[t.recast_id]) or 0)
 end
 
 -- Pianissimo songs: "Song>Name|Name,Song>Name"
