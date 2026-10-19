@@ -134,8 +134,9 @@ func (h *hub) guardHTTP(next http.Handler) http.Handler {
 }
 
 // scrub takes out character names and the Windows user name.
-func (h *hub) scrub(text string) string {
-	names := h.names()
+func (h *hub) scrub(text string) string { return scrubNames(text, h.names()) }
+
+func scrubNames(text string, names []string) string {
 	for i, n := range names {
 		if len(n) >= 3 {
 			text = regexp.MustCompile(`(?i)\b`+regexp.QuoteMeta(n)+`\b`).ReplaceAllString(text, "Char"+string(rune('A'+i%26)))
@@ -226,6 +227,9 @@ func (h *hub) handleCrashes(w http.ResponseWriter, r *http.Request) {
 			saveCrashes(list)
 		}
 		crashMu.Unlock()
+	case "logs":
+		n, _ := strconv.Atoi(q.Get("n"))
+		h.sendLogs(n)
 	case "problem":
 		openURL(h.reportURL(nil))
 		h.addLog("Opened a problem report in your browser: describe what happened, then click Submit.")

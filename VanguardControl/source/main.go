@@ -68,11 +68,16 @@ type hub struct {
 	nextID int
 }
 
-func (h *hub) addLog(format string, args ...any) {
+func (h *hub) addLog(format string, args ...any) { h.addLogFrom("app", format, args...) }
+
+// addLogFrom: who is "app" or the character the line came from (kept in the log file for Send logs, logfile.go).
+func (h *hub) addLogFrom(who, format string, args ...any) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	h.nextID++
-	h.logs = append(h.logs, logLine{ID: h.nextID, Time: time.Now().Format("15:04:05"), Text: fmt.Sprintf(format, args...)})
+	text := fmt.Sprintf(format, args...)
+	h.logs = append(h.logs, logLine{ID: h.nextID, Time: time.Now().Format("15:04:05"), Text: text})
+	writeLogFile(who, text)
 	if len(h.logs) > 500 {
 		h.logs = h.logs[len(h.logs)-500:]
 	}
@@ -186,7 +191,7 @@ func (h *hub) listen() {
 				c.addr = addr
 			}
 			h.mu.Unlock()
-			h.addLog("%s: %s", name, text)
+			h.addLogFrom(name, "%s: %s", name, text)
 			h.alarmFromLog(name, text)
 		}
 	}

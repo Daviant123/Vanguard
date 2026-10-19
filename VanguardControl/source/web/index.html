@@ -897,6 +897,8 @@ function renderCrashBadge() {
   b.textContent = `${unsent} problem${unsent === 1 ? "" : "s"} - send report`;
 }
 setInterval(() => crashDo(""), 20000);
+function logN() { try { return localStorage.getItem("vg_logn") || "250"; } catch (e) { return "250"; } }
+document.addEventListener("change", e => { if (e.target && e.target.id === "logn") try { localStorage.setItem("vg_logn", e.target.value); } catch (x) {} });
 function problemsBox() {
   const list = arr(crashes).map((c, i) => ({c, i})).reverse();
   return `<div class="box"><h3>Problems</h3>
@@ -908,6 +910,9 @@ function problemsBox() {
     </tbody></table>` : `<div class="hint">No problems caught. If something misbehaves without an error, use Report a problem.</div>`}
     <div class="row" style="margin-top:8px"><button onclick="crashDo('do=problem')">Report a problem</button>
       ${list.length ? `<button onclick="crashDo('do=clear')">Clear the list</button>` : ""}</div>
+    <div class="row" style="margin-top:8px;align-items:center;gap:6px"><button class="primary" title="Opens a report with your recent log (app, characters and updates); the full log is put on your clipboard to paste in" onclick="crashDo('do=logs&n=' + (document.getElementById('logn').value || 250))">Send logs</button>
+      <span>the last</span><select id="logn">${[100, 250, 500, 1000, 2000].map(n => `<option value="${n}" ${String(n) === String(logN()) ? "selected" : ""}>${n}</option>`).join("")}</select><span>lines</span></div>
+    <div class="hint" style="margin-top:4px">Send logs: your browser opens a report and the log goes on your clipboard - click in the report box, press Ctrl+V, say what went wrong, click Submit.</div>
     <div class="hint" style="margin-top:6px">Send report opens a ready-made report on the Vanguard GitHub page in your browser - click Submit there to send it.
       Character names and your Windows user name are replaced first; nothing is sent until you click Submit.</div></div>`;
 }

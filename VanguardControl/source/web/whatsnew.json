@@ -1,5 +1,12 @@
 [
   {
+    "version": "1.76.0",
+    "date": "2026-10-18",
+    "items": [
+      "New: Send logs (App & updates > Problems). Everything in the app's log - the app, each character's Vanguard messages and updates - is now also kept in vanguard_log.txt next to the app. Send logs opens the same report page as Report a problem and puts your last 100-2000 log lines on the clipboard: click in the report box, press Ctrl+V, say what went wrong, click Submit. Character names and your Windows user name are replaced first."
+    ]
+  },
+  {
     "version": "1.75.1",
     "date": "2026-10-18",
     "items": [
