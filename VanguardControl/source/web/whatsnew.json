@@ -1,5 +1,12 @@
 [
   {
+    "version": "1.83.2",
+    "date": "2026-10-19",
+    "items": [
+      "Farming with DO NOT MOVE on: a mob right in front is fought from where you stand - it used to be skipped with \"can't get any closer\" (farming tried to step up to it, the button stopped the step, and that looked like being stuck). Mobs up to about 7 yalms count as within reach without a pull (flying mobs hover a bit further out)."
+    ]
+  },
+  {
     "version": "1.83.1",
     "date": "2026-10-19",
     "items": [

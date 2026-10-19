@@ -212,7 +212,7 @@ function farm.judge(mob, me, ids, center)
     -- DO NOT MOVE: only mobs it can reach from where it stands (its pull's reach, or right next to it); the rest are
     -- left until they come (or attack)
     if S.farm.stay and not claimed_us then
-        local reach = farm.pull_range() or 5
+        local reach = farm.pull_range() or 7             -- (7: flying mobs like bats hover a little further out)
         if util.dist(mob) > reach then return nil, 'out of reach (Do not move is on)' end
     end
     -- "Then: let it come to me" with a pull set: only mobs the pull reaches from where it stands - no walking off to
@@ -316,11 +316,19 @@ local function progress(mob)
     end
     local d = util.dist(mob)
     if d < go.best - 1 or d <= 5 then go.best, go.best_t = math.min(d, go.best), now() end
-    if now() - go.best_t > 8 then farm.skip(mob.id, 120, "can't get any closer") return nil end
+    -- (DO NOT MOVE: it isn't trying to get closer - never "can't get any closer"; a bat right in front of his bard
+    -- was skipped that way, 2026-10-19)
+    if now() - go.best_t > 8 and not S.farm.stay then farm.skip(mob.id, 120, "can't get any closer") return nil end
     return go, d
 end
 
 local function walk_to(me, mob, d)
+    if S.farm.stay then                                 -- DO NOT MOVE: no walking; it fights what comes within reach
+        h.stop_running()
+        h.face(me, mob)
+        status(('waiting for %s to come within reach (%d yalms) - Do not move is on'):format(mob.name, math.floor(d + 0.5)))
+        return
+    end
     h.run_toward(me, mob)
     state.route_moving = true
     status(('walking to %s (%d yalms)'):format(mob.name, math.floor(d + 0.5)))
