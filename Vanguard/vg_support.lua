@@ -202,6 +202,33 @@ function support.geo_place(player, spell)
     return 'me'
 end
 
+-- What the Geomancy tab shows (2026-10-19 GEO round): the luopan (which Geo spell, its HP, how far from the mob it's
+-- for and whether that's within its ~6' reach), my Indi, and who carries the entrusted Indi.
+function support.geo_info(player)
+    local out = {}
+    local pet = windower.ffxi.get_mob_by_target('pet')
+    local last = state.geo_last
+    if pet then
+        local l = { name = last and last.name or 'luopan', hpp = pet.hpp or 100 }
+        local bt = h.battle_target()
+        if bt and last and util.spell(last.name) and util.targets(util.spell(last.name), 'Enemy') then
+            local dx, dy = pet.x - bt.x, pet.y - bt.y
+            l.dist = math.floor(math.sqrt(dx * dx + dy * dy) + 0.5)
+            l.mob = bt.name
+        end
+        out.luopan = l
+    end
+    local on = state.indi_on or {}
+    if util.has_buff(player.buffs, 612) and on.me then out.indi = on.me end
+    for _, m in ipairs(h.party_members(30)) do
+        local was = on[m.name:lower()]
+        if m.name ~= player.name and was and util.has_buff(h.buffs_of(m, player) or {}, 612) then
+            out.entrust = { name = was, who = m.name }
+        end
+    end
+    return out
+end
+
 -- Is the luopan out of use? Its bubble reaches about 6' around it (bg-wiki), and it stays where it was put down. It
 -- used to be recalled only 15' from the fight, so after a mob died the next one 7-15' away sat outside the bubble the
 -- whole fight, and a bubble on a member who walked off was never moved (2026-10-18). Returns why, or nil.

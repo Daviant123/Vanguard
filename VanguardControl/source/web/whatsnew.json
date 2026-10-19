@@ -1,5 +1,12 @@
 [
   {
+    "version": "1.80.0",
+    "date": "2026-10-19",
+    "items": [
+      "Geomancer: the Geomancy tab has a \"Bubbles now\" box - which luopan is out, its HP, how far it is from its mob (red when the mob is outside its reach), your own Indi, and who carries the entrusted Indi."
+    ]
+  },
+  {
     "version": "1.79.4",
     "date": "2026-10-19",
     "items": [

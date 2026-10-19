@@ -1,6 +1,6 @@
 _addon.name = 'Vanguard'
 _addon.author = 'Daviant'
-_addon.version = '0.83.3'
+_addon.version = '0.83.4'
 _addon.commands = {'vanguard', 'vg'}
 
 --[[
@@ -1136,6 +1136,7 @@ local function send_profile(player)
             local c = menu.config(settings)
             c.strat_info = strat.info(player)
             if player.main_job == 'BRD' then c.bard_info = bard.info(player) end
+            if player.main_job == 'GEO' then c.geo_info = support.geo_info(player) end
             c.known = quick.known(player)                -- for the app's quick buttons
             c.hotkeys = settings.hotkeys
             return c

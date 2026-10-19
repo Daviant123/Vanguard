@@ -1231,6 +1231,16 @@ function geoTab(p) {
   const [entSpell, entWho] = (cfg.entrust || "").split(">").map(x => (x || "").trim());
   return `<div class="stack">
     <div class="master">${modChk("Keep bubbles up", mods, "geo")}</div>
+    <div class="box"><h3>Bubbles now</h3>${(() => {
+      const gi = cfg.geo_info || {}, l = gi.luopan;
+      const rows = [];
+      if (l) rows.push(`<div>Luopan: <b>${esc(l.name)}</b> <span class="${l.hpp < 50 ? "warn" : "hint"}">HP ${l.hpp}%</span>${l.dist != null
+        ? ` <span class="${l.dist > 7 ? "warn" : "hint"}">${l.dist}' from ${esc(l.mob)}${l.dist > 7 ? " (outside its reach)" : ""}</span>` : ""}</div>`);
+      else rows.push(`<div class="hint">No luopan out.</div>`);
+      rows.push(gi.indi ? `<div>Indi on me: <b>${esc(gi.indi)}</b></div>` : `<div class="hint">No Indi on me.</div>`);
+      if (gi.entrust) rows.push(`<div>Entrusted: <b>${esc(gi.entrust.name)}</b> on ${esc(gi.entrust.who)}</div>`);
+      return rows.join("") + `<div class="hint" style="margin-top:6px">As of the character's last report (about every 15 s). A bubble reaches about 6' around the luopan.</div>`;
+    })()}</div>
     <div class="slots">
       <label class="field">Indi (on me) ${sel("menu indi ", indi, cfg.indi || "", "none")}</label>
       <label class="field">Geo (luopan) ${sel("menu geo ", geo, cfg.geo || "", "none")}</label>
