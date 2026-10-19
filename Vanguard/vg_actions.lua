@@ -256,7 +256,10 @@ local function conditions_ok(a, ctx)
         local g = ctx.settings.geo or {}
         local sp = (g.geo or '') ~= '' and util.spell(g.geo)
         if not ctx.settings.modules.geo or not sp or not util.spell_ready(sp, p) or ctx.silenced(p) then return false end
-        if util.targets(sp, 'Enemy') and g.geo_target == 'bt' and not ctx.battle_target() then return false end
+        if util.targets(sp, 'Enemy') and g.geo_target == 'bt' then
+            local bt = ctx.battle_target()
+            if not bt or util.dist(bt) > 21.5 then return false end     -- no mob, or out of casting range
+        end
     end
     if a.pet_hpp_below then                                       -- e.g. Life Cycle only for a luopan running low
         local pet = windower.ffxi.get_mob_by_target('pet')

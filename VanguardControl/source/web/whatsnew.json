@@ -1,5 +1,13 @@
 [
   {
+    "version": "1.78.8",
+    "date": "2026-10-19",
+    "items": [
+      "Geomancer (and every caster): spells on the mob aren't sent while it's out of casting range (about 21 yalms) - it says so and waits. The Geo bubble used to be sent every few seconds from too far away (\"too far away\" each time, no bubble), and Blaze of Glory went off for nothing.",
+      "Geomancer: the Dia cast first to get on the mob's hate list is no longer skipped when the mob started out of range."
+    ]
+  },
+  {
     "version": "1.78.7",
     "date": "2026-10-19",
     "items": [

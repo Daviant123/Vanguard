@@ -176,6 +176,7 @@ function support.geo_hate(player, spell, mob)
     if not util.targets(spell, 'Enemy') or util.targets(spell, 'Self') then return false end   -- only enemy-target Geo spells
     state.geo_hate = state.geo_hate or {}
     if state.geo_hate[mob.id] then return false end
+    if util.dist(mob) > 21.5 then return false end               -- out of range: not "nothing to cast", just wait
     for _, name in ipairs({ 'Dia II', 'Dia', 'Stone' }) do
         if h.try_cast(name, '<bt>', 'hate list before ' .. spell.en, player) then
             state.geo_hate[mob.id] = true

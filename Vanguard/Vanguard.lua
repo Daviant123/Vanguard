@@ -1,6 +1,6 @@
 _addon.name = 'Vanguard'
 _addon.author = 'Daviant'
-_addon.version = '0.82.7'
+_addon.version = '0.82.8'
 _addon.commands = {'vanguard', 'vg'}
 
 --[[
@@ -339,10 +339,26 @@ local function use_ws(ws_name)
     return true
 end
 
+-- Out of casting range (spell range 12 = about 20' from the mob's edge): not sent. Geo bubbles and the Dia before them
+-- were sent from 25-30' every 4 s, the game said "too far away" each time and no bubble went down (2026-10-19 GEO round)
+local CAST_REACH = 21.5
+local function out_of_reach(spell, target)
+    if spell.range ~= 12 or (target ~= '<bt>' and target ~= '<t>') then return false end
+    local mob = windower.ffxi.get_mob_by_target(target == '<bt>' and 'bt' or 't')
+    local d = mob and util.dist(mob)
+    if not d or d <= CAST_REACH then return false end
+    if not recently('reach:' .. spell.en, 20) then
+        mark('reach:' .. spell.en)
+        log(("%s: %s is %d' away - waiting until it is within 21'"):format(spell.en, mob.name, math.floor(d)))
+    end
+    return true
+end
+
 local function try_cast(name, target, why, player)
     local spell = util.spell(name)
     if not spell or not util.spell_ready(spell, player) then return false end
     if recently('ma:' .. spell.en .. ':' .. target, 4) then return false end
+    if out_of_reach(spell, target) then return false end
     return cast(spell, target, why)
 end
 
