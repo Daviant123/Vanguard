@@ -1,5 +1,13 @@
 [
   {
+    "version": "1.84.1",
+    "date": "2026-10-19",
+    "items": [
+      "Bard: after a reload or update, the 5th song (the Clarion Call one) is picked up and kept up like the other four - it used to be forgotten and never sung again.",
+      "Bard: Clarion Call is no longer sent twice in a row."
+    ]
+  },
+  {
     "version": "1.84.0",
     "date": "2026-10-19",
     "items": [

@@ -383,7 +383,8 @@ local function reconcile(player, wanted)
         local sp = util.spell(name)
         if sp and sp.status then groups[sp.status] = groups[sp.status] or {} table.insert(groups[sp.status], sp.en) end
     end
-    local room = (bard.slots(player)) - count(m)
+    -- (+1: the Clarion Call slot may be open with nothing of ours counted yet - right after a reload)
+    local room = (bard.slots(player)) + 1 - count(m)
     for status, names in pairs(groups) do
         local ours, missing = 0, {}
         for _, x in pairs(m) do if x.status == status then ours = ours + 1 end end
@@ -434,7 +435,19 @@ end
 function bard.sing(player)
     local wanted, slots, base = bard.wanted(player)
     if #wanted == 0 then return false end
-    reconcile(player, wanted)
+    -- after a reload the Clarion Call song (the 5th) is picked up too: picking up only the first 4 left its slot
+    -- counted as closed and the 5th song was never sung again (his log 2026-10-19, 19:19)
+    local pickup = wanted
+    if slots == base then
+        local songs = list(S.songs.list)
+        local extra = (S.songs.clarion_song or '') ~= '' and S.songs.clarion_song or songs[base + 1]
+        if extra then
+            pickup = {}
+            for _, n in ipairs(wanted) do pickup[#pickup + 1] = n end
+            pickup[#pickup + 1] = extra
+        end
+    end
+    reconcile(player, pickup)
     -- just reloaded with songs already on (mid-session - maybe mid-cast): a few seconds' wait
     if clock() - loaded_at < 4 and next(mine()) ~= nil then return false end
     local troub_up = util.has_buff(player.buffs, 348)

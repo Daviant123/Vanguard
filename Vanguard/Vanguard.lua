@@ -1,6 +1,6 @@
 _addon.name = 'Vanguard'
 _addon.author = 'Daviant'
-_addon.version = '0.88.0'
+_addon.version = '0.88.1'
 _addon.commands = {'vanguard', 'vg'}
 
 --[[
@@ -1304,7 +1304,8 @@ bard.init(settings, state, {
     save = function() store.save(settings) end,
     -- Clarion Call for the songs: only if ticked in the abilities, its "when" holds and it's ready; true = used now
     clarion_ok = function(p)
-        if not state.profile or util.has_buff(p.buffs, 499) or amnesia(p) then return false end
+        -- (not twice in a row: the buff shows a moment after - his log had Clarion Call sent twice 2 s apart)
+        if not state.profile or util.has_buff(p.buffs, 499) or amnesia(p) or recently('ja:Clarion Call:<me>', 10) then return false end
         for _, a in ipairs(jobs.actions_for(p.main_job)) do
             if a.id == 'clarion_call' and engine.enabled(a, state.profile) then
                 local w = engine.effective(a, state.profile).when
