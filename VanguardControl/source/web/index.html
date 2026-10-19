@@ -1618,6 +1618,11 @@ function farmTab(c, p) {
               onclick="send('set farm.stay ${x.farm_stay ? "false" : "true"}')">${x.farm_stay ? "⛔ DO NOT MOVE is ON - click to allow moving" : "⛔ DO NOT MOVE"}</button>
             ${x.farm_stay ? `<span class="warn">Standing still: only mobs within reach are fought.</span>` : ""}
           </div>
+          <div class="row" style="margin-top:6px;align-items:center;gap:8px;flex-wrap:wrap">
+            <label class="field" title="How long a mob takes to come back after it dies: learned from your kills, set by hand, or off (no timer, and farming doesn't wait for a mob that's about to come back)">Respawn timer ${sel("set farm.respawn ", [{v: "0", l: "learned from kills"}, {v: "30", l: "30 s"}, {v: "60", l: "1 min"}, {v: "90", l: "1 min 30 s"}, {v: "120", l: "2 min"}, {v: "180", l: "3 min"}, {v: "300", l: "5 min"}, {v: "420", l: "7 min"}, {v: "600", l: "10 min"}, {v: "960", l: "16 min"}, {v: "-1", l: "off"}], String(x.farm_respawn ?? 0))}</label>
+            ${(x.farm_respawn ?? 0) == 0 && arr(x.farm_respawn_learned).length ? `<span class="hint">learned: ${arr(x.farm_respawn_learned).map(l => `${esc(l.n)} ${l.secs >= 90 ? Math.round(l.secs / 60 * 10) / 10 + " min" : l.secs + " s"}`).join(" · ")}</span>
+              <button style="font-size:11px" onclick="send('respawnforget')">Forget learned times</button>` : ""}
+          </div>
           <div class="row" style="margin-top:6px;align-items:center"><span class="hint">Start / stop from the game with</span>
             ${sel("farmkey ", [{v: "off", l: "no key"}, {v: "^f8", l: "Ctrl+F8"}, {v: "^f9", l: "Ctrl+F9"}, {v: "^f10", l: "Ctrl+F10"}, {v: "!f9", l: "Alt+F9"}], x.farm_hotkey || "off")}</div>
           <div class="tiles">

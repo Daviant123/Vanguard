@@ -1,6 +1,6 @@
 _addon.name = 'Vanguard'
 _addon.author = 'Daviant'
-_addon.version = '0.87.0'
+_addon.version = '0.87.1'
 _addon.commands = {'vanguard', 'vg'}
 
 --[[
@@ -111,7 +111,7 @@ local defaults = {
     -- detection range/height, pull command after engaging, and a recorded route.
     -- farming (vg_farm): mode list|aggro|any; area camp|route; camp "x:y:z" in camp_zone; wait for the party before
     -- pulling (HP / MP %, within yalms); stop when the inventory is full / after stop_kills kills (0 = never)
-    farm = { targets = '', ignore = '', claim = 'unclaimed', aggro_first = true, range = 20, stay = false,
+    farm = { targets = '', ignore = '', claim = 'unclaimed', aggro_first = true, range = 20, stay = false, respawn = 0,
              height = 5, approach = true, pull_cmd = '', route = '', loop = true,
              mode = 'list', area = 'camp', camp = '', camp_zone = 0, back_to_camp = true,
              wait_party = true, wait_hp = 70, wait_mp = 40, wait_near = 20, stop_full = true, stop_kills = 0,
@@ -1949,6 +1949,10 @@ windower.register_event('addon command', function(cmd, ...)
             -- from the panel: //vg pianissimo set <name> <1|2> <song|none>
             if bard.pian_set(args[2], args[3], table.concat(args, ' ', 4)) then store.save(settings) send_profile() end
         elseif support.set_pianissimo(rest) then store.save(settings) send_profile() end
+    elseif cmd == 'respawnforget' then
+        farm.forget_respawn()
+        log('Respawn times forgotten: learned again from the next kills')
+        send_profile()
     elseif cmd == 'wschain' then
         -- the app's weapon skill chain: //vg wschain slot <1-6> <ws|none> | load <AutoSkillchain chain name> | clear
         local sub = (args[1] or ''):lower()

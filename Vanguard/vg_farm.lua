@@ -633,12 +633,16 @@ function farm.pops_tick()
 end
 
 -- the soonest expected pop of a mob farming wants: { n = name, secs = seconds to go (0 = any moment) } or nil
+-- farm.respawn (his request 2026-10-19: "why don't i have control of this timer"): 0 = learned from the kills,
+-- N = every mob comes back N s after it died, -1 = off (no timer, farming doesn't wait for pops)
 function farm.next_pop()
+    local fixed = tonumber(S.farm.respawn) or 0
+    if fixed < 0 then return nil end
     local best
     for id, p in pairs(state.farm_pops or {}) do
         local wanted = S.farm.mode ~= 'list' or matches(p.n, list(S.farm.targets))
         local k = state.farm_respawn_kind and state.farm_respawn_kind[p.n]
-        local secs = (state.farm_respawn and state.farm_respawn[id]) or (k and k.n > 0 and k.sum / k.n)
+        local secs = fixed > 0 and fixed or (state.farm_respawn and state.farm_respawn[id]) or (k and k.n > 0 and k.sum / k.n)
         if wanted and secs then
             local left = p.died + secs - now()
             if left > -60 and (not best or left < best.secs) then best = { n = p.n, secs = left } end
@@ -646,6 +650,19 @@ function farm.next_pop()
     end
     if best then best.secs = math.max(0, math.floor(best.secs + 0.5)) end
     return best
+end
+
+-- the learned respawn times, for the app: { {n, secs}, ... }
+function farm.learned_respawn()
+    local out = {}
+    for n, k in pairs(state.farm_respawn_kind or {}) do
+        if k.n > 0 then out[#out + 1] = { n = n, secs = math.floor(k.sum / k.n + 0.5), kills = k.n } end
+    end
+    table.sort(out, function(a, b) return a.n < b.n end)
+    return out
+end
+function farm.forget_respawn()
+    state.farm_respawn, state.farm_respawn_kind = {}, {}
 end
 
 local function pop_text()
@@ -1296,7 +1313,7 @@ end
 ------------------------------------------------------------------------
 -- farm spots: everything about a farm saved under a name, loaded with one click
 ------------------------------------------------------------------------
-local SPOT_FIELDS = { 'targets', 'ignore', 'claim', 'mode', 'range', 'height', 'pull_cmd', 'loop', 'aggro_first',
+local SPOT_FIELDS = { 'targets', 'ignore', 'claim', 'mode', 'range', 'height', 'pull_cmd', 'loop', 'aggro_first', 'respawn',
     'approach', 'route', 'area', 'camp', 'camp_zone', 'back_to_camp', 'wait_party', 'wait_hp', 'wait_mp', 'wait_near',
     'packs', 'pack_range', 'pack_strict', 'item', 'item_goal', 'pull_back', 'prefer_best', 'keep_chain', 'stop_mins', 'when_done', 'skip_strong', 'strong', 'th', 'check', 'skip_weak', 'skip_tough' }
 

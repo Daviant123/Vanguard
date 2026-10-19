@@ -1,5 +1,12 @@
 [
   {
+    "version": "1.83.1",
+    "date": "2026-10-19",
+    "items": [
+      "Farming: you control the respawn timer (\"next Locus Dire Bat in ~32 s\") - Respawn timer on the Farming tab: learned from your kills (as before, with the learned times shown and a Forget button), set by hand (30 s to 16 min), or off. It's saved with farm spots too."
+    ]
+  },
+  {
     "version": "1.83.0",
     "date": "2026-10-19",
     "items": [
