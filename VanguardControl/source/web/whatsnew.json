@@ -1,5 +1,12 @@
 [
   {
+    "version": "1.79.4",
+    "date": "2026-10-19",
+    "items": [
+      "Bard: how long each song really lasts (read from the game - your song gear changes it) is now remembered across reloads and updates, so refreshes stay on time right away instead of going back to the \"Songs last\" slider. The Songs tab lists these real lengths under Timing."
+    ]
+  },
+  {
     "version": "1.79.3",
     "date": "2026-10-19",
     "items": [

@@ -1,6 +1,6 @@
 _addon.name = 'Vanguard'
 _addon.author = 'Daviant'
-_addon.version = '0.83.2'
+_addon.version = '0.83.3'
 _addon.commands = {'vanguard', 'vg'}
 
 --[[
@@ -155,7 +155,7 @@ local defaults = {
     -- nitro: Nightingale + Troubadour (+ Marcato) then all songs; pianissimo = "Song>Name|Name,..." single-target songs
     -- Bard (vg_bard, after the Singer addon): slots 0 = from the instrument owned; dummy = up to 2 dummy songs;
     -- marcato_song / clarion_song ('' = first / next song); aoe_names = members that must be within 10'
-    songs = { list = '', duration = 240, refresh_before = 30, when = 'always', nitro = true, marcato = true, pianissimo = '',
+    songs = { list = '', duration = 240, refresh_before = 30, learned = '', when = 'always', nitro = true, marcato = true, pianissimo = '',
               slots = 0, dummy = '', marcato_song = '', clarion_song = '', aoe_names = '' },
     -- entrust = 'Indi-Spell>Member'. full_circle_range = recall luopan when target is this far from it.
     -- entrust = 'auto' for Indi-Haste/Fury on the leader; hate_first = Dia before a Geo debuff;
@@ -1232,6 +1232,7 @@ bard.init(settings, state, {
     party_members = party_members, ja_ready = ja_ready,
     nitro = function(p, due) return support.nitro(p, due) end,
     nitro_wait = function(p) return support.nitro_wait(p) end,
+    save = function() store.save(settings) end,
     -- Clarion Call for the songs: only if ticked in the abilities, its "when" holds and it's ready; true = used now
     clarion_ok = function(p)
         if not state.profile or util.has_buff(p.buffs, 499) or amnesia(p) then return false end

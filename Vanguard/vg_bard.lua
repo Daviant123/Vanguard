@@ -110,8 +110,40 @@ local function shortest(m, status)
 end
 local function on(name) return mine()[name:lower()] end
 
+-- Learned song lengths are kept in the settings (songs.learned = "honor march=330;valor minuet v=300"), so a reload
+-- or an update doesn't go back to the "Songs last" slider until each song is sung again (2026-10-19 BARD round).
+local function load_learned()
+    if state.song_base then return end
+    state.song_base = {}
+    for _, part in ipairs(util.split(tostring(S.songs.learned or ''), ';')) do
+        local k, v = part:match('^%s*(.-)%s*=%s*(%d+)%s*$')
+        if k and tonumber(v) then state.song_base[k:lower()] = tonumber(v) end
+    end
+end
+local function store_learned()
+    local keys = {}
+    for k in pairs(state.song_base or {}) do keys[#keys + 1] = k end
+    table.sort(keys)
+    local parts = {}
+    for _, k in ipairs(keys) do parts[#parts + 1] = ('%s=%d'):format(k, math.floor(state.song_base[k] + 0.5)) end
+    local text = table.concat(parts, ';')
+    if text ~= S.songs.learned then
+        S.songs.learned = text
+        if h.save then h.save() end
+    end
+end
+-- the learned lengths, for the app: { {name, secs}, ... }
+function bard.learned()
+    load_learned()
+    local out = {}
+    for k, v in pairs(state.song_base) do out[#out + 1] = { name = k, secs = math.floor(v + 0.5) } end
+    table.sort(out, function(a, b) return a.name < b.name end)
+    return out
+end
+
 -- how long a song sung now lasts: learned from the game's timer for that song, else the "Songs last" setting
 local function length(key, troub)
+    load_learned()
     local base = (state.song_base or {})[key] or tonumber(S.songs.duration) or 240
     return base * (troub and 2 or 1)
 end
@@ -223,8 +255,10 @@ local function reconcile(player, wanted)
                     local real = (clock() - x.at) + lefts[i]
                     if real > 30 and real < 3600 then
                         x.ends, x.learned = clock() + lefts[i], true
-                        state.song_base = state.song_base or {}
+                        load_learned()
+                        local before = state.song_base[k]
                         state.song_base[k] = real / (x.troub and 2 or 1)
+                        if not before or math.abs(before - state.song_base[k]) >= 5 then store_learned() end
                     end
                 end
             end
@@ -536,7 +570,8 @@ function bard.info(player)
     end
     table.sort(members, function(a, b) return a.left < b.left end)
     return { slots = slots, base = base, instrument = harp or 'none', auto = (tonumber(S.songs.slots) or 0) < 2,
-             pianissimo = map, candidates = bard.candidates(player), on_now = bard.current(), on_members = members }
+             pianissimo = map, candidates = bard.candidates(player), on_now = bard.current(), on_members = members,
+             learned = bard.learned() }
 end
 
 function bard.init(settings, runtime_state, helpers)

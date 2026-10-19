@@ -1193,6 +1193,7 @@ function songsTab(p) {
           ${slider("Songs last (your gear)", "songs.duration", x.song_duration ?? 240, 120, 900, 10, " s")}
           ${slider("Sing again this long before they wear", "songs.refresh_before", x.refresh_before ?? 30, 10, 180, 5, " s")}
         </div>
+        ${arr(bi.learned).length ? `<div class="hint" style="margin-top:6px">How long your songs really last (read from the game, kept across reloads; "Songs last" is only used until a song has been sung once):<br>${arr(bi.learned).map(l => `${esc(l.name.replace(/\w/g, c => c.toUpperCase()))} ${Math.floor(l.secs / 60)}:${String(l.secs % 60).padStart(2, "0")}`).join(" · ")}</div>` : ""}
         <button style="margin-top:8px" title="Sings every song in the list again right away (the game's timers on them start over)" onclick="send('resing')">Sing all songs again now</button>
       </div>
     </div>
