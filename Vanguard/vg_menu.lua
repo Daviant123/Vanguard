@@ -204,7 +204,7 @@ function menu.extra(settings)
         bar = m.bar, bar_status = m.bar_status, sleep = m.sleep, chain = m.chain, immanence = m.immanence,
         aoe_na = m.aoe_na, saboteur = m.saboteur, stymie = m.stymie,
         cor_risk = c.risk, cor_range = c.range,
-        nitro = settings.songs.nitro, marcato = settings.songs.marcato, pianissimo = settings.songs.pianissimo,
+        nitro = settings.songs.nitro, nitro_when = settings.songs.nitro_when, marcato = settings.songs.marcato, pianissimo = settings.songs.pianissimo,
         song_slots = settings.songs.slots, dummy = settings.songs.dummy, marcato_song = settings.songs.marcato_song,
         clarion_song = settings.songs.clarion_song, aoe_names = settings.songs.aoe_names,
         song_duration = settings.songs.duration, refresh_before = settings.songs.refresh_before,

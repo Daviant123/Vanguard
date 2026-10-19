@@ -298,9 +298,15 @@ end
 ------------------------------------------------------------------------
 -- BRD
 ------------------------------------------------------------------------
+-- When NiTro may go up: in a fight (songs.nitro_when 'fight', the default) or any time ('always' - also before the pull,
+-- as soon as the bard starts; he expected NiTro when he started his bard before a fight, 2026-10-19)
+local function nitro_time(player)
+    return S.songs.nitro_when == 'always' or h.party_engaged(player)
+end
+
 -- NiTro: both abilities ready, a fight, songs set, at least one song due soon.
 function support.nitro(player, songs_due)
-    if not S.songs.nitro or player.main_job ~= 'BRD' or S.songs.list == '' or not h.party_engaged(player) then return false end
+    if not S.songs.nitro or player.main_job ~= 'BRD' or S.songs.list == '' or not nitro_time(player) then return false end
     local p = player
     local night, troub = util.has_buff(p.buffs, 347), util.has_buff(p.buffs, 348)
     -- Under way: Troubadour after Nightingale, then Marcato, before any song.
@@ -331,7 +337,7 @@ end
 -- Seconds until Nightingale and Troubadour are both ready (0 = now); nil when NiTro isn't wanted / possible now
 -- (off, not a bard, no fight, the abilities not learned, Amnesia, Troubadour already up).
 function support.nitro_wait(player)
-    if not S.songs.nitro or player.main_job ~= 'BRD' or S.songs.list == '' or not h.party_engaged(player) then return nil end
+    if not S.songs.nitro or player.main_job ~= 'BRD' or S.songs.list == '' or not nitro_time(player) then return nil end
     if util.has_buff(player.buffs, 348) or h.amnesia(player) then return nil end
     local n, t = has_ja('Nightingale'), has_ja('Troubadour')
     if not n or not t then return nil end

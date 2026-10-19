@@ -23,7 +23,7 @@ local SECTIONS = {
     alts = true, upkeep = true, mount = true, gear = true, away = true, share = true, alerts = true, mages = true,
     cor = true, burst = true, strat = true,
     debuff = { retries = true },
-    songs = { duration = true, refresh_before = true, when = true, nitro = true, marcato = true, pianissimo = true,
+    songs = { duration = true, refresh_before = true, when = true, nitro = true, nitro_when = true, marcato = true, pianissimo = true,
               slots = true, dummy = true, marcato_song = true, clarion_song = true, aoe_names = true },
     geo = { entrust = true, full_circle_range = true, hate_first = true, party_mp = true },
 }

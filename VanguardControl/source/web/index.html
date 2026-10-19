@@ -1151,7 +1151,8 @@ function songsTab(p) {
                    {v: "2", l: "2 songs"}, {v: "3", l: "3 songs"}, {v: "4", l: "4 songs"}];   // the 5th: Clarion Call (Job & abilities)
   return `<div class="stack">
     <div class="master">${modChk("Sing these songs", mods, "songs")}
-      ${chk("NiTro when the party is fighting (Nightingale + Troubadour)", x.nitro, "set songs.nitro true", "set songs.nitro false")}
+      ${chk("NiTro (Nightingale + Troubadour)", x.nitro, "set songs.nitro true", "set songs.nitro false")}
+      ${x.nitro ? sel("set songs.nitro_when ", [{v: "fight", l: "when the party is fighting"}, {v: "always", l: "any time (also before the pull)"}], x.nitro_when || "fight") : ""}
       ${chk("Marcato", x.marcato, "set songs.marcato true", "set songs.marcato false")}</div>
     <div class="cols">
       <div class="box"><h3>Song slots: ${slots}${slots > base ? " (Clarion Call +1)" : ""}</h3>

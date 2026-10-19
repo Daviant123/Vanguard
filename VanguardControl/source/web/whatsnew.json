@@ -1,5 +1,14 @@
 [
   {
+    "version": "1.80.3",
+    "date": "2026-10-19",
+    "items": [
+      "Bard: NiTro can go up any time, not only in a fight - pick \"any time (also before the pull)\" next to the NiTro tick box on the Songs tab. The default stays \"when the party is fighting\".",
+      "Bard: after a reload or update during Soul Voice (or Troubadour), the songs already sung under it are picked up instead of all being sung again.",
+      "Bard: right after a reload it waits a few seconds before the next song, so it doesn't send one while the last cast is still going (the game ignored it)."
+    ]
+  },
+  {
     "version": "1.80.2",
     "date": "2026-10-19",
     "items": [

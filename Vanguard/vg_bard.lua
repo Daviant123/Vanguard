@@ -21,6 +21,9 @@ local bard = {}
 local S, state, h
 
 local function clock() return os.clock() end
+-- reloaded mid-song (an update, //lua r): the game ignores a cast sent before the last one finishes, so no song for a
+-- few seconds after loading (his log 2026-10-19: Honor March sent at once after each reload, ignored, sent 11 s later)
+local loaded_at = clock()
 
 local HARP = { [18571] = 4, [18575] = 3, [18576] = 3, [18839] = 4, [21400] = 3, [21401] = 3, [21407] = 3 }
 local HARP_NAME = { [18571] = 'Daurdabla', [18575] = 'Daurdabla', [18576] = 'Daurdabla', [18839] = 'Daurdabla',
@@ -358,8 +361,11 @@ local function reconcile(player, wanted)
                 local n = missing[i]
                 local len = tonumber(S.songs.duration) or 240
                 local rest = lefts[i] or len / 2       -- no timer from the game yet: assume half
+                -- picked up while Troubadour / Soul Voice is up: count it as sung under them (after a reload during
+                -- Soul Voice every song was sung again - his log 2026-10-19)
                 m[n:lower()] = { name = n, status = status, at = clock() - math.max(0, len - rest), ends = clock() + rest,
-                                 troub = rest > len * 1.1, learned = true }
+                                 troub = rest > len * 1.1 or util.has_buff(player.buffs, 348),
+                                 sv = util.has_buff(player.buffs, 52), learned = true }
                 room = room - 1
                 h.log(('Songs: %s is already up (%s) - picking up from there'):format(n,
                     lefts[i] and ('%ds left'):format(math.floor(rest)) or 'time left unknown'))
@@ -386,6 +392,8 @@ function bard.sing(player)
     local wanted, slots, base = bard.wanted(player)
     if #wanted == 0 then return false end
     reconcile(player, wanted)
+    -- just reloaded with songs already on (mid-session - maybe mid-cast): a few seconds' wait
+    if clock() - loaded_at < 4 and next(mine()) ~= nil then return false end
     local troub_up = util.has_buff(player.buffs, 348)
     local sv_up = util.has_buff(player.buffs, 52)
     local function singable(name)
