@@ -300,22 +300,19 @@ end
 function support.pianissimo(player)
     if player.main_job ~= 'BRD' or (S.songs.pianissimo or '') == '' or h.silenced(player) then return false end
     if S.songs.when == 'engaged' and not h.party_engaged(player) then return false end
-    state.psongs = state.psongs or {}
     local present = {}
     for _, m in ipairs(h.party_members(20)) do present[m.name:lower()] = m end
-    local keep = (tonumber(S.songs.duration) or 240) - (tonumber(S.songs.refresh_before) or 30)
+    local bard = require('vg_bard')
     for _, entry in ipairs(util.split(S.songs.pianissimo, ',')) do
         local song, who = entry:match('^(.-)%s*>%s*(.+)$')
         local spell = song and util.spell(song)
         if spell and util.can_cast(spell, player) then
             for _, name in ipairs(util.split(who, '|')) do
                 local m = present[util.trim(name):lower()]
-                local key = spell.en:lower() .. '>' .. util.trim(name):lower()
-                local last = state.psongs[key]
-                if m and m.name ~= player.name and m.hpp > 0 and (not last or clock() - last > keep)
+                if m and m.name ~= player.name and m.hpp > 0 and bard.member_needs(spell, m.name, player)
                     and util.spell_ready(spell, player) then
                     if util.has_buff(player.buffs, 409) then
-                        state.psongs[key] = clock()
+                        bard.member_cast(spell, m.name)
                         return h.cast(spell, m.name, 'Pianissimo ' .. spell.en .. ' -> ' .. m.name)
                     end
                     local pj = ja_ready('Pianissimo', player)

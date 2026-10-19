@@ -1,5 +1,13 @@
 [
   {
+    "version": "1.78.1",
+    "date": "2026-10-19",
+    "items": [
+      "Bard: Pianissimo songs (one song on one member) are kept up like the bard's own songs. They count once the song lands - an interrupted or out-of-range song is tried again within seconds instead of minutes later.",
+      "Bard: Pianissimo songs use the real song length (gear, Troubadour doubles it), are sung again under NiTro, and are sung again right away when the member is KO'd or the song is dispelled."
+    ]
+  },
+  {
     "version": "1.78.0",
     "date": "2026-10-18",
     "items": [

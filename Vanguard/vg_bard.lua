@@ -392,6 +392,58 @@ function bard.sing(player)
 end
 
 ------------------------------------------------------------------------
+-- Songs on party members (Pianissimo songs, and the party songs that reach them), kept like our own (Singer keeps a
+-- timer list per target): added when the song LANDS on them (it used to count from the start of the cast, so an
+-- interrupted or out-of-range song left them without it for minutes), its real length (learned song lengths,
+-- Troubadour), sung again under NiTro, and forgotten when it wears off or they're KO'd (2026-10-19 BARD round).
+-- state.pmine[member][song] = { name, status, at, ends, troub }
+------------------------------------------------------------------------
+local function pm(name)
+    state.pmine = state.pmine or {}
+    local k = name:lower()
+    state.pmine[k] = state.pmine[k] or {}
+    local t = clock()
+    for s, x in pairs(state.pmine[k]) do if x.ends <= t then state.pmine[k][s] = nil end end
+    return state.pmine[k]
+end
+
+function bard.on_member_song(spell, name, player)
+    local m = pm(name)
+    local key = spell.en:lower()
+    local troub = util.has_buff(player.buffs, 348)
+    if not m[key] and count(m) >= (bard.slots(player)) then
+        local gone = shortest(m)
+        if gone then m[gone] = nil end
+    end
+    m[key] = { name = spell.en, status = spell.status, at = clock(), ends = clock() + length(key, troub), troub = troub }
+    state.ppending = state.ppending or {}
+    state.ppending[key .. '>' .. name:lower()] = nil
+end
+function bard.on_member_lost(name, buff_id)
+    local m = pm(name)
+    local key = shortest(m, buff_id)
+    if key then m[key] = nil end
+end
+function bard.on_member_ko(name) if state.pmine then state.pmine[name:lower()] = nil end end
+
+-- Does <name> need this song (Pianissimo)? Not on them; running low; Troubadour up and not sung under it. A cast
+-- started in the last 12 s is waited for (it lands, or it didn't and we try again).
+function bard.member_needs(spell, name, player)
+    local pk = spell.en:lower() .. '>' .. name:lower()
+    local pend = (state.ppending or {})[pk]
+    if pend and clock() < pend then return false end
+    local x = pm(name)[spell.en:lower()]
+    if not x then return true end
+    if x.ends - clock() <= (tonumber(S.songs.refresh_before) or 30) then return true end
+    if util.has_buff(player.buffs, 348) and not x.troub then return true end
+    return false
+end
+function bard.member_cast(spell, name)
+    state.ppending = state.ppending or {}
+    state.ppending[spell.en:lower() .. '>' .. name:lower()] = clock() + 12
+end
+
+------------------------------------------------------------------------
 -- Pianissimo songs per member: "Song>Name|Name,Song>Name"
 ------------------------------------------------------------------------
 function bard.pian_map()

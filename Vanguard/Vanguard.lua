@@ -1,6 +1,6 @@
 _addon.name = 'Vanguard'
 _addon.author = 'Daviant'
-_addon.version = '0.82.0'
+_addon.version = '0.82.1'
 _addon.commands = {'vanguard', 'vg'}
 
 --[[
@@ -1391,12 +1391,19 @@ local landed_msgs = S{2, 236, 237, 252, 264, 268, 271}
 local resist_msgs = S{85, 284, 653, 654, 655, 656}
 local buffed_msgs = S{230, 266, 280, 319}
 local song_gone_msgs = { [64] = true, [204] = true, [206] = true, [350] = true, [531] = true }
+local ko_msgs = { [6] = true, [20] = true, [97] = true, [113] = true, [406] = true, [605] = true, [646] = true }
 
 windower.register_event('action message', function(actor_id, target_id, actor_index, target_index, message_id, p1, p2)
     stats.on_message(actor_id, target_id, message_id, p1, p2)
     local me = windower.ffxi.get_player()
     -- one of our songs wore off us / was dispelled (vg_bard keeps its song slots like Singer)
     if me and target_id == me.id and song_gone_msgs[message_id] then bard.on_lost(p1) end
+    if me and target_id ~= me.id and (song_gone_msgs[message_id] or ko_msgs[message_id]) then
+        local mb = windower.ffxi.get_mob_by_id(target_id)
+        if mb and (not mb.is_npc or mb.spawn_type == 14) then
+            if ko_msgs[message_id] then bard.on_member_ko(mb.name) else bard.on_member_lost(mb.name, p1) end
+        end
+    end
     local paused = me and engine.on_message(actor_id, message_id, me.id)
     if paused then log(paused) end
     farm.on_message(actor_id, target_id, message_id)
@@ -1425,6 +1432,12 @@ windower.register_event('action', function(act)
                 local on_me = false
                 for _, t in ipairs(act.targets or {}) do if t.id == player.id then on_me = true end end
                 if spell.type == 'BardSong' and on_me then bard.on_song(spell, player) end
+                if spell.type == 'BardSong' and spell.status and not util.targets(spell, 'Enemy') then   -- on party members
+                    for _, t in ipairs(act.targets or {}) do
+                        local mb = t.id ~= player.id and windower.ffxi.get_mob_by_id(t.id)
+                        if mb and (not mb.is_npc or mb.spawn_type == 14) then bard.on_member_song(spell, mb.name, player) end
+                    end
+                end
                 if spell.type == 'Geomancy' and spell.en:sub(1, 4) == 'Geo-' then          -- where the luopan went down
                     state.geo_last = { name = spell.en, target = first and first.id, at = now() }
                 end
