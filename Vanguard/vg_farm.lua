@@ -361,6 +361,14 @@ local function engage(me, mob)
             state.busy_until = math.max(state.busy_until or 0, now() + 2)
             return true
         end
+        -- pulled and "let it come to me": stand still facing it until it's close enough to engage (he saw his BLU walk
+        -- to every mob it had pulled with Glutinous Dart, 2026-10-19)
+        if mine and S.farm.approach == false and (S.farm.pull_cmd or '') ~= '' and d > ATTACK_RANGE then
+            h.stop_running()
+            h.face(me, t)
+            status(('waiting for %s to come (%d yalms)'):format(t.name, math.floor(d + 0.5)))
+            return false
+        end
         -- too far to engage: walk first (the old code sent /attack from 35 yalms every 3 s and never moved)
         if d > ATTACK_RANGE then walk_to(me, t, d) return false end
         if h.recently('farm:attack', 4) then return false end

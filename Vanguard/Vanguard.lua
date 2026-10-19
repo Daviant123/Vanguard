@@ -1,6 +1,6 @@
 _addon.name = 'Vanguard'
 _addon.author = 'Daviant'
-_addon.version = '0.85.2'
+_addon.version = '0.85.3'
 _addon.commands = {'vanguard', 'vg'}
 
 --[[
@@ -439,8 +439,11 @@ local function do_movement(player)
     if safety.unstick() then return end
 
     -- Engaged melee: close to melee range on our target.
-    local approach = (settings.modules.assist and settings.assist.approach)
-        or (settings.modules.farm and settings.farm.approach)
+    -- farming decides by its own "Then: walk up to it / let it come to me" - the role's "close in" (melee roles have
+    -- it on) made a farmer that pulled and should wait walk to every mob anyway (his BLU, 2026-10-19)
+    local approach
+    if settings.modules.farm then approach = settings.farm.approach ~= false
+    else approach = settings.modules.assist and settings.assist.approach end
     if player.status == 1 and approach then
         local t = windower.ffxi.get_mob_by_target('t')
         if t and t.hpp > 0 then

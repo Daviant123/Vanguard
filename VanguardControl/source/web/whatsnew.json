@@ -1,5 +1,12 @@
 [
   {
+    "version": "1.81.3",
+    "date": "2026-10-19",
+    "items": [
+      "Farming: with \"Then: let it come to me\", the farmer now really stays put after pulling - it faces the mob and fights it where it is. A melee job's own \"close in on the target\" used to override it, so it walked to every mob it pulled."
+    ]
+  },
+  {
     "version": "1.81.2",
     "date": "2026-10-19",
     "items": [
