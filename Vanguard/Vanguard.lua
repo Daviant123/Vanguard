@@ -1,6 +1,6 @@
 _addon.name = 'Vanguard'
 _addon.author = 'Daviant'
-_addon.version = '0.79.3'
+_addon.version = '0.79.4'
 _addon.commands = {'vanguard', 'vg'}
 
 --[[
@@ -182,7 +182,7 @@ local defaults = {
     -- sleeping extra mobs (off until //vg sleep on), Scholar stratagems and Immanence skillchains.
     -- Corsair: risk = highest bust chance % to Double-Up into (0 = never bust), range = roll reach in yalms
     -- //vg update: GitHub page (owner/name) and folder that hold the newest Vanguard
-    update = { repo = 'Daviant123/Vanguard', path = 'Vanguard', branch = 'main', check = true },
+    updater = { repo = 'Daviant123/Vanguard', path = 'Vanguard', branch = 'main', check = true },   -- //vg update (see take_old_update_section)
     cor = { risk = 0, snake_eye = true, fold = true, range = 8 },
     -- Scholar stratagems, main or sub SCH (vg_strat): which spells get which stratagem, reserve, Arts upkeep
     strat = { enabled = true, arts = 'auto', reserve = 1, jp_gift = false,
@@ -198,7 +198,36 @@ local defaults = {
               chain = 'liquefaction', chain_every = 40 },
 }
 
+-- The update settings are called "updater", not "update": Windower's config library calls its own table method
+-- :update on a copy of the settings when it first writes settings.xml (libs/config.lua, config.save), and a setting
+-- named "update" hid that method - a brand-new install crashed at once with "libs/config.lua:344: attempt to call
+-- method 'update' (a table value)" (a friend's first try, 2026-10-18). Older settings files still carry an <update>
+-- section: it's taken out of the file before loading (so it can never hide the method again) and its on / off and
+-- page are kept.
+local function take_old_update_section()
+    local path = (windower.addon_path or '') .. 'data/settings.xml'
+    local f = io.open(path, 'r')
+    if not f then return nil end
+    local text = f:read('*a')
+    f:close()
+    if not text:find('<update>', 1, true) then return nil end
+    local old = {}
+    for block in text:gmatch('<update>(.-)</update>') do
+        local repo, check = block:match('<repo>([^<]*)</repo>'), block:match('<check>([^<]*)</check>')
+        if repo and repo ~= '' then old.repo = repo end
+        if check == 'false' then old.check = false end
+    end
+    text = text:gsub('%s*<update>.-</update>', '')
+    local w = io.open(path, 'w')
+    if w then w:write(text) w:close() end
+    return old
+end
+local old_update = take_old_update_section()
 local settings = config.load(defaults)
+if old_update then
+    if old_update.repo then settings.updater.repo = old_update.repo end
+    if old_update.check == false then settings.updater.check = false end
+end
 -- Running or not is decided now, not by whatever was saved last time: only Auto start starts it by itself.
 -- Windower's config library re-reads settings.xml right after loading and again at login (bringing back a saved
 -- <enabled>true</enabled> - why CharB kept showing "running" with Auto start off), so it's applied again then.

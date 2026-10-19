@@ -1,5 +1,12 @@
 [
   {
+    "version": "1.74.1",
+    "date": "2026-10-18",
+    "items": [
+      "Fix: on a brand-new install, //lua load vanguard failed with \"libs/config.lua:344: attempt to call method 'update' (a table value)\". It loads now (your update settings are kept)."
+    ]
+  },
+  {
     "version": "1.74.0",
     "date": "2026-10-18",
     "items": [

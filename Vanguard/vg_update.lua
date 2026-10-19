@@ -28,8 +28,8 @@ update.get = function(url)                  -- blocking fetch; tests replace thi
 end
 
 local function raw(file)
-    local path = (S.update.path or ''):gsub('^/+', ''):gsub('/+$', '')
-    return ('https://raw.githubusercontent.com/%s/%s/%s%s'):format(S.update.repo, S.update.branch or 'main',
+    local path = (S.updater.path or ''):gsub('^/+', ''):gsub('/+$', '')
+    return ('https://raw.githubusercontent.com/%s/%s/%s%s'):format(S.updater.repo, S.updater.branch or 'main',
         path ~= '' and (path .. '/') or '', file)
 end
 
@@ -45,7 +45,7 @@ function update.newer(a, b)
 end
 
 local function configured()
-    return S.update and type(S.update.repo) == 'string' and S.update.repo:match('^[%w%-_.]+/[%w%-_.]+$') ~= nil
+    return S.updater and type(S.updater.repo) == 'string' and S.updater.repo:match('^[%w%-_.]+/[%w%-_.]+$') ~= nil
 end
 
 -- Returns the newer version string, or nil (and says so unless quiet).
@@ -115,21 +115,21 @@ function update.command(args)
     local sub = (args[1] or ''):lower()
     if sub == 'install' then update.install()
     elseif sub == 'off' or sub == 'on' then
-        S.update.check = (sub == 'on')
+        S.updater.check = (sub == 'on')
         save()
         log(('Updates: checking when Vanguard loads is %s.'):format(sub:upper()))
     elseif sub == 'repo' and args[2] then
-        S.update.repo = args[2]
-        if args[3] then S.update.path = args[3] end
+        S.updater.repo = args[2]
+        if args[3] then S.updater.path = args[3] end
         save()
-        log(('Updates: GitHub page set to %s%s.'):format(args[2], S.update.path ~= '' and (' (folder ' .. S.update.path .. ')') or ''))
+        log(('Updates: GitHub page set to %s%s.'):format(args[2], S.updater.path ~= '' and (' (folder ' .. S.updater.path .. ')') or ''))
         update.check(false)
     else update.check(false) end
 end
 
 -- Once, a little after loading (never during login).
 function update.on_load()
-    if not (S.update and S.update.check) or not configured() then return end
+    if not (S.updater and S.updater.check) or not configured() then return end
     coroutine.schedule(function() pcall(update.check, true) end, 30)
 end
 
