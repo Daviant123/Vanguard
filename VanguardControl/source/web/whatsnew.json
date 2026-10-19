@@ -1,5 +1,12 @@
 [
   {
+    "version": "1.81.4",
+    "date": "2026-10-19",
+    "items": [
+      "Farming: with a pull set and \"Then: let it come to me\", the farmer no longer runs off to get a far mob within reach of its pull - it only pulls mobs its pull reaches from where it stands (about 19 yalms for a spell, 23 for a ranged attack, 15 for an ability) and waits for the others to come closer. Mobs that attack it are still fought."
+    ]
+  },
+  {
     "version": "1.81.3",
     "date": "2026-10-19",
     "items": [
