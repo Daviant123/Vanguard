@@ -1,6 +1,6 @@
 _addon.name = 'Vanguard'
 _addon.author = 'Daviant'
-_addon.version = '0.83.1'
+_addon.version = '0.83.2'
 _addon.commands = {'vanguard', 'vg'}
 
 --[[
@@ -839,25 +839,28 @@ local function do_geo(player)
             return use_ja(fc, '<me>')
         end
     end
-    -- Entrust: "Indi-Spell>Member"
+    -- Entrust: "Indi-Spell>Member" - kept up like our own Indi, in and out of fights (it was only done in a fight, so
+    -- each fight started without it), and only with the member alive within 20' (Entrust used to go off for a member
+    -- out of range and the Indi then failed - a 10-minute ability wasted; 2026-10-19 GEO round)
     local entrust = support.entrust_setting(player)
-    if entrust ~= '' and party_engaged(player) then
+    if entrust ~= '' then
         local spell, who = entrust:match('^(.-)%s*>%s*(.+)$')
         if spell and who then
             if util.has_buff(player.buffs, util.buff_id('Entrust')) then
                 if try_cast(spell, who, 'entrust', player) then return true end
             else
                 local ent = util.ability('Entrust')
-                local target_has = false
+                local target_has, near = false, false
                 for _, m in ipairs(party_members(20)) do
-                    if m.name:lower() == who:lower() then
+                    if m.name:lower() == who:lower() and (m.hpp or 0) > 0 then
+                        near = true
                         target_has = util.has_buff(buffs_of(m, player) or {}, 612)
                         -- carrying another Indi than the one picked now: entrust the new one
                         local was = (state.indi_on or {})[m.name:lower()]
                         if target_has and was and was:lower() ~= spell:lower() then target_has = false end
                     end
                 end
-                if not target_has and util.ability_ready(ent) and util.spell_ready(util.spell(spell), player)
+                if near and not target_has and util.ability_ready(ent) and util.spell_ready(util.spell(spell), player)
                     and not recently('ja:Entrust:<me>', 30) then
                     return use_ja(ent, '<me>')
                 end

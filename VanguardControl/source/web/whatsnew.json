@@ -1,5 +1,13 @@
 [
   {
+    "version": "1.79.3",
+    "date": "2026-10-19",
+    "items": [
+      "Geomancer: Entrust is kept up like your own Indi - out of fights too, so the party member has it before the pull. It used to wait for a fight to start.",
+      "Geomancer: Entrust waits until that member is alive and within 20 yalms. It used to go off for someone out of range, and the Indi then failed - wasting a 10-minute ability."
+    ]
+  },
+  {
     "version": "1.79.2",
     "date": "2026-10-19",
     "items": [
