@@ -521,8 +521,17 @@ function bard.info(player)
     local slots, base = bard.slots(player)
     local _, harp = bard.instrument()
     local map = bard.pian_map()
+    -- the songs on the bard now and on members (Pianissimo), with the time left - shown on the Songs tab
+    local members = {}
+    for who, songs in pairs(state.pmine or {}) do
+        for _, x in pairs(songs) do
+            local left = math.floor(x.ends - clock())
+            if left > 0 then members[#members + 1] = { who = who, name = x.name, left = left, troub = x.troub } end
+        end
+    end
+    table.sort(members, function(a, b) return a.left < b.left end)
     return { slots = slots, base = base, instrument = harp or 'none', auto = (tonumber(S.songs.slots) or 0) < 2,
-             pianissimo = map, candidates = bard.candidates(player) }
+             pianissimo = map, candidates = bard.candidates(player), on_now = bard.current(), on_members = members }
 end
 
 function bard.init(settings, runtime_state, helpers)

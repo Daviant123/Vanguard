@@ -1,5 +1,12 @@
 [
   {
+    "version": "1.79.0",
+    "date": "2026-10-19",
+    "items": [
+      "Bard: the Songs tab has an \"On now\" box - the songs your bard has on right now and its Pianissimo songs on party members, each with the time left and a NiTro tag for songs sung under Troubadour. A missing or short song is easy to spot."
+    ]
+  },
+  {
     "version": "1.78.8",
     "date": "2026-10-19",
     "items": [

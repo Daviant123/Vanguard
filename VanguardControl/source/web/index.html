@@ -1158,6 +1158,14 @@ function songsTab(p) {
         <label class="field">How many songs ${sel("set songs.slots ", slotSel, String(x.song_slots || 0))}</label>
         <div class="hint" style="margin-top:4px">Found from the instrument in your inventory / wardrobes: Daurdabla 4, Terpander or Blurred Harp 3, otherwise 2. A 5th song needs Clarion Call: tick it under Job &amp; abilities and it goes up right before the songs.</div>
       </div>
+      <div class="box"><h3>On now</h3>${(() => {
+        const mmss = n => `${Math.floor(n / 60)}:${String(n % 60).padStart(2, "0")}`;
+        const mine = arr(bi.on_now), others = arr(bi.on_members);
+        if (!mine.length && !others.length) return `<div class="hint">No songs from this bard are on yet.</div>`;
+        const row = (who, s) => `<div style="display:flex;justify-content:space-between;gap:8px"><span>${who ? esc(who.charAt(0).toUpperCase() + who.slice(1)) + ": " : ""}${esc(s.name)}${s.troub ? ' <span class="btag">NiTro</span>' : ""}</span><span class="${s.left < 60 ? "warn" : "hint"}">${mmss(s.left)}</span></div>`;
+        return mine.map(s => row("", s)).join("") + (others.length ? `<div class="hint" style="margin-top:6px">On party members (Pianissimo):</div>` + others.map(s => row(s.who, s)).join("") : "")
+          + `<div class="hint" style="margin-top:6px">Time left when the character last reported (about every 15 s). NiTro = sung under Troubadour (twice as long).</div>`;
+      })()}</div>
       <div class="box"><h3>Songs (in order)</h3><div class="slots" style="grid-template-columns:1fr">
         ${Array.from({length: 5}, (_, i) => `<label class="field">Song ${i + 1}${i < slots ? (i >= base ? " (Clarion Call)" : "")
           : (i === base ? " (with Clarion Call)" : " (needs more song slots)")} ${sel(`menu song ${i + 1} `, opts, cur[i] || "", "none")}</label>`).join("")}
