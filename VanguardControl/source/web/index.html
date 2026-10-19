@@ -291,7 +291,8 @@ function jobTab(c, p) {
     ${acts.length ? `<div class="box"><h3>Abilities, in priority order: the top one is tried first <button style="float:right;font-size:11px" onclick="send('actmove reset')">Reset order</button></h3>
       ${acts.map((a, i) => `<div class="act"><span class="hint" style="width:20px;text-align:right">${i + 1}</span>
         <span style="display:inline-flex;gap:2px"><button title="Move up" ${i ? "" : "disabled"} onclick="send('actmove ${esc(a.id)} up')">▲</button><button title="Move down" ${i < acts.length - 1 ? "" : "disabled"} onclick="send('actmove ${esc(a.id)} down')">▼</button><button title="Move to the top" ${i ? "" : "disabled"} onclick="send('actmove ${esc(a.id)} top')">⤒</button></span>
-        ${chk(a.label, a.on, `action ${a.id} on`, `action ${a.id} off`)}<span class="btag">${esc(a.group)}</span>${limits(a)}</div>`).join("")}</div>`
+        ${chk(a.label, a.on, `action ${a.id} on`, `action ${a.id} off`)}<span class="btag">${esc(a.group)}</span>${limits(a)}${a.custom ? ` <button title="Remove it" onclick="send('custom del ${esc(a.id)}')">×</button>` : ""}</div>`).join("")}
+      ${customAdd(p)}</div>`
       : `<div class="empty">Waiting for ${esc(selected)}'s job info…</div>`}
     ${jobExtras(p)}
     <div class="hint">Only abilities ${esc(selected)} can use right now are listed (sub-job included). Changing the role re-ticks the recommended set.</div>
@@ -915,6 +916,24 @@ function renderCrashBadge() {
 setInterval(() => crashDo(""), 20000);
 function logN() { try { return localStorage.getItem("vg_logn") || "250"; } catch (e) { return "250"; } }
 document.addEventListener("change", e => { if (e.target && e.target.id === "logn") try { localStorage.setItem("vg_logn", e.target.value); } catch (x) {} });
+// "Add your own" (his request 2026-10-19: add job abilities, magic etc. by hand): kind, which one, on whom
+let custKind = "ja", custTgt = "me", custName = "";
+function customAdd(p) {
+  const k = (p.config || {}).known || {};
+  const blue = arr(k.blue), lists = {ja: arr(k.abilities).slice().sort(), blu: blue.slice().sort(), ma: arr(k.spells).filter(n => !blue.includes(n)).sort()};
+  const names = lists[custKind] || [];
+  if (!names.includes(custName)) custName = names[0] || "";
+  const kinds = [{v: "ja", l: "Job ability"}].concat(blue.length ? [{v: "blu", l: "Blue magic"}] : []).concat([{v: "ma", l: "Magic"}]);
+  const opt2 = (list, cur) => list.map(o => `<option value="${esc(o.v)}" ${o.v === cur ? "selected" : ""}>${esc(o.l)}</option>`).join("");
+  return `<div class="row" style="margin-top:8px;gap:8px;align-items:flex-end;flex-wrap:wrap;border-top:1px solid var(--line);padding-top:8px">
+    <b>Add your own:</b>
+    <label class="field">Kind <select id="custkind">${opt2(kinds, custKind)}</select></label>
+    <label class="field">Which <select id="custname">${opt2(names.map(n => ({v: n, l: n})), custName)}</select></label>
+    <label class="field">On <select id="custtgt">${opt2([{v: "me", l: "me"}, {v: "mob", l: "my target (the mob)"}, {v: "leader", l: "the leader"}], custTgt)}</select></label>
+    <button class="go" ${custName ? "" : "disabled"} onclick="send('custom add ${custKind === "ja" ? "ja" : "ma"} ' + custTgt + ' ' + custName)">+ Add</button>
+    <span class="hint">It joins the list above (on, with "every" and "when" to set). A buff on me isn't used again while it's up.</span></div>`;
+}
+
 function problemsBox() {
   const list = arr(crashes).map((c, i) => ({c, i})).reverse();
   return `<div class="box"><h3>Problems</h3>
@@ -1987,6 +2006,9 @@ document.addEventListener("change", e => {
     return;
   }
   if (el.id === "profsel") return;
+  if (el.id === "custkind") { custKind = el.value; custName = ""; bodyKey = ""; render(); return; }
+  if (el.id === "custname") { custName = el.value; return; }
+  if (el.id === "custtgt") { custTgt = el.value; return; }
   if (["tmmode", "tmmins", "tmhour", "tmminute", "tmaction", "tmwho"].includes(el.id)) { tm[el.id.slice(2)] = el.value; bodyKey = ""; render(); return; }
   if (el.id === "hkhost") { hkHost = el.value; return; }
   if (el.dataset.scwho !== undefined) { scb[+el.dataset.scwho].who = el.value; scb[+el.dataset.scwho].ws = ""; bodyKey = ""; render(); return; }

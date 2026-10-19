@@ -147,7 +147,7 @@ function engine.list(profile, player)
             end
             limits[#limits + 1] = { k = 'cooldown', v = e.cooldown or 5, d = a.cooldown or 5 }
             limits[#limits + 1] = { k = 'when', v = e.when, d = a.when }
-            out[#out + 1] = { id = a.id, label = a.label, group = a.group, on = engine.enabled(a, profile), limits = limits }
+            out[#out + 1] = { id = a.id, label = a.label, group = a.group, on = engine.enabled(a, profile), limits = limits, custom = a.custom or nil }
         end
     end
     return out

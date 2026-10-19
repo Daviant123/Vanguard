@@ -1,5 +1,14 @@
 [
   {
+    "version": "1.84.0",
+    "date": "2026-10-19",
+    "items": [
+      "New: \"Add your own\" under the ability list on Job & abilities - pick a job ability, magic or blue magic the character can use and who it's for (me, my target, the leader), then + Add. It joins the list with its on/off, priority arrows, \"every\" and \"when\", and an × to remove it. A buff on yourself isn't used again while it's up. Saved per job.",
+      "Farming pulls: the pull now waits until it's ready (spell / ability recast, MP, blue magic set) and is tried again after 6 seconds if the mob doesn't come (3 tries). It used to count as pulled the moment it was sent, so a pull that didn't go off left the mob sitting there and it was skipped.",
+      "Farming pulls with \"let it come to me\" or DO NOT MOVE: the pull's full reach counts even if the farm range is shorter (Glutinous Dart ~19 yalms with range 15)."
+    ]
+  },
+  {
     "version": "1.83.4",
     "date": "2026-10-19",
     "items": [

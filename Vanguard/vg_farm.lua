@@ -207,6 +207,9 @@ function farm.judge(mob, me, ids, center)
     local d = center and dist2(mob, center) or util.dist(mob)
     local aggro = claimed_us and S.farm.aggro_first
     local range = farm.range()
+    -- pulling from where it stands: the pull's full reach counts even if the range setting is shorter (his range 15 with
+    -- Glutinous Dart's ~19 left the last yalms of the Dart unused, 2026-10-19)
+    if (S.farm.approach == false or S.farm.stay) and farm.pull_range() then range = math.max(range, farm.pull_range()) end
     if d > range and not (aggro and util.dist(mob) <= range + 10) then return nil, 'out of range' end
     if aggro then return 'aggro', 'attacking us' end
     -- DO NOT MOVE: only mobs it can reach from where it stands (its pull's reach, or right next to it); the rest are
@@ -371,8 +374,31 @@ local function engage(me, mob)
         -- walking up or engaging - so it's ours sooner (and comes to us)
         local pr = farm.pull_range()
         local mine = t.claim_id and t.claim_id ~= 0 and ids[t.claim_id]
-        if pr and not mine and not state.farm_pulled[t.id] then
+        -- a pull that didn't take (still recasting, out of MP, out of sight...) is tried again after 6 s, up to 3 times -
+        -- it used to count as pulled at once, the mob never came and was skipped 25 s later (his "vanguard consistently
+        -- does not pull using glutinous dart", 2026-10-19)
+        state.farm_pull_try = state.farm_pull_try or {}
+        local try = state.farm_pull_try[t.id]
+        if pr and not mine and try and try.n >= 3 and now() - try.t > 6 then
+            farm.skip(t.id, 120, "the pull didn't take (3 tries)")
+            return false
+        end
+        if pr and not mine and (not try or now() - try.t > 6) then
             if d > pr then walk_to(me, t, d) return false end
+            -- the pull ready? (spell recast / MP / set blue magic, ability recast) - wait for it instead of wasting the mob
+            local ready, why = farm.pull_ready()
+            if not ready then
+                h.stop_running()
+                h.face(me, t)
+                if state.farm_go then state.farm_go.best_t = now() end      -- waiting, not stuck
+                status(('waiting to pull %s: %s'):format(t.name, why))
+                if why ~= 'recast' and not h.recently('farm:pullwhy', 60) then
+                    h.mark('farm:pullwhy')
+                    h.log(("Farming: can't pull with %s - %s"):format(S.farm.pull_cmd:match('"(.-)"') or S.farm.pull_cmd, why))
+                end
+                return false
+            end
+            state.farm_pull_try[t.id] = { n = (try and try.n or 0) + 1, t = now() }
             state.farm_pulled[t.id] = true
             h.stop_running()
             h.face(me, t)
@@ -425,6 +451,26 @@ local function engage(me, mob)
 end
 
 -- how far the pull command reaches (a ranged attack about 24 yalms, a spell 20, an ability like Provoke 16)
+-- Is the pull ready to use now? true, or false and why ('recast', 'not enough MP', 'not set / not learned', 'silenced')
+function farm.pull_ready()
+    local c = S.farm.pull_cmd or ''
+    local player = windower.ffxi.get_player()
+    if not player then return false, 'no player' end
+    local kind, name = c:match('^input /(%a+) "(.-)"')
+    if kind == 'ma' then
+        local sp = util.spell(name)
+        if not sp or not util.can_cast(sp, player) then return false, "it isn't learned / set on this job" end
+        if util.has_buff(player.buffs, 6) or util.has_buff(player.buffs, 29) then return false, 'silenced' end
+        if (sp.mp_cost or 0) > player.vitals.mp then return false, 'not enough MP' end
+        local rc = (windower.ffxi.get_spell_recasts() or {})[sp.recast_id]
+        if rc and rc > 0 then return false, 'recast' end
+    elseif kind == 'ja' then
+        local ja = util.ability(name)
+        if ja and not util.ability_ready(ja) then return false, 'recast' end
+    end
+    return true
+end
+
 function farm.pull_range()
     local c = S.farm.pull_cmd or ''
     if c == '' or state.farm_no_pull then return nil end

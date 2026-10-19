@@ -485,7 +485,27 @@ function jobs.actions_for(job)
     for _, a in ipairs(common) do
         if not seen[a.id] and not same[key(a)] then out[#out + 1] = a; seen[a.id] = true end
     end
+    -- the player's own additions (his request 2026-10-19: "a setting where i can manually add things like job
+    -- abilities, magic etc"), from Vanguard.lua's settings.customs
+    for _, a in ipairs(jobs.custom_provider and jobs.custom_provider(job) or {}) do
+        if not seen[a.id] then out[#out + 1] = a; seen[a.id] = true end
+    end
     return out
+end
+
+-- One custom action from its saved form "kind#target#Name" (kind ja / ma, target me / mob / leader).
+function jobs.custom(entry)
+    local kind, tgt, name = tostring(entry):match('^(%a+)#(%a+)#(.+)$')
+    if not kind or (kind ~= 'ja' and kind ~= 'ma') then return nil end
+    local target = tgt == 'mob' and '<t>' or tgt == 'leader' and '{leader}' or '<me>'
+    local id = 'c_' .. kind .. '_' .. tgt .. '_' .. name:lower():gsub('[^%w]', '')
+    local opts = { target = target, when = target == '<t>' and 'engaged' or 'always', cooldown = 10, on = true, custom = true }
+    -- a job ability on me that gives a buff of the same name (Berserk, Warcry...): not used while it's up
+    if kind == 'ja' and target == '<me>' then
+        local ok, util = pcall(require, 'vg_util')
+        if ok and util.buff_id and util.buff_id(name) then opts.buff = name end
+    end
+    return A(id, name .. ' (added by you)', 'Yours', kind, name, opts)
 end
 
 function jobs.roles_for(job)

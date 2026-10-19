@@ -1,6 +1,6 @@
 _addon.name = 'Vanguard'
 _addon.author = 'Daviant'
-_addon.version = '0.87.4'
+_addon.version = '0.88.0'
 _addon.commands = {'vanguard', 'vg'}
 
 --[[
@@ -82,7 +82,8 @@ local defaults = {
     profiles = {},
     -- Saved per-job menu choices from the panel (buff grid, songs, geo, enfeebles, modules).
     menus = {},
-    wschains = {},           -- weapon skill chain per job (vg_wschain): "1|WS,WS,..." (1 = repeat)
+    wschains = {},
+    customs = {},            -- the player's own abilities / spells per job (vg_jobs.custom): "kind#target#Name+..."           -- weapon skill chain per job (vg_wschain): "1|WS,WS,..." (1 = repeat)
     pause_on_zone = true,   -- stop the bot on a zone change (his request 2026-10-17: "when it changes zones i want you to stop the bot")
     stop_on_job = true,     -- ...and when the job or sub job changes (same request)
     -- formation: spread (fan behind the leader), line (single file) or off (plain follow)
@@ -1287,6 +1288,14 @@ farm.init(settings, state, { log = log, run_toward = run_toward, stop_running = 
 finish.init(settings, state, { log = log, use_ws = use_ws, ws_in_range = ws_in_range, recently = recently, mark = mark,
     save = function() store.save(settings) end })
 wschain.init(settings, state, {})
+jobs.custom_provider = function(job)
+    local out = {}
+    for _, e in ipairs(util.split(tostring(util.job_get(settings.customs, job) or ''), '+')) do
+        local a = jobs.custom(e)
+        if a then out[#out + 1] = a end
+    end
+    return out
+end
 bard.init(settings, state, {
     log = log, recently = recently, mark = mark, try_cast = try_cast, use_ja = use_ja, amnesia = amnesia,
     party_members = party_members, ja_ready = ja_ready,
@@ -1644,7 +1653,7 @@ windower.register_event('zone change', function(new_id, old_id)
     bard.on_zone()
     state.sc = { target = 0, step = 0, time = 0 }
     state.busy_until = now() + 5
-    state.farm_pulled, state.route, state.wp, state.resting = {}, nil, 1, false
+    state.farm_pulled, state.farm_pull_try, state.route, state.wp, state.resting = {}, {}, nil, 1, false
     state.action_once = {}
     state.zone_push_until, state.zone_push = nil, nil
     if settings.pause_on_zone and was_running then
@@ -1960,6 +1969,36 @@ windower.register_event('addon command', function(cmd, ...)
             -- from the panel: //vg pianissimo set <name> <1|2> <song|none>
             if bard.pian_set(args[2], args[3], table.concat(args, ' ', 4)) then store.save(settings) send_profile() end
         elseif support.set_pianissimo(rest) then store.save(settings) send_profile() end
+    elseif cmd == 'custom' then
+        -- the app's "Add your own": //vg custom add <ja|ma> <me|mob|leader> <name> | del <id>
+        local sub = (args[1] or ''):lower()
+        local player = windower.ffxi.get_player()
+        local job = player and player.main_job
+        local list = util.split(tostring(util.job_get(settings.customs, job) or ''), '+')
+        if sub == 'add' then
+            local kind, tgt, name = (args[2] or ''):lower(), (args[3] or ''):lower(), table.concat(args, ' ', 4)
+            local real = kind == 'ja' and util.ability(name) or kind == 'ma' and util.spell(name)
+            if real and (tgt == 'me' or tgt == 'mob' or tgt == 'leader') then
+                local entry = kind .. '#' .. tgt .. '#' .. real.en
+                local dup = false
+                for _, e in ipairs(list) do if e:lower() == entry:lower() then dup = true end end
+                if not dup then list[#list + 1] = entry end
+                log(('Added %s (%s)'):format(real.en, tgt == 'mob' and 'on my target' or tgt == 'leader' and 'on the leader' or 'on me'))
+            else
+                log('Usage: //vg custom add ja|ma me|mob|leader <name>')
+            end
+        elseif sub == 'del' then
+            local out = {}
+            for _, e in ipairs(list) do
+                local a = jobs.custom(e)
+                if not (a and a.id == args[2]) then out[#out + 1] = e end
+            end
+            list = out
+        end
+        settings.customs = settings.customs or {}
+        util.job_set(settings.customs, job, table.concat(list, '+'))
+        store.save(settings)
+        send_profile()
     elseif cmd == 'respawnforget' then
         farm.forget_respawn()
         log('Respawn times forgotten: learned again from the next kills')
