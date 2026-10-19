@@ -277,11 +277,13 @@ end
 
 -- Does this song need singing now? Not on; running low ("Sing again this long before they wear"); Troubadour is up
 -- and it wasn't sung under it (as Singer); or sung before a NiTro / "Sing all songs again now" that isn't finished.
-local function needs(name, troub_up)
+local function needs(name, troub_up, sv_up)
     local x = on(name)
     if not x then return true end
     if x.ends - clock() <= (tonumber(S.songs.refresh_before) or 30) then return true end
     if troub_up and not x.troub then return true end
+    -- Soul Voice doubles songs sung while it's up: the songs already on are sung again under it (Singer)
+    if sv_up and not x.sv then return true end
     if state.redo_at and x.at < state.redo_at then return true end
     return false
 end
@@ -292,13 +294,14 @@ function bard.sing(player)
     if #wanted == 0 then return false end
     reconcile(player, wanted)
     local troub_up = util.has_buff(player.buffs, 348)
+    local sv_up = util.has_buff(player.buffs, 52)
     local function singable(name)
         local sp = util.spell(name)
         return sp and util.can_cast(sp, player) and sp
     end
     local due = {}
     for _, name in ipairs(wanted) do
-        if needs(name, troub_up) and not held(name) and not bounced(name, player) then due[#due + 1] = name end
+        if needs(name, troub_up, sv_up) and not held(name) and not bounced(name, player) then due[#due + 1] = name end
     end
     -- the redo is over when every song it covered was sung again (or after 3 minutes, e.g. out of range all along)
     if state.redo_at then
@@ -415,7 +418,8 @@ function bard.on_member_song(spell, name, player)
         local gone = shortest(m)
         if gone then m[gone] = nil end
     end
-    m[key] = { name = spell.en, status = spell.status, at = clock(), ends = clock() + length(key, troub), troub = troub }
+    m[key] = { name = spell.en, status = spell.status, at = clock(), ends = clock() + length(key, troub), troub = troub,
+               sv = util.has_buff(player.buffs, 52) }
     state.ppending = state.ppending or {}
     state.ppending[key .. '>' .. name:lower()] = nil
 end
@@ -436,6 +440,7 @@ function bard.member_needs(spell, name, player)
     if not x then return true end
     if x.ends - clock() <= (tonumber(S.songs.refresh_before) or 30) then return true end
     if util.has_buff(player.buffs, 348) and not x.troub then return true end
+    if util.has_buff(player.buffs, 52) and not x.sv then return true end
     return false
 end
 function bard.member_cast(spell, name)

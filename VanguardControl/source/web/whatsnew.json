@@ -1,5 +1,12 @@
 [
   {
+    "version": "1.78.3",
+    "date": "2026-10-19",
+    "items": [
+      "Bard: when Soul Voice goes up (by Vanguard or by you), every song - and the Pianissimo songs - is sung again once under it, so they get its double strength. Songs already on used to stay as they were, so Soul Voice did nothing for them."
+    ]
+  },
+  {
     "version": "1.78.2",
     "date": "2026-10-19",
     "items": [
