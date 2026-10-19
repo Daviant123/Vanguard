@@ -1,5 +1,16 @@
 [
   {
+    "version": "1.80.1",
+    "date": "2026-10-19",
+    "items": [
+      "Bard: tested in a new bard simulator (the game's song rules, an hour of play, 150 random bards with dispels, zoning, KOs, Soul Voice, interrupted casts). It found and fixed four problems:",
+      "- A harp's extra song slots need dummy songs to open. With fewer dummies than extra slots, the bard tried to keep songs it couldn't hold and kept knocking them off (180+ songs in half an hour). It now sings 2 + your number of dummy songs and tells you how many dummies the harp needs.",
+      "- With two Minuets (or two Marches) on and one dispelled, it sometimes sang the wrong one again first. It now reads the game's timers to tell which one went.",
+      "- With two Minuets, it could mix up which one had how long left (when one was sung under Troubadour) and let one run out.",
+      "- Soul Voice: the bard waited for NiTro instead of singing the songs again under Soul Voice, and Soul Voice ran out with one song done."
+    ]
+  },
+  {
     "version": "1.80.0",
     "date": "2026-10-19",
     "items": [

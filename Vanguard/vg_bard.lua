@@ -46,17 +46,35 @@ function bard.instrument()
 end
 function bard.forget() cache.t = -100 end
 
+local function list(str) return util.split(str or '', ',') end
+
 function bard.slots(player)
     local base = tonumber(S.songs.slots) or 0
     if base < 2 then base = bard.instrument() end
     -- an instrument gives at most 4; the 5th only while Clarion Call is up. "5 songs" picked by hand without it had the
     -- bard singing a 5th song that knocked another off, round and round (2026-10-18)
     base = math.min(base, 4)
+    -- the harp's extra slots only open while each holds a song sung with the harp - a dummy song (Singer's rule): with
+    -- fewer dummies than extra slots, only 2 + the dummies can be kept. Counting the harp's 4 with no / one dummy had
+    -- every extra song knock another off, 180+ songs in half an hour (found by the bard fuzz test, 2026-10-19)
+    if base > 2 then
+        local n = 0
+        for _, d in ipairs(util.split(S.songs.dummy or '', ',')) do
+            local sp = util.spell(d)
+            if sp and util.can_cast(sp, player) then n = n + 1 end
+        end
+        if 2 + n < base then
+            if h and h.recently and not h.recently('song_dummies', 900) then
+                h.mark('song_dummies')
+                h.log(('Songs: %d song slots need %d dummy song%s (Songs tab) - singing %d songs until then'):format(
+                    base, base - 2, base - 2 == 1 and '' or 's', 2 + n))
+            end
+            base = 2 + n
+        end
+    end
     local extra = util.has_buff(player.buffs, 499) and 1 or 0          -- Clarion Call
     return base + extra, base
 end
-
-local function list(str) return util.split(str or '', ',') end
 
 -- The songs to keep up now: the list cut to the slots, plus the Clarion Call song.
 function bard.wanted(player)
@@ -243,18 +261,37 @@ local function reconcile(player, wanted)
         if x.status then by[x.status] = by[x.status] or {} table.insert(by[x.status], k) end
     end
     for status, keys in pairs(by) do
-        -- the real time of songs just sung (the newest song has the longest timer)
+        -- the game's timers for this buff, matched to our songs by what each is expected to have left (two Minuets
+        -- share one buff; "the newest has the longest timer" swapped them when the older one was a Troubadour song -
+        -- found by the bard fuzz test, 2026-10-19). A song sung in the last 30 s takes its real time (and length).
         if ends[status] then
             local lefts = {}
             for _, t in ipairs(ends[status]) do lefts[#lefts + 1] = t - now end
-            table.sort(lefts, function(a, b) return a > b end)
-            table.sort(keys, function(a, b) return m[a].at > m[b].at end)
-            for i, k in ipairs(keys) do
-                local x = m[k]
-                if lefts[i] and not x.learned and clock() - x.at < 30 and ends_at >= x.at then
-                    local real = (clock() - x.at) + lefts[i]
+            -- songs whose time is known (learned) first, closest match; then the ones just sung take what's left,
+            -- the newest the longest (their expected time may still be the slider's guess)
+            local cand = {}
+            for _, k in ipairs(keys) do
+                if m[k].learned then
+                    for i, l in ipairs(lefts) do cand[#cand + 1] = { k = k, i = i, d = math.abs((m[k].ends - clock()) - l) } end
+                end
+            end
+            table.sort(cand, function(a, b) return a.d < b.d end)
+            local used, got = {}, {}
+            for _, c in ipairs(cand) do
+                if not used[c.i] and not got[c.k] then used[c.i], got[c.k] = true, lefts[c.i] end
+            end
+            local rest_i, rest_k = {}, {}
+            for i in ipairs(lefts) do if not used[i] then rest_i[#rest_i + 1] = i end end
+            for _, k in ipairs(keys) do if not got[k] then rest_k[#rest_k + 1] = k end end
+            table.sort(rest_i, function(a, b) return lefts[a] > lefts[b] end)
+            table.sort(rest_k, function(a, b) return m[a].at > m[b].at end)
+            for j, k in ipairs(rest_k) do if rest_i[j] then got[k] = lefts[rest_i[j]] end end
+            for _, k in ipairs(keys) do
+                local x, l = m[k], got[k]
+                if l and not x.learned and clock() - x.at < 30 and ends_at >= x.at then
+                    local real = (clock() - x.at) + l
                     if real > 30 and real < 3600 then
-                        x.ends, x.learned = clock() + lefts[i], true
+                        x.ends, x.learned = clock() + l, true
                         load_learned()
                         local before = state.song_base[k]
                         state.song_base[k] = real / (x.troub and 2 or 1)
@@ -266,9 +303,31 @@ local function reconcile(player, wanted)
         -- fewer of these buffs than our songs: one wore off / was dispelled without a message we saw
         local n = have[status] or 0
         if seen_buffs and n < #keys then
-            table.sort(keys, function(a, b) return m[a].ends < m[b].ends end)
-            for i = 1, #keys - n do
-                if clock() - m[keys[i]].at > 6 then m[keys[i]] = nil end
+            -- which one went: the game's timers say how long each one left has - match them, the song without a match
+            -- is gone (two Minuets share one buff; guessing "the one with least time" re-sang the wrong one after a
+            -- dispel - found by the bard simulator, 2026-10-19). Without timers: the one with least time left.
+            local gone = {}
+            local lefts = {}
+            for _, t in ipairs(ends[status] or {}) do lefts[#lefts + 1] = t - now end
+            if #lefts == n and n > 0 then
+                local free = {}
+                for i = 1, #lefts do free[i] = true end
+                local pairs_ = {}
+                for _, k in ipairs(keys) do
+                    for i, l in ipairs(lefts) do pairs_[#pairs_ + 1] = { k = k, i = i, d = math.abs((m[k].ends - clock()) - l) } end
+                end
+                table.sort(pairs_, function(a, b) return a.d < b.d end)
+                local matched = {}
+                for _, p in ipairs(pairs_) do
+                    if free[p.i] and not matched[p.k] then free[p.i], matched[p.k] = false, true end
+                end
+                for _, k in ipairs(keys) do if not matched[k] then gone[#gone + 1] = k end end
+            else
+                table.sort(keys, function(a, b) return m[a].ends < m[b].ends end)
+                for i = 1, #keys - n do gone[#gone + 1] = keys[i] end
+            end
+            for _, k in ipairs(gone) do
+                if clock() - m[k].at > 6 then m[k] = nil end
             end
         end
     end
@@ -372,7 +431,9 @@ function bard.sing(player)
     -- NiTro nearly ready and the due songs are still up for longer than that: wait for it instead of singing them
     -- plain now (they'd only last half as long as under Troubadour)
     local wait = h.nitro_wait and h.nitro_wait(player)
-    if wait and wait > 0 then
+    -- not under Soul Voice: it lasts 3 minutes and the songs are sung again for it now (waiting for NiTro let it run out
+    -- with one song sung - found by the bard simulator, 2026-10-19)
+    if wait and wait > 0 and not sv_up then
         local soonest = math.huge
         for _, name in ipairs(due) do
             local x = on(name)
