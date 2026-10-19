@@ -1,5 +1,13 @@
 [
   {
+    "version": "1.81.1",
+    "date": "2026-10-19",
+    "items": [
+      "Bard with another bard in the party: your bard no longer mistakes the other bard's songs for its own. It used to (with Minuets / Marches from both bards on it) skip a song of its own thinking it was up, sing one again too early, or take another bard's song wearing off as its own.",
+      "Bard: a song dispelled right after it landed is noticed at once (it could be thought \"on\" for minutes)."
+    ]
+  },
+  {
     "version": "1.81.0",
     "date": "2026-10-19",
     "items": [

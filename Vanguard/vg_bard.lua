@@ -208,10 +208,18 @@ end
 local function held(name) local t = (state.song_hold or {})[name:lower()] return t and clock() < t end
 
 -- a song effect wore off us or was dispelled ('action message' 64 / 204 / 206 / 350 / 531, param = the buff)
+-- (the message doesn't say whose song it was: another bard's Minuet wearing off us took ours away and it was sung again
+-- early - only one of ours due to end about now counts; found by the simulator with a 2nd bard)
 function bard.on_lost(buff_id)
     local m = mine()
     local key = shortest(m, buff_id)
-    if key then m[key] = nil end
+    if not key then return end
+    local ours, up = 0, 0
+    for _, x in pairs(m) do if x.status == buff_id then ours = ours + 1 end end
+    local p = windower.ffxi.get_player()
+    for _, b in pairs(p and p.buffs or {}) do if b == buff_id then up = up + 1 end end
+    -- ours if one was due about now, or if fewer of that buff are left than songs we think we have
+    if math.abs(m[key].ends - clock()) < 15 or up < ours then m[key] = nil end
 end
 
 -- What's on now, for the app / tests: { {name, left, troub}, ... }, least time left first
@@ -287,17 +295,33 @@ local function reconcile(player, wanted)
             table.sort(cand, function(a, b) return a.d < b.d end)
             local used, got = {}, {}
             for _, c in ipairs(cand) do
+                if c.d <= 15 and not used[c.i] and not got[c.k] then used[c.i], got[c.k] = true, lefts[c.i] end
+            end
+            -- just sung: the free timer closest to what it should have (its learned length minus the seconds since it
+            -- landed) - "the longest" took another bard's newer Minuet on us (found by the simulator with a 2nd bard)
+            local cand2 = {}
+            for _, k in ipairs(keys) do
+                if m[k] and not got[k] then
+                    local want = length(k, m[k].troub) - (clock() - m[k].at)
+                    for i, l in ipairs(lefts) do
+                        if not used[i] then cand2[#cand2 + 1] = { k = k, i = i, d = math.abs(want - l) } end
+                    end
+                end
+            end
+            table.sort(cand2, function(a, b) return a.d < b.d end)
+            for _, c in ipairs(cand2) do
                 if not used[c.i] and not got[c.k] then used[c.i], got[c.k] = true, lefts[c.i] end
             end
-            local rest_i, rest_k = {}, {}
-            for i in ipairs(lefts) do if not used[i] then rest_i[#rest_i + 1] = i end end
-            for _, k in ipairs(keys) do if not got[k] then rest_k[#rest_k + 1] = k end end
-            table.sort(rest_i, function(a, b) return lefts[a] > lefts[b] end)
-            table.sort(rest_k, function(a, b) return m[a].at > m[b].at end)
-            for j, k in ipairs(rest_k) do if rest_i[j] then got[k] = lefts[rest_i[j]] end end
+            -- a song of ours with no timer left for it (a timer update came since it landed) is gone - dispelled, or
+            -- replaced without a message; counting buffs can't tell when another bard's songs share the buff, and a
+            -- song dispelled before its timer was read used to stay "on" for minutes (found by the simulator)
+            for _, k in ipairs(keys) do
+                local x = m[k]
+                if x and not got[k] and ends_at > x.at and clock() - x.at > 6 then m[k] = nil end
+            end
             for _, k in ipairs(keys) do
                 local x, l = m[k], got[k]
-                if l and not x.learned and clock() - x.at < 30 and ends_at >= x.at then
+                if x and l and not x.learned and clock() - x.at < 30 and ends_at >= x.at then
                     local real = (clock() - x.at) + l
                     if real > 30 and real < 3600 then
                         x.ends, x.learned = clock() + l, true
@@ -309,9 +333,9 @@ local function reconcile(player, wanted)
                 end
             end
         end
-        -- fewer of these buffs than our songs: one wore off / was dispelled without a message we saw
+        -- no timers for this buff at all (none of it is up): fewer buffs than our songs - one wore off / was dispelled
         local n = have[status] or 0
-        if seen_buffs and n < #keys then
+        if seen_buffs and not ends[status] and n < #keys then
             -- which one went: the game's timers say how long each one left has - match them, the song without a match
             -- is gone (two Minuets share one buff; guessing "the one with least time" re-sang the wrong one after a
             -- dispel - found by the bard simulator, 2026-10-19). Without timers: the one with least time left.
@@ -340,7 +364,10 @@ local function reconcile(player, wanted)
             end
         end
     end
-    -- songs in the list that are up but weren't sung by Vanguard: picked up with the game's time left
+    -- songs in the list that are up but weren't sung by Vanguard: picked up with the game's time left - only just after
+    -- loading (songs sung before Vanguard was on / a reload); later, a song of ours that's missing while the same buff
+    -- is up is another bard's song, and adopting it left ours unsung (found by the simulator with a 2nd bard)
+    if clock() - loaded_at > 90 then return end
     local groups = {}
     for _, name in ipairs(wanted) do
         local sp = util.spell(name)
