@@ -1,5 +1,13 @@
 [
   {
+    "version": "1.82.0",
+    "date": "2026-10-19",
+    "items": [
+      "Farming: a big \"DO NOT MOVE\" button at the top of the Farming tab. While it's on, Vanguard never moves that character - no walking to mobs, back to camp, following, closing in or stepping around. It still pulls, fights and casts at whatever it can reach from where it stands (its pull's reach, or right next to it); the rest are left until they come.",
+      "Bard: with Clarion Call up and 3 dummy songs set, only 2 dummies are sung - Clarion Call's extra slot takes a normal song. It used to sing a 3rd dummy for nothing each time."
+    ]
+  },
+  {
     "version": "1.81.5",
     "date": "2026-10-19",
     "items": [

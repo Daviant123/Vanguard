@@ -209,6 +209,12 @@ function farm.judge(mob, me, ids, center)
     local range = farm.range()
     if d > range and not (aggro and util.dist(mob) <= range + 10) then return nil, 'out of range' end
     if aggro then return 'aggro', 'attacking us' end
+    -- DO NOT MOVE: only mobs it can reach from where it stands (its pull's reach, or right next to it); the rest are
+    -- left until they come (or attack)
+    if S.farm.stay and not claimed_us then
+        local reach = farm.pull_range() or 5
+        if util.dist(mob) > reach then return nil, 'out of reach (Do not move is on)' end
+    end
     -- "Then: let it come to me" with a pull set: only mobs the pull reaches from where it stands - no walking off to
     -- pull a far one (his BLU ran 50+ yalms to get each bat within Glutinous Dart's reach, 2026-10-19)
     if S.farm.approach == false and not claimed_us then

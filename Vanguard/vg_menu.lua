@@ -219,7 +219,7 @@ function menu.extra(settings)
         rest_hp_low = settings.rest.hp_low, rest_mp_low = settings.rest.mp_low,
         ws_am = settings.ws.am, ws_am_ws = settings.ws.am_ws, ws_finish = settings.ws.finish, ws_finish_at = settings.ws.finish_at, ws_finish_trial_only = settings.ws.finish_trial_only, ws_finish_learned = require('vg_finish').learned_list(), ws_finish_save = settings.ws.finish_save,
         ws_finish_others = settings.ws.finish_others, ws_finish_wait = settings.ws.finish_wait,
-        farm_approach = settings.farm.approach, farm_mode = settings.farm.mode, farm_area = settings.farm.area,
+        farm_approach = settings.farm.approach, farm_stay = settings.farm.stay, farm_mode = settings.farm.mode, farm_area = settings.farm.area,
         farm_camp = settings.farm.camp ~= '' and require('vg_farm').camp() ~= nil, farm_back = settings.farm.back_to_camp,
         farm_wait = settings.farm.wait_party, farm_wait_hp = settings.farm.wait_hp, farm_wait_mp = settings.farm.wait_mp,
         farm_wait_near = settings.farm.wait_near, farm_packs = settings.farm.packs, farm_pack_range = settings.farm.pack_range,

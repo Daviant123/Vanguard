@@ -1,6 +1,6 @@
 _addon.name = 'Vanguard'
 _addon.author = 'Daviant'
-_addon.version = '0.85.5'
+_addon.version = '0.86.0'
 _addon.commands = {'vanguard', 'vg'}
 
 --[[
@@ -109,7 +109,7 @@ local defaults = {
     -- detection range/height, pull command after engaging, and a recorded route.
     -- farming (vg_farm): mode list|aggro|any; area camp|route; camp "x:y:z" in camp_zone; wait for the party before
     -- pulling (HP / MP %, within yalms); stop when the inventory is full / after stop_kills kills (0 = never)
-    farm = { targets = '', ignore = '', claim = 'unclaimed', aggro_first = true, range = 20,
+    farm = { targets = '', ignore = '', claim = 'unclaimed', aggro_first = true, range = 20, stay = false,
              height = 5, approach = true, pull_cmd = '', route = '', loop = true,
              mode = 'list', area = 'camp', camp = '', camp_zone = 0, back_to_camp = true,
              wait_party = true, wait_hp = 70, wait_mp = 40, wait_near = 20, stop_full = true, stop_kills = 0,
@@ -413,6 +413,9 @@ end
 -- Movement: follow and combat positioning
 ------------------------------------------------------------------------
 local function run_toward(me, mob)
+    -- DO NOT MOVE (his request 2026-10-19: "a DO NOT MOVE button ... that overrides all the other movements"): every
+    -- walk Vanguard makes - farming, back to camp, follow, closing in, formation, travel - comes through here
+    if settings.farm.stay then stop_running() return end
     local dx, dy = mob.x - me.x, mob.y - me.y
     local len = math.sqrt(dx * dx + dy * dy)
     if len < 0.01 then return end

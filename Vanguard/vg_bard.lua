@@ -512,7 +512,9 @@ function bard.sing(player)
     local ms_due = false
     for _, n in ipairs(due) do if ms_name and n:lower() == ms_name:lower() then ms_due = true end end
     if base > 2 and cur < slots and #real > cur and not (marcato_up and ms_due) then
-        for i = 1, math.min(#dummies, slots - 2) do
+        -- (only the harp's extra slots need a dummy: base - 2. Clarion Call's slot takes a song sung without the harp -
+        -- with Clarion Call up, a 3rd dummy was sung for nothing every time; his log 2026-10-19)
+        for i = 1, math.min(#dummies, base - 2) do
             if base - i >= 0 and cur == slots - i then
                 local sp = util.spell(dummies[i])
                 if sp and util.spell_ready(sp, player) and h.try_cast(sp.en, '<me>', 'dummy song (opens a slot)', player) then return true end
