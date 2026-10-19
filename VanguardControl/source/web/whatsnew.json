@@ -1,5 +1,12 @@
 [
   {
+    "version": "1.79.2",
+    "date": "2026-10-19",
+    "items": [
+      "Bard: after a zone change (songs come off everyone who zones), the Pianissimo songs on party members are sung again right away. The bard used to think they were still on and waited out their old timers."
+    ]
+  },
+  {
     "version": "1.79.1",
     "date": "2026-10-19",
     "items": [

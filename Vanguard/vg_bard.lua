@@ -428,6 +428,11 @@ function bard.on_member_lost(name, buff_id)
     local key = shortest(m, buff_id)
     if key then m[key] = nil end
 end
+-- Songs come off everyone who zones: forget them all (the members' Pianissimo songs were kept on their old timers and
+-- not sung again for minutes after a zone change - 2026-10-19 BARD round)
+function bard.on_zone()
+    state.mysongs, state.pmine, state.pseen, state.ppending, state.song_hold, state.redo_at = {}, {}, {}, {}, {}, nil
+end
 function bard.on_member_ko(name) if state.pmine then state.pmine[name:lower()] = nil end end
 
 -- Does <name> need this song (Pianissimo)? Not on them; running low; Troubadour up and not sung under it. A cast

@@ -1,6 +1,6 @@
 _addon.name = 'Vanguard'
 _addon.author = 'Daviant'
-_addon.version = '0.83.0'
+_addon.version = '0.83.1'
 _addon.commands = {'vanguard', 'vg'}
 
 --[[
@@ -1566,6 +1566,7 @@ windower.register_event('zone change', function(new_id, old_id)
     warp.on_zone()
     farm.on_zone(new_id, old_id)
     state.party_buffs, state.debuffs, state.burst = {}, {}, nil
+    bard.on_zone()
     state.sc = { target = 0, step = 0, time = 0 }
     state.busy_until = now() + 5
     state.farm_pulled, state.route, state.wp, state.resting = {}, nil, 1, false
