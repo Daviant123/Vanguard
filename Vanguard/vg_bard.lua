@@ -107,24 +107,46 @@ function bard.sing(player)
         return false
     end
     if h.nitro(player, true) then return true end
-    -- Dummy songs (Singer): with 3+ slots, after the first real songs, fill the extra slots with the dummies.
-    local dummies = list(S.songs.dummy)
-    if base > 2 and #dummies > 0 then
-        local count = 0
-        for _, name in ipairs(wanted) do if active(name) then count = count + 1 end end
-        for _, name in ipairs(dummies) do if active(name) then count = count + 1 end end
-        if count < slots and #wanted > count then
-            for i = 1, math.min(#dummies, slots - 2) do
-                local d = dummies[i]
-                if count == slots - i and not active(d) then
-                    if h.try_cast(d, '<me>', 'dummy song (opens a slot)', player) then return true end
+    -- songs this bard can't sing (not learned, or not a song): skipped, and said once in a while - a friend's bard
+    -- sang 3 of 4 songs and no dummies without a word about why (2026-10-18)
+    local function can_sing(name)
+        local sp = util.spell(name)
+        if sp and util.can_cast(sp, player) then return sp end
+        if not h.recently('song_skip:' .. name:lower(), 600) then
+            h.mark('song_skip:' .. name:lower())
+            h.log(('Songs: %s skipped - %s'):format(name, sp and "it isn't learned on this character" or "that isn't a song name"))
+        end
+        return nil
+    end
+    local real = {}
+    for _, name in ipairs(wanted) do if can_sing(name) then real[#real + 1] = name end end
+    -- Dummy songs (Singer's order): with 3+ slots and K dummies (at most slots - 2), the first slots - K real songs,
+    -- then the dummies (last one first) in the slots still free, then the remaining real songs go over them. Worked out
+    -- from the songs this bard can actually sing (it used to count songs, and one real song that couldn't be sung threw
+    -- the count off - the dummies were skipped).
+    local dummies = {}
+    for _, d in ipairs(list(S.songs.dummy)) do if can_sing(d) then dummies[#dummies + 1] = d end end
+    local k = math.min(#dummies, slots - 2)
+    if base > 2 and k > 0 and #real > slots - k then
+        local first = slots - k
+        local ready, up, later_due = true, 0, false
+        for i, name in ipairs(real) do
+            if active(name) then up = up + 1
+            elseif i <= first then ready = false
+            else later_due = true end
+        end
+        for i = 1, k do if active(dummies[i]) then up = up + 1 end end
+        if ready and later_due and up < slots then
+            for i = k, 1, -1 do
+                if not active(dummies[i]) then
+                    if h.try_cast(dummies[i], '<me>', 'dummy song (opens a slot)', player) then return true end
                 end
             end
         end
     end
     for _, name in ipairs(due) do
         local sp = util.spell(name)
-        if sp and util.spell_ready(sp, player) then
+        if sp and util.can_cast(sp, player) and util.spell_ready(sp, player) then
             -- Marcato right before its song
             local ms = S.songs.marcato_song ~= '' and S.songs.marcato_song or wanted[1]
             if S.songs.marcato and ms and sp.en:lower() == ms:lower() and not util.has_buff(player.buffs, 231)

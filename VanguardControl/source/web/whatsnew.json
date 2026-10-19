@@ -1,5 +1,13 @@
 [
   {
+    "version": "1.74.2",
+    "date": "2026-10-18",
+    "items": [
+      "Bard: a song your bard hasn't learned is skipped with a message saying so (it used to be skipped silently), and the dummy songs work out their place from the songs you can actually sing.",
+      "Bard: \"Songs last\" goes up to 900 seconds (long-duration song gear lasts past 600)."
+    ]
+  },
+  {
     "version": "1.74.1",
     "date": "2026-10-18",
     "items": [
