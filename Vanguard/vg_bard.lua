@@ -76,6 +76,14 @@ function bard.slots(player)
         end
     end
     local extra = util.has_buff(player.buffs, 499) and 1 or 0          -- Clarion Call
+    -- the extra slot stays open after Clarion Call wears off as long as its song is kept up (bg-wiki: "keep re-singing
+    -- the Clarion Call song before it expires") - counted only while the buff was up, the 5th song dropped 3 minutes
+    -- later and stayed off (his report 2026-10-19: "struggles to keep the 5th song up")
+    if extra == 0 then
+        local n, t = 0, clock()
+        for _, x in pairs(state and state.mysongs or {}) do if x.ends > t then n = n + 1 end end
+        if n > base then extra = 1 end
+    end
     return base + extra, base
 end
 
@@ -301,7 +309,9 @@ local function reconcile(player, wanted)
             -- landed) - "the longest" took another bard's newer Minuet on us (found by the simulator with a 2nd bard)
             local cand2 = {}
             for _, k in ipairs(keys) do
-                if m[k] and not got[k] then
+                -- (only songs whose timer isn't known yet: a known one with no close timer is gone - it took another
+                -- bard's March after ours was dispelled; found by the bard fuzz test)
+                if m[k] and not got[k] and not m[k].learned then
                     local want = length(k, m[k].troub) - (clock() - m[k].at)
                     for i, l in ipairs(lefts) do
                         if not used[i] then cand2[#cand2 + 1] = { k = k, i = i, d = math.abs(want - l) } end
@@ -437,6 +447,18 @@ function bard.sing(player)
     for _, name in ipairs(wanted) do
         if needs(name, troub_up, sv_up) and not held(name) and not bounced(name, player) then due[#due + 1] = name end
     end
+    -- songs that are on: the one closest to running out first (in list order a NiTro refresh reached the 5th song after
+    -- it had run out - and with it the Clarion Call slot; his report 2026-10-19); missing songs first, in list order
+    do
+        local order = {}
+        for i, n in ipairs(due) do order[n] = i end
+        table.sort(due, function(a, b)
+            local xa, xb = on(a), on(b)
+            if (xa == nil) ~= (xb == nil) then return xa == nil end
+            if xa and xb and xa.ends ~= xb.ends then return xa.ends < xb.ends end
+            return order[a] < order[b]
+        end)
+    end
     -- the redo is over when every song it covered was sung again (or after 3 minutes, e.g. out of range all along)
     if state.redo_at then
         local left = false
@@ -475,13 +497,19 @@ function bard.sing(player)
     -- not under Soul Voice: it lasts 3 minutes and the songs are sung again for it now (waiting for NiTro let it run out
     -- with one song sung - found by the bard simulator, 2026-10-19)
     if wait and wait > 0 and not sv_up then
+        -- only if NiTro AND singing every song again after it fit before the first one runs out (~4 s a song under
+        -- Nightingale, which halves cast and recast times)
         local soonest = math.huge
         for _, name in ipairs(due) do
             local x = on(name)
             if not x or (state.redo_at and x.at < state.redo_at) then soonest = 0 break end
-            soonest = math.min(soonest, x.ends - clock())
         end
-        if wait < soonest - 8 then
+        local n = 0
+        for _, name in ipairs(wanted) do
+            local x = on(name)
+            if x then n = n + 1 soonest = math.min(soonest, x.ends - clock()) end
+        end
+        if wait + 4 * n + 3 < soonest then
             if not h.recently('nitro_wait', 30) then h.mark('nitro_wait') h.log(('Songs: waiting %ds for NiTro'):format(math.ceil(wait))) end
             return false
         end

@@ -1,5 +1,14 @@
 [
   {
+    "version": "1.82.1",
+    "date": "2026-10-19",
+    "items": [
+      "Bard: the 5th song is kept up. The extra slot from Clarion Call stays open after Clarion Call wears off as long as its song is sung again in time - the bard used to stop counting it after 3 minutes and the 5th song dropped.",
+      "Bard: when several songs are due (a NiTro refresh), the one closest to running out is sung first, and the bard only waits for NiTro if it can sing every song again before the first one runs out.",
+      "Bard: a song of yours dispelled while another bard's song of the same kind is on you is now noticed and sung again."
+    ]
+  },
+  {
     "version": "1.82.0",
     "date": "2026-10-19",
     "items": [
