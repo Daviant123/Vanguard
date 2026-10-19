@@ -186,6 +186,35 @@ function support.geo_hate(player, spell, mob)
     return false
 end
 
+-- Is the luopan out of use? Its bubble reaches about 6' around it (bg-wiki), and it stays where it was put down. It
+-- used to be recalled only 15' from the fight, so after a mob died the next one 7-15' away sat outside the bubble the
+-- whole fight, and a bubble on a member who walked off was never moved (2026-10-18). Returns why, or nil.
+local REACH = 7                                                  -- 6' plus a little for the mob's size
+function support.luopan_off(player, pet, bt)
+    local last = state.geo_last
+    if not last or clock() - last.at < 8 then return nil end     -- just put down
+    local spell = util.spell(last.name)
+    if not spell then return nil end
+    local function d(a, b) local dx, dy = a.x - b.x, a.y - b.y return math.sqrt(dx * dx + dy * dy) end
+    if S.geo.geo ~= '' and S.geo.geo:lower() ~= last.name:lower() and h.party_engaged(player) then
+        return 'changing it to ' .. S.geo.geo
+    end
+    if util.targets(spell, 'Enemy') then
+        if not bt then return nil end                            -- between fights: the next mob may come to it
+        local dist = d(pet, bt)
+        if dist > (tonumber(S.geo.full_circle_range) or 15) then return 'luopan too far from the target' end
+        if bt.id ~= last.target and dist > REACH then return ("the new mob is %d' from the luopan"):format(math.floor(dist)) end
+        return nil
+    end
+    -- a bubble for the party, put down on me or a member: moved when that one is out of its reach
+    local who = S.geo.geo_target
+    local m = (who == 'me' or who == 'bt' or who == '') and windower.ffxi.get_mob_by_target('me') or windower.ffxi.get_mob_by_name(who)
+    if m and d(pet, m) > REACH + 1 and h.party_engaged(player) then
+        return ("%s is %d' from the luopan"):format(m.name, math.floor(d(pet, m)))
+    end
+    return nil
+end
+
 -- Somebody on our side hit the mob (cure-hate also counts, but a hit or enfeeble from us is what we see).
 function support.note_hate(act, player)
     if act.actor_id ~= player.id then return end

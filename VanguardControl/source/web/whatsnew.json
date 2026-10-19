@@ -1,5 +1,13 @@
 [
   {
+    "version": "1.78.0",
+    "date": "2026-10-18",
+    "items": [
+      "Geomancer: the luopan is moved when it isn't reaching anyone. Its bubble only reaches about 6 yalms, but it used to be recalled only 15 yalms from the fight - so when the next mob was 7-15 yalms away, the whole fight happened outside the bubble. Now Full Circle and a new bubble on the new mob.",
+      "Geomancer: a party bubble put down on you or a member (Geo-Regen, Geo-Haste...) is moved when that person walks out of its reach, and picking a different Geo spell replaces the luopan right away."
+    ]
+  },
+  {
     "version": "1.77.1",
     "date": "2026-10-18",
     "items": [

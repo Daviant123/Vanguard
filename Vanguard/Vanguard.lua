@@ -1,6 +1,6 @@
 _addon.name = 'Vanguard'
 _addon.author = 'Daviant'
-_addon.version = '0.81.1'
+_addon.version = '0.82.0'
 _addon.commands = {'vanguard', 'vg'}
 
 --[[
@@ -813,17 +813,14 @@ end
 
 local function do_geo(player)
     if not settings.modules.geo or silenced(player) then return false end
-    -- Full Circle: recall the luopan when the fight has moved away from it.
+    -- Full Circle when the luopan isn't reaching anyone (vg_support.luopan_off); the bubble is put down again below
     local pet = windower.ffxi.get_mob_by_target('pet')
-    local bt = battle_target()
-    if pet and bt and settings.geo.full_circle_range > 0 then
-        local dx, dy = pet.x - bt.x, pet.y - bt.y
-        if math.sqrt(dx * dx + dy * dy) > settings.geo.full_circle_range then
-            local fc = util.ability('Full Circle')
-            if util.ability_ready(fc) and not recently('ja:Full Circle:<me>', 5) then
-                log('Full Circle (luopan too far from target)')
-                return use_ja(fc, '<me>')
-            end
+    local why = pet and support.luopan_off(player, pet, battle_target())
+    if why then
+        local fc = util.ability('Full Circle')
+        if util.ability_ready(fc) and not amnesia(player) and not recently('ja:Full Circle:<me>', 15) then
+            log('Full Circle (' .. why .. ')')
+            return use_ja(fc, '<me>')
         end
     end
     -- Entrust: "Indi-Spell>Member"
@@ -1428,6 +1425,9 @@ windower.register_event('action', function(act)
                 local on_me = false
                 for _, t in ipairs(act.targets or {}) do if t.id == player.id then on_me = true end end
                 if spell.type == 'BardSong' and on_me then bard.on_song(spell, player) end
+                if spell.type == 'Geomancy' and spell.en:sub(1, 4) == 'Geo-' then          -- where the luopan went down
+                    state.geo_last = { name = spell.en, target = first and first.id, at = now() }
+                end
                 if first and first_action and state.debuffs[first.id] then
                     local rec = state.debuffs[first.id][spell.en]
                     if rec then
