@@ -236,7 +236,7 @@ function support.nitro(player, songs_due)
         if night and not troub then
             local t = ja_ready('Troubadour', p)
             if t then
-                state.nitro_at = clock()                         -- every song sung before this is sung again (vg_bard)
+                state.redo_at = clock()                          -- every song sung before this is sung again (vg_bard)
                 return h.use_ja(t, '<me>')
             end
             return true

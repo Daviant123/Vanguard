@@ -89,11 +89,11 @@ local function up_raw(name)
     local len = (state.song_len or {})[name:lower()] or S.songs.duration
     return last and clock() - last < len
 end
--- sung before NiTro started while Troubadour is up: to be sung again, so it lasts twice as long
-local troub_up = false
+-- sung before a NiTro (or //vg resing): to be sung again. It stays that way until it is - Troubadour running out
+-- part way used to leave the rest as they were (2 ten-minute songs and 2 five-minute ones, 2026-10-18)
 local function stale(name)
     local last = state.songs[name:lower()]
-    return troub_up and state.nitro_at and last ~= nil and last < state.nitro_at
+    return state.redo_at ~= nil and last ~= nil and last < state.redo_at
 end
 local function active(name) return up_raw(name) and not stale(name) end
 
@@ -203,13 +203,18 @@ function bard.sing(player)
     state.song_len, state.song_troub, state.song_learned = state.song_len or {}, state.song_troub or {}, state.song_learned or {}
     local wanted, slots, base = bard.wanted(player)
     if #wanted == 0 then return false end
-    troub_up = util.has_buff(player.buffs, 348)
     adopt(player, wanted)
     local due = {}
     for _, name in ipairs(wanted) do
         local last = state.songs[name:lower()]
         local keep = (state.song_len[name:lower()] or S.songs.duration) - S.songs.refresh_before
         if not last or clock() - last > keep or stale(name) then due[#due + 1] = name end
+    end
+    -- the redo is over when every song it covered was sung again (or after 3 minutes, e.g. out of range all along)
+    if state.redo_at then
+        local left = false
+        for _, name in ipairs(due) do if stale(name) and util.can_cast(util.spell(name) or {}, player) then left = true end end
+        if not left or clock() - state.redo_at > 180 then state.redo_at = nil end
     end
     if #due == 0 then
         -- NiTro as soon as it's ready in a fight when the songs up weren't sung under Troubadour: they're all sung
@@ -268,12 +273,15 @@ function bard.sing(player)
     if base > 2 and k > 0 and #real > slots - k then
         local first = slots - k
         local ready, up, later_due = true, 0, false
+        -- a slot only needs a dummy when its song is gone: songs still on (even ones due again, as after NiTro)
+        -- are sung over themselves, so a NiTro refresh is 4 songs, not 6, and fits in Troubadour
         for i, name in ipairs(real) do
-            if active(name) then up = up + 1
-            elseif i <= first then ready = false
+            if i <= first then
+                if active(name) then up = up + 1 else ready = false end
+            elseif up_raw(name) then up = up + 1
             else later_due = true end
         end
-        for i = 1, k do if active(dummies[i]) then up = up + 1 end end
+        for i = 1, k do if up_raw(dummies[i]) then up = up + 1 end end
         if ready and later_due and up < slots then
             for i = k, 1, -1 do
                 if not active(dummies[i]) then

@@ -1,5 +1,14 @@
 [
   {
+    "version": "1.75.1",
+    "date": "2026-10-18",
+    "items": [
+      "Bard: after NiTro, every song is sung again even if Troubadour runs out part way (it used to leave the rest on their old, shorter timers - two 10-minute songs and two 5-minute ones).",
+      "Bard: when all your songs are still on, the NiTro refresh sings them over themselves and skips the dummy songs, so all 4 fit inside Troubadour.",
+      "Bard: new \"Sing all songs again now\" button under Timing, and \"Sing again this long before they wear\" goes up to 180 seconds."
+    ]
+  },
+  {
     "version": "1.75.0",
     "date": "2026-10-18",
     "items": [

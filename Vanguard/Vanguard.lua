@@ -1,6 +1,6 @@
 _addon.name = 'Vanguard'
 _addon.author = 'Daviant'
-_addon.version = '0.80.0'
+_addon.version = '0.80.1'
 _addon.commands = {'vanguard', 'vg'}
 
 --[[
@@ -1806,6 +1806,10 @@ windower.register_event('addon command', function(cmd, ...)
             -- from the panel: //vg pianissimo set <name> <1|2> <song|none>
             if bard.pian_set(args[2], args[3], table.concat(args, ' ', 4)) then store.save(settings) send_profile() end
         elseif support.set_pianissimo(rest) then store.save(settings) send_profile() end
+    elseif cmd == 'resing' then
+        -- //vg resing: sing every song again now (the panel's "Sing all songs again now")
+        state.redo_at = now()
+        log('Songs: singing them all again')
     elseif cmd == 'dummy' then
         -- //vg dummy <1|2|3> <song|none>  (3 dummies open slots 3-5: Daurdabla + Clarion Call)
         local slot, song = tonumber(args[1]), table.concat(args, ' ', 2)
