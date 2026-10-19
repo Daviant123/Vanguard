@@ -217,6 +217,9 @@ Settings are now saved safely with several characters running (one character's s
 - **Geomancer.** Casts Dia II first so Geo-Frailty / Malaise work (the guide: the GEO must be on the mob's hate list).
   `//vg set geo.entrust auto` entrusts Indi-Haste (or Indi-Fury) to you. Radial Arcana also when 2+ party members are
   under 40% MP (`geo.party_mp`).
+- **Weapon skill chain (one character).** On Job & abilities: up to 6 weapon skills used in turn (each at 1000+ TP,
+  4 s or more apart, in range), repeating or stopping at the end; a new mob or a 20 s break starts it over. Chains saved
+  in the AutoSkillchain addon (its data folder) can be loaded with one click. Saved per job.
 - **Bard NiTro.** In a fight, as soon as Nightingale + Troubadour are ready and your songs weren't sung under them:
   NiTro + Marcato, then all songs fresh (they last twice as long; it knows). Songs due with NiTro only seconds away:
   it waits for NiTro. `//vg set songs.nitro false` to save them for yourself.

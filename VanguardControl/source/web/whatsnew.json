@@ -1,5 +1,12 @@
 [
   {
+    "version": "1.83.0",
+    "date": "2026-10-19",
+    "items": [
+      "New: Weapon skill chain for one character (like the AutoSkillchain addon), on Job & abilities. Pick up to 6 weapon skills; they're used in turn - each at 1000 TP or more, at least 4 seconds apart, from melee range (22 yalms for a ranged weapon skill) - and repeat, or stop at the end. A new mob, or 20 seconds without the next one, starts it over. Your chains saved in AutoSkillchain (for that job and weapon type) can be loaded with one click. Saved per job."
+    ]
+  },
+  {
     "version": "1.82.1",
     "date": "2026-10-19",
     "items": [

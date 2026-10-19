@@ -1,6 +1,6 @@
 _addon.name = 'Vanguard'
 _addon.author = 'Daviant'
-_addon.version = '0.86.1'
+_addon.version = '0.87.0'
 _addon.commands = {'vanguard', 'vg'}
 
 --[[
@@ -47,6 +47,7 @@ local update = require('vg_update')
 local link = require('vg_link')
 local strat = require('vg_strat')
 local bard = require('vg_bard')
+local wschain = require('vg_wschain')
 local stats = require('vg_stats')
 local crash = require('vg_crash')
 local warp = require('vg_warp')
@@ -81,6 +82,7 @@ local defaults = {
     profiles = {},
     -- Saved per-job menu choices from the panel (buff grid, songs, geo, enfeebles, modules).
     menus = {},
+    wschains = {},           -- weapon skill chain per job (vg_wschain): "1|WS,WS,..." (1 = repeat)
     pause_on_zone = true,   -- stop the bot on a zone change (his request 2026-10-17: "when it changes zones i want you to stop the bot")
     stop_on_job = true,     -- ...and when the job or sub job changes (same request)
     -- formation: spread (fan behind the leader), line (single file) or off (plain follow)
@@ -794,7 +796,7 @@ local function do_ws(player)
     local t = windower.ffxi.get_mob_by_target('t')
     local fin = finish.ws(player, t)                                  -- the finishing weapon skill comes first
     if fin == 'used' then return true elseif fin == 'block' then return false end
-    if settings.ws.name == '' then return false end
+    if settings.ws.name == '' and #wschain.list() == 0 then return false end
     if settings.modules.sc then
         for _, s in ipairs(sc_steps()) do
             if s.who == player.name:lower() then return false end   -- chain owns our TP
@@ -818,6 +820,16 @@ local function do_ws(player)
             return use_ws(am_ws)
         end
     end
+    -- a weapon skill chain for this character (AutoSkillchain, vg_wschain): its next weapon skill instead
+    local nx = wschain.next(player, t)
+    if nx == 'hold' then return false end
+    if nx then
+        if recently('ws:' .. nx, 3) or (t and t.hpp < settings.ws.min_mob_hpp) then return false end
+        use_ws(nx)
+        wschain.used()
+        return true
+    end
+    if settings.ws.name == '' then return false end
     if player.vitals.tp < settings.ws.tp or recently('ws:' .. settings.ws.name, 3) then return false end
     if not ws_in_range(t) then return false end
     return use_ws(settings.ws.name)
@@ -1180,6 +1192,8 @@ local function send_profile(player)
             local c = menu.config(settings)
             c.strat_info = strat.info(player)
             if player.main_job == 'BRD' then c.bard_info = bard.info(player) end
+            c.wschain = { presets = wschain.presets(player), weapon = wschain.weapon_type(), step = wschain.step(),
+                          list = wschain.list(), rep = wschain.rep() }
             if player.main_job == 'GEO' then c.geo_info = support.geo_info(player) end
             c.known = quick.known(player)                -- for the app's quick buttons
             c.hotkeys = settings.hotkeys
@@ -1272,6 +1286,7 @@ farm.init(settings, state, { log = log, run_toward = run_toward, stop_running = 
     send = bridge.send })
 finish.init(settings, state, { log = log, use_ws = use_ws, ws_in_range = ws_in_range, recently = recently, mark = mark,
     save = function() store.save(settings) end })
+wschain.init(settings, state, {})
 bard.init(settings, state, {
     log = log, recently = recently, mark = mark, try_cast = try_cast, use_ja = use_ja, amnesia = amnesia,
     party_members = party_members, ja_ready = ja_ready,
@@ -1934,6 +1949,32 @@ windower.register_event('addon command', function(cmd, ...)
             -- from the panel: //vg pianissimo set <name> <1|2> <song|none>
             if bard.pian_set(args[2], args[3], table.concat(args, ' ', 4)) then store.save(settings) send_profile() end
         elseif support.set_pianissimo(rest) then store.save(settings) send_profile() end
+    elseif cmd == 'wschain' then
+        -- the app's weapon skill chain: //vg wschain slot <1-6> <ws|none> | load <AutoSkillchain chain name> | clear
+        local sub = (args[1] or ''):lower()
+        local ws, rep = wschain.list(), wschain.rep()
+        if sub == 'slot' then
+            local i, name = tonumber(args[2]), table.concat(args, ' ', 3)
+            local w = util.wskill(name)
+            if i and i >= 1 and i <= 6 then
+                if name:lower() == 'none' or name == '' then ws[i] = false elseif w then ws[i] = w.en end
+                local out = {}
+                for j = 1, 6 do if ws[j] then out[#out + 1] = ws[j] end end
+                wschain.set(out, rep)
+            end
+        elseif sub == 'repeat' then
+            wschain.set(ws, (args[2] or 'on'):lower() ~= 'off')
+        elseif sub == 'load' then
+            local p = wschain.load(windower.ffxi.get_player(), table.concat(args, ' ', 2))
+            if not p then log('Weapon skill chain: no chain called "' .. table.concat(args, ' ', 2) .. '"') end
+        elseif sub == 'clear' then
+            wschain.set({}, true)
+        end
+        state.wschain = nil
+        local now_ws = wschain.list()
+        log('Weapon skill chain: ' .. (#now_ws > 0 and table.concat(now_ws, ' > ') .. (wschain.rep() and ' (repeat)' or '') or 'off'))
+        store.save(settings)
+        save_profile() send_profile()
     elseif cmd == 'resing' then
         -- //vg resing: sing every song again now (the panel's "Sing all songs again now")
         state.redo_at = now()

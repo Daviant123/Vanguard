@@ -271,6 +271,20 @@ function jobTab(c, p) {
       <label class="field">Weapon skill ${sel("ws ", [{v: "", l: "None"}].concat(arr(p.ws_list).map(w => ({v: w, l: w}))), p.ws)}</label>
       <label class="field" title="Mythic / Empyrean / Relic weapons: without the Aftermath picked here (or with under 8 s left), TP is saved to 1000 / 2000 / 3000 and the Aftermath weapon skill used; with it up, the weapon skill above">Keep Aftermath ${sel("set ws.am ", [{v: "0", l: "Off"}, {v: "1", l: "Lv.1 (1000 TP)"}, {v: "2", l: "Lv.2 (2000 TP)"}, {v: "3", l: "Lv.3 (3000 TP)"}], String((p.config || {}).extra ? ((p.config.extra.ws_am) || 0) : 0))}</label>
       ${((p.config || {}).extra || {}).ws_am > 0 ? `<label class="field">Aftermath weapon skill ${sel("set ws.am_ws ", [{v: "", l: "the one above"}].concat(arr(p.ws_list).map(w => ({v: w, l: w}))), ((p.config || {}).extra || {}).ws_am_ws || "")}</label>` : ""}
+      ${(() => {
+        // a weapon skill chain for this character (AutoSkillchain): his request 2026-10-19
+        const wc = (p.config || {}).wschain || {}, cur = arr(wc.list), wl = arr(p.ws_list), presets = arr(wc.presets);
+        const opts = [{v: "none", l: "—"}].concat(wl.map(w => ({v: w, l: w})));
+        const slots = Array.from({length: Math.min(6, cur.length + 1)}, (_, i) =>
+          `<label class="field">${i + 1}${cur.length && wc.step === i + 1 ? " ▸" : ""} ${sel(`wschain slot ${i + 1} `, opts, cur[i] || "none")}</label>`).join("");
+        return `<div class="box" style="margin-top:8px;flex-basis:100%"><h3>Weapon skill chain (this character on its own)</h3>
+          <div class="row" style="flex-wrap:wrap;gap:6px 12px;align-items:flex-end">${slots}
+            ${cur.length ? chk("Repeat", wc.rep !== false, "wschain repeat on", "wschain repeat off") : ""}
+            ${cur.length ? `<button onclick="send('wschain clear')">Clear</button>` : ""}
+            ${presets.length ? `<label class="field">Load from AutoSkillchain (${esc(wc.weapon || "")}) ${sel("wschain load ", [{v: "", l: "— pick a chain —"}].concat(presets.map(c => ({v: c.name, l: `${c.name}: ${arr(c.ws).join(" > ")}${c.rep ? " (repeat)" : ""}`}))), "")}</label>` : ""}
+          </div>
+          <div class="hint" style="margin-top:4px">Used in turn instead of the weapon skill above - each at 1000 TP or more, 4 s or more apart, from melee range (22' for a ranged weapon skill). A new mob, or 20 s without the next one, starts it over. Without Repeat it stops at the end and the weapon skill above is used again. Saved per job.</div></div>`;
+      })()}
       <label class="field">Follow / assist ${sel("leader ", [{v: "", l: "Nobody (I lead)"}].concat(others.map(n => ({v: n, l: n}))), s.leader || "", "none")}</label>
     </div>
     ${finishBox(p)}
