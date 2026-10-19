@@ -1,6 +1,6 @@
 _addon.name = 'Vanguard'
 _addon.author = 'Daviant'
-_addon.version = '0.84.2'
+_addon.version = '0.85.0'
 _addon.commands = {'vanguard', 'vg'}
 
 --[[
@@ -140,7 +140,7 @@ local defaults = {
     -- "Spell>target" pairs. target = me or a party member name. "ja:" prefix = job ability.
     buffs = { list = '' },
     -- finish*: the weapon skill that lands the kill (vg_finish): at mob HP% finish_at, saving TP, others stop attacking
-    ws = { name = '', tp = 1000, min_mob_hpp = 1, max_range = 6,
+    ws = { name = '', tp = 1000, min_mob_hpp = 1, max_range = 6, am = 0, am_ws = '',
            finish = '', finish_at = 0, learned = '', finish_trial_only = true, finish_save = true, finish_others = true, finish_wait = false },
     -- Ordered chain steps "Character:Weapon Skill". Each character only fires its own steps.
     sc = { steps = '', open_tp = 1000, window_min = 3, window_max = 8 },
@@ -772,6 +772,24 @@ local function do_ws(player)
     if settings.modules.sc then
         for _, s in ipairs(sc_steps()) do
             if s.who == player.name:lower() then return false end   -- chain owns our TP
+        end
+    end
+    -- Aftermath (his request 2026-10-19): keep Lv.1 / 2 / 3 up - without it (or with under 8 s left by the game's timer)
+    -- TP is saved to 1000 / 2000 / 3000 and the Aftermath weapon skill used; with it up, the normal weapon skill
+    local am = tonumber(settings.ws.am) or 0
+    if am > 0 then
+        local am_ws = settings.ws.am_ws ~= '' and settings.ws.am_ws or settings.ws.name
+        local have, id = 0, nil
+        if util.has_buff(player.buffs, 273) then have, id = 3, 273               -- relic Aftermath
+        elseif util.has_buff(player.buffs, 272) then have, id = 3, 272
+        elseif util.has_buff(player.buffs, 271) then have, id = 2, 271
+        elseif util.has_buff(player.buffs, 270) then have, id = 1, 270 end
+        local left = id and bard.buff_left(id)
+        if have >= am and left and left < 8 then have = 0 end
+        if have < am then
+            if player.vitals.tp < am * 1000 or recently('ws:' .. am_ws, 3) or not ws_in_range(t) then return false end
+            log(('%s at %d TP for Aftermath Lv.%d'):format(am_ws, player.vitals.tp, am))
+            return use_ws(am_ws)
         end
     end
     if player.vitals.tp < settings.ws.tp or recently('ws:' .. settings.ws.name, 3) then return false end

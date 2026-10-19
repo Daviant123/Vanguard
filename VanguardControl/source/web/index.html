@@ -269,6 +269,8 @@ function jobTab(c, p) {
     <div class="row" style="align-items:flex-end">
       <label class="field">Role ${sel("role ", arr(p.roles).map(r => ({v: r.id, l: r.label})), p.role)}</label>
       <label class="field">Weapon skill ${sel("ws ", [{v: "", l: "None"}].concat(arr(p.ws_list).map(w => ({v: w, l: w}))), p.ws)}</label>
+      <label class="field" title="Mythic / Empyrean / Relic weapons: without the Aftermath picked here (or with under 8 s left), TP is saved to 1000 / 2000 / 3000 and the Aftermath weapon skill used; with it up, the weapon skill above">Keep Aftermath ${sel("set ws.am ", [{v: "0", l: "Off"}, {v: "1", l: "Lv.1 (1000 TP)"}, {v: "2", l: "Lv.2 (2000 TP)"}, {v: "3", l: "Lv.3 (3000 TP)"}], String((p.config || {}).extra ? ((p.config.extra.ws_am) || 0) : 0))}</label>
+      ${((p.config || {}).extra || {}).ws_am > 0 ? `<label class="field">Aftermath weapon skill ${sel("set ws.am_ws ", [{v: "", l: "the one above"}].concat(arr(p.ws_list).map(w => ({v: w, l: w}))), ((p.config || {}).extra || {}).ws_am_ws || "")}</label>` : ""}
       <label class="field">Follow / assist ${sel("leader ", [{v: "", l: "Nobody (I lead)"}].concat(others.map(n => ({v: n, l: n}))), s.leader || "", "none")}</label>
     </div>
     ${finishBox(p)}
@@ -1555,13 +1557,23 @@ function farmTab(c, p) {
   // pulls this character can do
   const PULLERS = ["Provoke", "Flash", "Dia", "Dia II", "Bio", "Stone", "Animated Flourish", "Jump", "Sleep", "Foe Lullaby", "Light Shot"];
   const ab = arr(known.abilities), sp = arr(known.spells);
-  const pullOpts = [{v: "none", l: "Walk up and attack"}, {v: "ra", l: "Ranged attack"}]
-    .concat(PULLERS.filter(n => ab.includes(n)).map(n => ({v: "ja " + n, l: n})))
-    .concat(PULLERS.filter(n => sp.includes(n)).map(n => ({v: "ma " + n, l: n})));
+  // how to pull: a kind, then which one (his request 2026-10-19: "I'd like to choose blue magic and a specific spell")
+  const blue = arr(known.blue), other = sp.filter(n => !blue.includes(n)).sort(), abl = ab.slice().sort();
   const pc = String(x.farm_pull || ""), pm = pc.match(/^input \/(ja|ma) "(.+)" <t>$/);
-  const pullCur = !pc ? "none" : pc === "input /ra <t>" ? "ra" : pm ? pm[1] + " " + pm[2] : "custom";
-  if (pm && !pullOpts.some(o => o.v === pullCur)) pullOpts.push({v: pullCur, l: pm[2]});
-  if (pullCur === "custom") pullOpts.push({v: "custom", l: pc});
+  const pullKind = !pc ? "none" : pc === "input /ra <t>" ? "ra" : pm ? (pm[1] === "ja" ? "ja" : blue.includes(pm[2]) ? "blu" : "ma") : "custom";
+  const pullName = pm ? pm[2] : "";
+  const kindList = {ja: abl, blu: blue.slice().sort(), ma: other};
+  const firstOf = k => (kindList[k] || [])[0] || "";
+  const pullKinds = [{v: "farmpull none", l: "Walk up and attack"}, {v: "farmpull ra", l: "Ranged attack"}]
+    .concat(abl.length ? [{v: "farmpull ja " + (pullKind === "ja" ? pullName : firstOf("ja")), l: "Job ability"}] : [])
+    .concat(blue.length ? [{v: "farmpull ma " + (pullKind === "blu" ? pullName : firstOf("blu")), l: "Blue magic"}] : [])
+    .concat(other.length ? [{v: "farmpull ma " + (pullKind === "ma" ? pullName : firstOf("ma")), l: "Magic"}] : [])
+    .concat(pullKind === "custom" ? [{v: "", l: pc}] : []);
+  const kindCur = pullKinds.find(o => (pullKind === "none" && o.l === "Walk up and attack") || (pullKind === "ra" && o.l === "Ranged attack")
+    || (pullKind === "ja" && o.l === "Job ability") || (pullKind === "blu" && o.l === "Blue magic") || (pullKind === "ma" && o.l === "Magic")
+    || (pullKind === "custom" && o.v === ""));
+  const pullWhich = ["ja", "blu", "ma"].includes(pullKind)
+    ? sel(pullKind === "ja" ? "farmpull ja " : "farmpull ma ", (kindList[pullKind] || []).map(n => ({v: n, l: n})), pullName) : "";
   const route = f.rec != null ? f.rec : (x.farm_route || 0);
   const spots = arr(x.farm_spots), here = spots.filter(q => q.here), elsewhere = spots.filter(q => !q.here);
   const others = Object.keys(chars).filter(n => n !== selected && chars[n].online);
@@ -1743,7 +1755,8 @@ function farmTab(c, p) {
       <button onclick="setFarmView('all')">All settings</button></div></div>` : ""}
     ${!all ? "" : card(3, "How to fight", `
       <div class="row">
-        <label class="field">Pull with ${sel("farmpull ", pullOpts, pullCur)}</label>
+        <label class="field">Pull with ${sel("", pullKinds, kindCur ? kindCur.v : "")}</label>
+        ${pullWhich ? `<label class="field">${pullKind === "ja" ? "Ability" : "Spell"} ${pullWhich}</label>` : ""}
         <label class="field">Then ${sel("set farm.approach ", [{v: "true", l: "walk up to it"}, {v: "false", l: "let it come to me"}], x.farm_approach === false ? "false" : "true")}</label>
       </div>
       <div class="row" style="margin-top:8px;align-items:center">

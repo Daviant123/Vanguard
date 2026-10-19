@@ -133,10 +133,27 @@ function util.instrument_song(spell)
 end
 
 -- Can the player currently use this spell (known, job/level allows it)?
+-- Blue magic is castable only while it's set (learned isn't enough): the set spells of the BLU main / sub job
+local blu_set = { t = -100, ids = {} }
+function util.blu_set()
+    if os.clock() - blu_set.t < 5 then return blu_set.ids end
+    blu_set.t, blu_set.ids = os.clock(), {}
+    for _, f in ipairs({ 'get_mjob_data', 'get_sjob_data' }) do
+        local ok, d = pcall(function() return windower.ffxi[f] and windower.ffxi[f]() end)
+        if ok and type(d) == 'table' and type(d.spells) == 'table' then
+            for _, id in pairs(d.spells) do if tonumber(id) and id ~= 512 then blu_set.ids[id] = true end end
+        end
+    end
+    return blu_set.ids
+end
+
 function util.can_cast(spell, player)
     if not spell then return false end
     local known = windower.ffxi.get_spells()
     if not known or (not known[spell.id] and not util.instrument_song(spell)) then return false end
+    -- unset blue magic: the game refuses it (pull with a blue spell, quick buttons...; 2026-10-19)
+    if spell.type == 'BlueMagic' and (player.main_job == 'BLU' or player.sub_job == 'BLU')
+        and (windower.ffxi.get_mjob_data or windower.ffxi.get_sjob_data) and not util.blu_set()[spell.id] then return false end
     local lv = spell.levels or {}
     local main_lv = lv[player.main_job_id]
     local sub_lv = lv[player.sub_job_id]

@@ -248,6 +248,12 @@ function bard.on_buff_packet(data)
     end
     ends, seen_buffs, ends_at = out, true, clock()
 end
+-- seconds left on one of our buffs by the game's timer (the soonest if several), or nil (Aftermath upkeep uses it)
+function bard.buff_left(id)
+    local best
+    for _, t in ipairs(ends[id] or {}) do if not best or t < best then best = t end end
+    return best and (best - os.time()) or nil
+end
 -- after a reload: the last buff packet the game sent
 function bard.read_last_buffs()
     local ok, data = pcall(function() return windower.packets and windower.packets.last_incoming and windower.packets.last_incoming(0x063) end)

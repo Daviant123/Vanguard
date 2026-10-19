@@ -1,5 +1,14 @@
 [
   {
+    "version": "1.81.0",
+    "date": "2026-10-19",
+    "items": [
+      "Aftermath: \"Keep Aftermath\" next to the weapon skill on Job & abilities - Off, Lv.1, Lv.2 or Lv.3, and which weapon skill gives it (your Mythic / Empyrean / Relic weapon's). Without that Aftermath up (or with under 8 seconds left), the character saves TP to 1000 / 2000 / 3000 and uses that weapon skill; with it up, it uses its normal weapon skill at the usual TP.",
+      "Farming: \"Pull with\" lets you pick the kind - walk up, ranged attack, job ability, blue magic or other magic - and then exactly which ability or spell, from everything the character can use (for a Blue Mage: the blue spells it has set).",
+      "Blue Mage: blue magic that's learned but not set is no longer treated as castable (the game refuses it)."
+    ]
+  },
+  {
     "version": "1.80.3",
     "date": "2026-10-19",
     "items": [
