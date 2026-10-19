@@ -274,6 +274,9 @@ end
 -- Round 10 (farming 3/5): "Bring each mob back to camp" on the Farming tab uses the farming camp, works for melee
 -- pulls too (once the mob is ours it follows), and runs all the way back once per mob before fighting.
 function party.pull_to_camp(player, me, t)
+    -- pulling from where it stands and letting the mob come ("Then: let it come to me" with a pull): nothing to bring
+    -- back - "bring each mob back to camp" had his BLU run to the bat and back before using Provoke (2026-10-19)
+    if S.modules.farm and S.farm.approach == false and (S.farm.pull_cmd or '') ~= '' then return false end
     local zone = (windower.ffxi.get_info() or {}).zone
     local camp = state.my_camp
     local back = S.modules.farm and S.farm.pull_back and S.farm.area == 'camp'

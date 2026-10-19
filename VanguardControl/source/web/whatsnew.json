@@ -1,5 +1,13 @@
 [
   {
+    "version": "1.81.5",
+    "date": "2026-10-19",
+    "items": [
+      "Farming with a pull and \"let it come to me\": target the mob, pull it (Provoke, a spell...) from where you stand and wait for it. \"Bring each mob back to camp\" no longer makes the farmer run out to the mob and back first.",
+      "Farming: if the pulled mob stops just out of reach (a hovering bat), the farmer steps in after a moment so its attacks and weapon skills land - it used to stand still and resend the weapon skill every few seconds."
+    ]
+  },
+  {
     "version": "1.81.4",
     "date": "2026-10-19",
     "items": [

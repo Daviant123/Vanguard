@@ -1,6 +1,6 @@
 _addon.name = 'Vanguard'
 _addon.author = 'Daviant'
-_addon.version = '0.85.4'
+_addon.version = '0.85.5'
 _addon.commands = {'vanguard', 'vg'}
 
 --[[
@@ -451,6 +451,26 @@ local function do_movement(player)
             local d = util.dist(t)
             -- farming: close in on its own mob from any distance (assist keeps the engage_range limit)
             if d > settings.assist.melee_range and (d < settings.assist.engage_range or (settings.modules.farm and settings.farm.approach)) then
+                run_toward(me, t)
+            else
+                stop_running()
+                face(me, t)
+            end
+            return
+        end
+    end
+    -- farming with "let it come to me": no chasing - but once the mob has come (within 8') close the last yalms to
+    -- melee range, or the weapon skills are refused from just out of reach (his BLU: Expiacion every 3 s, 2026-10-19)
+    if player.status == 1 and settings.modules.farm and settings.farm.approach == false then
+        local t = windower.ffxi.get_mob_by_target('t')
+        if t and t.hpp > 0 then
+            local d = util.dist(t)
+            -- still coming: wait; stopped short of melee range for 1.5 s (a hovering bat): step in
+            local w = state.stay_watch
+            if not w or w.id ~= t.id then w = { id = t.id, d = d, t = now() } state.stay_watch = w end
+            if d < w.d - 0.3 then w.d, w.t = d, now() end
+            local stalled = now() - w.t >= 1.5
+            if d > settings.assist.melee_range and d <= 8 and stalled then
                 run_toward(me, t)
             else
                 stop_running()
