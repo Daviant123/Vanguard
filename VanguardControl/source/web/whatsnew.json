@@ -1,5 +1,12 @@
 [
   {
+    "version": "1.83.3",
+    "date": "2026-10-19",
+    "items": [
+      "Farming: every pull is now in the log (\"Pulling Locus Dire Bat with Glutinous Dart (12 yalms)\"), so you can see when and with what it pulled."
+    ]
+  },
+  {
     "version": "1.83.2",
     "date": "2026-10-19",
     "items": [

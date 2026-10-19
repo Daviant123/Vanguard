@@ -378,6 +378,8 @@ local function engage(me, mob)
             h.face(me, t)
             windower.send_command(S.farm.pull_cmd)
             status(('pulling %s (%d yalms)'):format(t.name, math.floor(d + 0.5)))
+            -- in the log too, so a pull can be seen (his question 2026-10-19: "pulling the monster should have worked")
+            h.log(('Pulling %s with %s (%d yalms)'):format(t.name, (S.farm.pull_cmd:match('"(.-)"') or S.farm.pull_cmd), math.floor(d + 0.5)))
             state.busy_until = math.max(state.busy_until or 0, now() + 2)
             return true
         end
