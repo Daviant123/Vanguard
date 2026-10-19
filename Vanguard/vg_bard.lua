@@ -432,11 +432,21 @@ function bard.on_member_ko(name) if state.pmine then state.pmine[name:lower()] =
 
 -- Does <name> need this song (Pianissimo)? Not on them; running low; Troubadour up and not sung under it. A cast
 -- started in the last 12 s is waited for (it lands, or it didn't and we try again).
-function bard.member_needs(spell, name, player)
+function bard.member_needs(spell, name, player, buffs)
     local pk = spell.en:lower() .. '>' .. name:lower()
     local pend = (state.ppending or {})[pk]
     if pend and clock() < pend then return false end
     local x = pm(name)[spell.en:lower()]
+    -- after a reload the bard knew none of its Pianissimo songs and sang them all again: one the member is already
+    -- showing (party buff icons) is picked up once, as if half done (2026-10-19 BARD round)
+    state.pseen = state.pseen or {}
+    if not x and not state.pseen[pk] and spell.status and buffs and util.has_buff(buffs, spell.status) then
+        local len = tonumber(S.songs.duration) or 240
+        x = { name = spell.en, status = spell.status, at = clock() - len / 2, ends = clock() + len / 2, troub = false }
+        pm(name)[spell.en:lower()] = x
+        h.log(('Songs: %s is already on %s - picking up from there'):format(spell.en, name))
+    end
+    state.pseen[pk] = true
     if not x then return true end
     if x.ends - clock() <= (tonumber(S.songs.refresh_before) or 30) then return true end
     if util.has_buff(player.buffs, 348) and not x.troub then return true end

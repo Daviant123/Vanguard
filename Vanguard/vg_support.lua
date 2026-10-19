@@ -309,7 +309,7 @@ function support.pianissimo(player)
         if spell and util.can_cast(spell, player) then
             for _, name in ipairs(util.split(who, '|')) do
                 local m = present[util.trim(name):lower()]
-                if m and m.name ~= player.name and m.hpp > 0 and bard.member_needs(spell, m.name, player)
+                if m and m.name ~= player.name and m.hpp > 0 and bard.member_needs(spell, m.name, player, h.buffs_of(m, player))
                     and util.spell_ready(spell, player) then
                     if util.has_buff(player.buffs, 409) then
                         bard.member_cast(spell, m.name)

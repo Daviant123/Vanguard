@@ -1,6 +1,6 @@
 _addon.name = 'Vanguard'
 _addon.author = 'Daviant'
-_addon.version = '0.82.6'
+_addon.version = '0.82.7'
 _addon.commands = {'vanguard', 'vg'}
 
 --[[
