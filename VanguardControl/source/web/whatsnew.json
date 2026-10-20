@@ -1,5 +1,12 @@
 [
   {
+    "version": "1.84.2",
+    "date": "2026-10-19",
+    "items": [
+      "Bard: if your dummy songs last about as long as your real songs (sung with duration gear), Vanguard says so once and what to change: in GearSwap, sing the dummies with the harp and no song duration gear. Long dummies make each new song knock a real song off instead of the dummy - the reason for the burst of re-singing after Clarion Call."
+    ]
+  },
+  {
     "version": "1.84.1",
     "date": "2026-10-19",
     "items": [

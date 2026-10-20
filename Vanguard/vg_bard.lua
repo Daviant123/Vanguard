@@ -547,6 +547,23 @@ function bard.sing(player)
     -- first 2 songs, dummy 2, dummy 1, then the 3rd and 4th songs replace the dummies (least time left). With every
     -- slot still full (a refresh, NiTro) no dummies: each song replaces itself.
     local cur = count(mine())
+    -- dummies must be the songs with the least time left, or the next real song knocks a real one off instead (bg-wiki:
+    -- sing them with the harp and no duration gear). His last ~5 min, as long as his songs - after Clarion Call each new
+    -- song knocked another off, ~15 casts (his log 2026-10-19, 19:47). Said once an hour, with what to change.
+    if #dummies > 0 and not h.recently('song_dummy_long', 3600) then
+        load_learned()
+        local dl = state.song_base[dummies[1]:lower()]
+        local shortest_real
+        for _, name in ipairs(real) do
+            local l = state.song_base[name:lower()]
+            if l and (not shortest_real or l < shortest_real) then shortest_real = l end
+        end
+        if dl and shortest_real and dl >= shortest_real * 0.8 then
+            h.mark('song_dummy_long')
+            h.log(('Songs: your dummy songs last %d:%02d - nearly as long as your real songs (%d:%02d). In GearSwap, sing the dummies with the harp and NO song duration gear, or new songs knock real ones off instead of the dummies.'):format(
+                math.floor(dl / 60), math.floor(dl % 60), math.floor(shortest_real / 60), math.floor(shortest_real % 60)))
+        end
+    end
     -- Marcato is up: its song goes first - a dummy now would use Marcato up (found by the bard fuzz test, 2026-10-19)
     local marcato_up = util.has_buff(player.buffs, 231)
     local ms_name = S.songs.marcato_song ~= '' and S.songs.marcato_song or wanted[1]
