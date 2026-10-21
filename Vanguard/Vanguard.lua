@@ -1,6 +1,6 @@
 _addon.name = 'Vanguard'
 _addon.author = 'Daviant'
-_addon.version = '0.88.2'
+_addon.version = '0.88.3'
 _addon.commands = {'vanguard', 'vg'}
 
 --[[
@@ -225,6 +225,24 @@ local function take_old_update_section()
     if w then w:write(text) w:close() end
     return old
 end
+-- A numbered entry (trials / triggers t1, t2 ...) saved as a one-item list "<t1><1>text</1></t1>" instead of plain text:
+-- Windower warned "Mismatched setting types for key 't1': table / string" and "Could not safely merge values for
+-- 'global/trials/t1'" at every load and save, and the trial in it couldn't be read (his screenshot 2026-10-20).
+-- Put back to plain text (an empty list to nothing) before loading.
+local function fix_listed_entries()
+    local path = (windower.addon_path or '') .. 'data/settings.xml'
+    local f = io.open(path, 'r')
+    if not f then return end
+    local text = f:read('*a')
+    f:close()
+    local fixed, n = text:gsub('<(t%d+)>%s*<1>([^<]*)</1>%s*</t%d+>', function(tag, v) return '<' .. tag .. '>' .. v .. '</' .. tag .. '>' end)
+    fixed = fixed:gsub('<(t%d+)>%s*</t%d+>', '<%1 />')
+    if n > 0 and fixed ~= text then
+        local w = io.open(path, 'w')
+        if w then w:write(fixed) w:close() end
+    end
+end
+fix_listed_entries()
 local old_update = take_old_update_section()
 local settings = config.load(defaults)
 if old_update then

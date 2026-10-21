@@ -1,5 +1,12 @@
 [
   {
+    "version": "1.84.3",
+    "date": "2026-10-20",
+    "items": [
+      "Fix: the red \"Mismatched setting types for key 't1'\" / \"Could not safely merge values for 'global/trials/t1'\" warnings at every load. Magian trials saved in an odd format in the settings file are put back to normal when Vanguard loads, and those trials work again."
+    ]
+  },
+  {
     "version": "1.84.2",
     "date": "2026-10-19",
     "items": [
