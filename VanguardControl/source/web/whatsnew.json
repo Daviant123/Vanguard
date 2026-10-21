@@ -1,5 +1,12 @@
 [
   {
+    "version": "1.86.3",
+    "date": "2026-10-21",
+    "items": [
+      "Fix: with Approach on, farming ran past the mob and back, again and again, instead of running up to it, stopping and engaging. It now stops within Melee Distance and engages, and stands still during the pause after each action (no more interrupted pulls)."
+    ]
+  },
+  {
     "version": "1.86.2",
     "date": "2026-10-21",
     "items": [

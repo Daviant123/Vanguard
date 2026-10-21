@@ -243,11 +243,18 @@ end
 ------------------------------------------------------------------------
 -- Moving, facing, targeting (EasyFarm's Navigator and Player.SetTarget)
 ------------------------------------------------------------------------
-local function reset_nav() h.stop_running() end
+-- (its own "am I moving" flag: Vanguard's state.running is cleared elsewhere, so a stop through it never went out and he
+-- ran past the mob and back - his report 2026-10-21: "approach just makes him run back and forth")
+local moving = false
+local function reset_nav()
+    if moving then windower.ffxi.run(false) moving = false end
+    h.stop_running()
+end
 local function goto_pos(me, pos, tol)                   -- Navigator.GotoNPC / GotoWaypoint, one step per pass
     local dx, dy = pos.x - me.x, pos.y - me.y
     if math.sqrt(dx * dx + dy * dy) <= tol then reset_nav() return true end
     h.run_toward(me, pos)
+    if not (S.farm and S.farm.stay) then moving = true end
     return false
 end
 local function face(me, mob) h.face(me, mob) end
@@ -601,11 +608,13 @@ local STATES = {
       end,
       run = function(player, ids, plist, me)
           local t = windower.ffxi.get_mob_by_id(M.target.id)
-          if C.approach and dist(t) > C.melee then goto_pos(me, t, C.melee) elseif not C.approach then reset_nav() end
+          -- (goto_pos stops once within Melee Distance; before, nothing stopped him there and he ran past the mob)
+          if C.approach then goto_pos(me, t, C.melee) else reset_nav() end
           face(me, t)
           local targeted = set_target(t)
           if C.engage and targeted and player.status ~= 1 and dist(t) < 25 and not h.recently('ef:attack', 2) then
               h.mark('ef:attack')
+              if dist(t) <= C.melee + 0.5 or not C.approach then reset_nav() end
               windower.send_command('input /attack <t>')
           end
       end },
@@ -644,7 +653,9 @@ function ef.tick(player)
     local me = windower.ffxi.get_mob_by_target('me')
     if not me then return true end
     -- the Executor's waits (global cooldown, a cast in progress): EasyFarm's thread sleeps; nothing happens meanwhile
-    if (state.ef_wait or 0) > clock() or (state.busy_until or 0) > clock() then return true end
+    -- (and standing still meanwhile: EasyFarm's walking always finishes before a pause; left running, he ran past the
+    -- mob and back again and again - his report 2026-10-21: "approach just makes him run back and forth")
+    if (state.ef_wait or 0) > clock() or (state.busy_until or 0) > clock() then reset_nav() return true end
     local ids, plist = party_ids()
     state.ef_cache = state.ef_cache or {}
     local doing
