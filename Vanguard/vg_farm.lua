@@ -37,6 +37,14 @@ local S, state, h
 local function now() return os.clock() end
 local function dist2(a, b) local dx, dy = a.x - b.x, a.y - b.y return math.sqrt(dx * dx + dy * dy) end
 local function list(s) return util.split(s or '', ',') end
+-- the farming mode in use: like EasyFarm, mobs on Mobs to Kill are always pulled - "Only what attacks us" applies only
+-- while that list is empty (his report 2026-10-21: "daviant is not engaging or attack anything" - Eschan Sorcerer was
+-- on Mobs to Kill but the mode was still "Only what attacks us" from before)
+local function fmode()
+    if S.farm.mode == 'aggro' and #list(S.farm.targets) > 0 then return 'list' end
+    return S.farm.mode
+end
+function farm.mode() return fmode() end
 
 local function matches(name, entries)
     name = (name or ''):lower()
@@ -238,7 +246,7 @@ function farm.judge(mob, me, ids, center)
         local pr = farm.pull_range()
         if pr and util.dist(mob) > pr then return nil, 'beyond the pull (staying put)' end
     end
-    local mode = S.farm.mode
+    local mode = fmode()
     if mode == 'aggro' then return nil, 'not attacking us' end
     if mode == 'any' or matches(mob.name, list(S.farm.targets)) then return 'target', 'to fight' end
     return nil, 'not on the list'
@@ -295,7 +303,7 @@ local function best_target(me)
     local seen, theirs = 0, 0                         -- how busy the spot is (mobs on the list someone else has)
     for _, mob in pairs(mobs) do
         local verdict, why = farm.judge(mob, me, ids, center)
-        if type(mob) == 'table' and mob.spawn_type == 16 and (mob.hpp or 0) > 0 and (S.farm.mode ~= 'list' or matches(mob.name, list(S.farm.targets))) then
+        if type(mob) == 'table' and mob.spawn_type == 16 and (mob.hpp or 0) > 0 and (fmode() ~= 'list' or matches(mob.name, list(S.farm.targets))) then
             if verdict or why == 'theirs' then seen = seen + 1 end
             if why == 'theirs' then theirs = theirs + 1 end
         end
@@ -741,7 +749,7 @@ function farm.next_pop()
     if fixed < 0 then return nil end
     local best
     for id, p in pairs(state.farm_pops or {}) do
-        local wanted = S.farm.mode ~= 'list' or matches(p.n, list(S.farm.targets))
+        local wanted = fmode() ~= 'list' or matches(p.n, list(S.farm.targets))
         local k = state.farm_respawn_kind and state.farm_respawn_kind[p.n]
         local secs = fixed > 0 and fixed or (state.farm_respawn and state.farm_respawn[id]) or (k and k.n > 0 and k.sum / k.n)
         if wanted and secs then
@@ -1062,7 +1070,7 @@ function farm.start(player, me)
     state.farm_no_pull = nil
     pcall(farm.visitant_check, player)
     local okt, tr = pcall(require, 'vg_trials')
-    if okt and tr.weapon_check then pcall(tr.weapon_check, S.farm.mode == 'list' and S.farm.targets or '') end
+    if okt and tr.weapon_check then pcall(tr.weapon_check, fmode() == 'list' and S.farm.targets or '') end
     state.farm_run = { t = now(), kills0 = kills_now(), zone0 = res.zones[zone()] and res.zones[zone()].en or nil, xp0 = xp, cp0 = cp, lv0 = player and tonumber(player.main_job_level) or nil,
                        trials0 = okt and tr.counts and tr.counts() or nil }
     state.farm_inv, state.farm_inv_t, state.farm_loot = inv_counts(), now(), {}
@@ -1193,7 +1201,7 @@ function farm.send_run(player, why)
     if h.send and (r.kills > 0 or r.secs >= 60) then pcall(h.send, { type = 'farmrun', name = player and player.name or '?', zone = z, secs = r.secs, kills = r.kills,
         xp = math.max(0, xp - (state.farm_run.xp0 or xp)), cp = math.max(0, cp - (state.farm_run.cp0 or cp)),
         loot = table.concat(top, ', '), why = why or 'stopped',
-        mobs = most and most.n or (S.farm.mode == 'list' and list(S.farm.targets)[1]) or (S.farm.mode == 'aggro' and 'what attacks us' or 'anything nearby'),
+        mobs = most and most.n or (fmode() == 'list' and list(S.farm.targets)[1]) or (fmode() == 'aggro' and 'what attacks us' or 'anything nearby'),
         trial = trial ~= '' and trial or nil }) end
     state.farm_run = nil
 end
@@ -1282,7 +1290,7 @@ function farm.tick(player)
     if not S.enabled then status(state.farm_run and state.farm_run.paused and 'paused' or 'stopped') return false end
     if state.resting or player.status == 33 then status('resting') return false end
     if player.status ~= 0 then status('waiting') return false end
-    if S.farm.mode == 'list' and #list(S.farm.targets) == 0 then status('no mobs picked yet: pick what to fight') return false end
+    if fmode() == 'list' and #list(S.farm.targets) == 0 then status('no mobs picked yet: pick what to fight') return false end
     local me = windower.ffxi.get_mob_by_target('me')
     if not me then return false end
     local camp = (not use_route()) and farm.camp() or nil

@@ -1,5 +1,12 @@
 [
   {
+    "version": "1.85.2",
+    "date": "2026-10-21",
+    "items": [
+      "Fix: farming didn't pull anything when \"Only what attacks us\" was still picked from before, even with mobs on Mobs to Kill. Like EasyFarm, mobs on Mobs to Kill are now always pulled; \"Only what attacks us\" only counts while Mobs to Kill is empty."
+    ]
+  },
+  {
     "version": "1.85.1",
     "date": "2026-10-21",
     "items": [
