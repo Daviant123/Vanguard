@@ -1,5 +1,12 @@
 [
   {
+    "version": "1.85.3",
+    "date": "2026-10-21",
+    "items": [
+      "Fix: Farming > Targeting - adding a mob to Mobs to Kill / Mobs to Avoid didn't work while farming (the window refreshed and forgot your pick before you clicked Add). Now picking a mob in the Name list adds it straight away."
+    ]
+  },
+  {
     "version": "1.85.2",
     "date": "2026-10-21",
     "items": [

@@ -1756,14 +1756,14 @@ function efTargeting(x, tgt, ign, mobNames) {
     const avail = mobNames.filter(n => !list.some(t => lc(t) === lc(n)));
     return efGroup(which === "kill" ? "Mobs to Kill" : "Mobs to Avoid", `
       <div class="ef-row"><label class="ef-lab">Name</label>
-        <select id="ef_${which}" style="flex:1"><option value="">- mobs nearby -</option>${avail.map(n => `<option value="${esc(n)}">${esc(n)}</option>`).join("")}</select>
+        <select id="ef_${which}" style="flex:1" title="Picking a mob adds it" onchange="if(this.value)send('farmlist add ${cmdList} ' + this.value)"><option value="">${avail.length ? "- pick a mob nearby to add it -" : "- none seen: click ↻ to look around -"}</option>${avail.map(n => `<option value="${esc(n)}">${esc(n)}</option>`).join("")}</select>
         <button onclick="send('nearby')" title="Look for mobs around you">↻</button></div>
       ${filters ? `<div class="ef-row" style="align-items:flex-start"><label class="ef-lab">Kill</label><div class="ef-2x2">
         ${chk("Aggro", x.farm_aggro !== false, "set farm.aggro_first true", "set farm.aggro_first false")}
         ${chk("Party Claimed", x.farm_f_party !== false, "set farm.f_party true", "set farm.f_party false")}
         ${chk("Unclaimed", x.farm_f_unclaimed !== false, "set farm.f_unclaimed true", "set farm.f_unclaimed false")}
         ${chk("Claimed", !!x.farm_f_claimed, "set farm.f_claimed true", "set farm.f_claimed false")}</div></div>` : ""}
-      ${efBtns([["Add", `(function(){var v=document.getElementById('ef_${which}').value;if(v)send('farmlist add ${cmdList} '+v)})()`],
+      ${efBtns([["Add", `(function(){var e=document.getElementById('ef_${which}');if(e&&e.value)send('farmlist add ${cmdList} '+e.value);else{send('nearby');if(e)e.focus()}})()`],
         ["Delete", `efTgtDel('${which}')`, !efTgt[which]], ["Clear", `send('farmlist clear ${cmdList}')`, !list.length]])}
       <div class="ef-list">${list.length ? list.map((n, i) => `<div class="${efTgt[which] === n ? "sel" : ""}" onclick="efTgtSel('${which}', ${i})">${esc(n)}</div>`).join("")
         : `<div class="ef-hint">Empty.</div>`}</div>`, "flex:1");
