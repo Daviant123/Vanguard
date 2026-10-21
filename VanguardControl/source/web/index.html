@@ -1770,7 +1770,7 @@ function efTargeting(x, tgt, ign, mobNames) {
   };
   const mode = x.farm_mode || "list";
   efLists = {kill: tgt, avoid: ign};
-  return `<div class="ef-hint" style="margin:0 0 6px">Mobs to Kill empty: it fights any mob the Kill filters allow.</div>
+  return `${tgt.length ? "" : `<div class="ef-hint" style="margin:0 0 6px">Mobs to Kill is empty: it fights any mob the Kill filters allow.</div>`}
     <div class="ef-cols">${box("kill", tgt, "targets", true)}${box("avoid", ign, "ignore", false)}</div>
     ${mode === "any" && tgt.length && x.farm_engine === "vanguard" ? `<div class="ef-hint">Vanguard extras has "Anything nearby" picked, so it fights more than Mobs to Kill.
       <a href="#" onclick="send('set farm.mode list');return false">Use Mobs to Kill</a></div>` : ""}`;

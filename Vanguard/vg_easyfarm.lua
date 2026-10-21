@@ -201,6 +201,16 @@ function ef.buffing_ok(list, a, player, ids)
     if not kind then return false end
     local v = player.vitals
     if (kind == 'ma' or kind == 'trust') and r and (r.mp_cost or 0) > v.mp then return false end
+    -- a spell this character can't cast (not learned, not this job): EasyFarm's EnsureCast fails on it; here it
+    -- doesn't count as usable at all (his report 2026-10-21: a trust that never went out held up every pull)
+    if (kind == 'ma' or kind == 'trust') and r and util.can_cast and not util.can_cast(r, player) then return false end
+    if kind == 'trust' then
+        local fail = (state.ef_trust_fail or {})[r.en]
+        if fail and fail > clock() then return false end
+        local p = windower.ffxi.get_party() or {}
+        local leader = p.party1_leader
+        if leader and leader ~= 0 and leader ~= player.id and p.p1 and p.p1.name then return false end   -- only the leader calls trusts
+    end
     if kind == 'ws' and v.tp < 1000 then return false end
     if kind == 'ja' and r and (r.tp_cost or 0) > v.tp then return false end
     if (v.max_mp or 0) > 0 and not in_range(a.ml, a.mh, v.mpp) then return false end
@@ -334,7 +344,12 @@ Rest = {
 -- SummonTrustsState
 local function trust_in_party(name, plist)
     local comp = name:gsub(' %(UC%)', ''):gsub(' II', ''):gsub('AA', 'Ark'):gsub(' ', '')
-    for i = 2, #plist do if plist[i].name == comp then return true end end
+    for i = 2, #plist do
+        if plist[i].name == comp then
+            if state.ef_trust_tries then state.ef_trust_tries[name] = nil end
+            return true
+        end
+    end
     return false
 end
 local function party_has_space(plist) return #plist < 6 end
@@ -361,7 +376,17 @@ Trusts = {
         if player.status == 1 then return end
         for _, t in ipairs(list_of('trusts')) do
             if tonumber(t.on) == 1 and not trust_in_party(t.n, plist) and party_has_space(plist) and ef.buffing_ok('trusts', t, player, ids) then
-                use('trusts', t, nil, player)
+                state.ef_trust_tries = state.ef_trust_tries or {}
+                local tr = state.ef_trust_tries[t.n]
+                if tr and clock() - tr > 20 then
+                    -- called 20 s ago and still not here (not allowed in this area, the party is full...): skip it
+                    state.ef_trust_fail = state.ef_trust_fail or {}
+                    state.ef_trust_fail[t.n] = clock() + 120
+                    state.ef_trust_tries[t.n] = nil
+                    h.log(("[EasyFarm] %s didn't join: skipping it for 2 minutes"):format(t.n))
+                    return
+                end
+                if use('trusts', t, nil, player) and not tr then state.ef_trust_tries[t.n] = clock() end
                 return
             end
         end

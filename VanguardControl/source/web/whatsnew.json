@@ -1,5 +1,12 @@
 [
   {
+    "version": "1.86.2",
+    "date": "2026-10-21",
+    "items": [
+      "Fix: farming sat still for minutes when a trust on the Battles > Trusts list couldn't be called (not learned, not the party leader, not allowed in the area). EasyFarm doesn't pull while a listed trust is missing; now a trust the character can't call doesn't count, and one that is called but doesn't join within 20 seconds is skipped for 2 minutes (the Log says so)."
+    ]
+  },
+  {
     "version": "1.86.1",
     "date": "2026-10-21",
     "items": [
