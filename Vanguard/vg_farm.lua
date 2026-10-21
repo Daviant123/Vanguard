@@ -396,6 +396,9 @@ local function engage(me, mob)
         -- walking up or engaging - so it's ours sooner (and comes to us)
         local pr = farm.pull_range()
         local mine = t.claim_id and t.claim_id ~= 0 and ids[t.claim_id]
+        -- one we pulled and already hurt is ours to finish, not a pull that "didn't take" (his log 2026-10-21: an Eschan
+        -- Sorcerer at 7 % was skipped for "the pull didn't take (3 tries)" while CharA waited for TP next to it)
+        if not mine and state.farm_pulled[t.id] and (t.hpp or 100) < 100 and (t.claim_id or 0) == 0 then mine = true end
         -- a pull that didn't take (still recasting, out of MP, out of sight...) is tried again after 6 s, up to 3 times -
         -- it used to count as pulled at once, the mob never came and was skipped 25 s later (his "vanguard consistently
         -- does not pull using glutinous dart", 2026-10-19)

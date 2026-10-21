@@ -11,7 +11,7 @@ trials that need the killing blow to be a set weapon skill, with several charact
   ws.finish_save   save TP for it: the normal weapon skill isn't used while a finisher is set
   ws.finish_others the other characters stop attacking that mob once it's that low (they keep curing / buffing)
   ws.finish_wait   if the mob gets that low before TP is ready, stop attacking until TP is 1000 (a tank still gains
-                   TP from being hit), then attack again and finish it
+                   TP from being hit), then attack again and finish it - only from 700 TP up, and 10 s at most
 
 Normal game commands only (/ws, /attackoff, /attack). The "stop attacking" order to the others goes over Windower IPC
 on this PC (vg_finish <mob id> <name>).
@@ -30,6 +30,11 @@ local adjust = {}             -- kind -> % added to the line from its misses (up
 local store_learned          -- (below)
 
 local function auto() return (tonumber(S.ws.finish_at) or 25) <= 0 end
+
+-- Stop attacking to save TP only when TP is nearly there: TP comes from hitting (or from being hit), so stopping at
+-- 260 TP left his PLD standing next to the mob doing nothing for 30 s, again and again (his report 2026-10-21: "daviant
+-- is doing nothing"). Under this it keeps attacking; the weapon skill goes off if TP gets there in time.
+local HOLD_TP = 700
 
 -- The mob's HP % at which the finishing weapon skill should go off.
 function finish.line(t)
@@ -133,7 +138,7 @@ function finish.ws(player, t)
     finish.learn_tick()
     state.finish_seen = { id = t.id, hpp = t.hpp }
     local line = finish.line(t)
-    if t.hpp > line and t.hpp <= finish.wait_line(t) and player.vitals.tp < 1000 then
+    if t.hpp > line and t.hpp <= finish.wait_line(t) and player.vitals.tp < 1000 and player.vitals.tp >= HOLD_TP then
         -- close to the line without TP: stop now (the others too), attack again when TP is 1000
         if S.ws.finish_others and state.finish_told ~= t.id then
             state.finish_told = t.id
@@ -158,7 +163,7 @@ function finish.ws(player, t)
             if h.ws_in_range(t, true) and not h.recently('ws:' .. f, 3) then return h.use_ws(f) and 'used' end
             return 'block'
         end
-        if waits(t) and player.status == 1 and state.finish_wait ~= t.id then
+        if waits(t) and player.vitals.tp >= HOLD_TP and player.status == 1 and state.finish_wait ~= t.id then
             state.finish_wait, state.finish_wait_t = t.id, clock()
             windower.send_command('input /attackoff')
             h.log(('%s is low and TP is %d: stopping until TP is 1000, then %s'):format(t.name, player.vitals.tp, f))
@@ -178,8 +183,8 @@ function finish.waiting(player)
     local bt = windower.ffxi.get_mob_by_target('bt')
     if not bt or bt.id ~= id or (bt.hpp or 0) <= 0 then state.finish_wait = nil return false end
     if player.status == 1 then return false end
-    -- TP isn't coming (the mob isn't hitting us): don't stand there forever - attack again after 30 s
-    if player.vitals.tp >= 1000 or clock() - (state.finish_wait_t or clock()) > 30 then
+    -- TP isn't coming (the mob isn't hitting us): don't stand there - attack again after 10 s
+    if player.vitals.tp >= 1000 or clock() - (state.finish_wait_t or clock()) > 10 then
         if not h.recently('finish:attack', 3) then
             h.mark('finish:attack')
             windower.send_command('input /attack <bt>')

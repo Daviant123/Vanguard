@@ -1,5 +1,12 @@
 [
   {
+    "version": "1.85.4",
+    "date": "2026-10-21",
+    "items": [
+      "Fix: farming stood still next to low mobs. The finishing weapon skill (Atonement for a Magian trial) stopped attacking to wait for 1000 TP even at 200-300 TP - TP comes from hitting, so it waited 30 s for nothing, and the half-dead mob was then skipped as a pull that \"didn't take\". Now it only stops to save TP from 700 TP up, for 10 seconds at most, and a mob you pulled and hurt is never skipped that way."
+    ]
+  },
+  {
     "version": "1.85.3",
     "date": "2026-10-21",
     "items": [
