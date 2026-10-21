@@ -1,5 +1,14 @@
 [
   {
+    "version": "1.85.1",
+    "date": "2026-10-21",
+    "items": [
+      "Farming now has EasyFarm's own layout, copied from EasyFarm's screens: the black bar with Start, Select Character, Load Settings and Save Settings; the tabs Battles, Targeting, Resting, Routes, Follow, Log and Settings in EasyFarm's order; a white window and the black status bar at the bottom.",
+      "Battles works like EasyFarm's: the lists on the left with each action's checkbox under them, the action's tabs on the right (Command, Action, MP, TP, Status, Player, Target, Misc) and Add / Delete / Clear underneath. Targeting has Mobs to Kill (with the Kill filters) and Mobs to Avoid side by side; Settings has Battle, Trust and Misc Settings with sliders and Restore Defaults.",
+      "Vanguard's own farming extras (radar, kill counts, checklist, quick setups, trials, stop rules...) are under the last tab, Vanguard extras."
+    ]
+  },
+  {
     "version": "1.85.0",
     "date": "2026-10-21",
     "items": [

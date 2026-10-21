@@ -161,6 +161,59 @@ table.sgrid .na { color: var(--line); }
 .charges { display: flex; gap: 4px; align-items: center; }
 .charges i { width: 16px; height: 16px; border-radius: 50%; background: var(--panel); border: 1px solid var(--line); }
 .charges i.on { background: var(--accent); border-color: var(--accent); }
+
+/* Farming, EasyFarm's look (MahApps light window: black bar, big thin tab names, white body, black status bar) */
+.ef { background: #fff; color: #222; border: 1px solid #333; font-family: "Segoe UI", sans-serif; display: flex; flex-direction: column; min-height: 420px; }
+.ef-top { background: #000; display: flex; align-items: center; gap: 6px; padding: 8px 10px; min-height: 50px; box-sizing: border-box; flex-wrap: wrap; }
+.ef-top button, .ef-top select { background: #f7f7f7; color: #000; border: 1px solid #ccc; border-radius: 0; padding: 4px 10px; font-size: 12px; }
+.ef-top .ef-small { font-size: 10px; }
+.ef-top .ef-go { font-weight: 700; min-width: 64px; }
+.ef-top .ef-stay { background: #c0392b; color: #fff; border-color: #c0392b; }
+.ef-lbl { color: #fff; font-size: 12px; margin-left: 6px; }
+.ef-sep { width: 1px; align-self: stretch; background: #555; margin: 0 4px; }
+.ef-tabs { display: flex; gap: 18px; padding: 6px 10px 0; flex-wrap: wrap; background: #fff; }
+.ef-tabs span { font-size: 22px; font-weight: 300; color: #9a9a9a; cursor: pointer; padding-bottom: 2px; }
+.ef-tabs span:hover { color: #555; }
+.ef-tabs span.on { color: #000; }
+.ef-tabs span.ef-x { font-size: 15px; align-self: center; margin-left: auto; }
+.ef-body { flex: 1; padding: 10px; background: #fff; color: #222; font-size: 13px; }
+.ef-body button { background: #f7f7f7; color: #222; border: 1px solid #ccc; border-radius: 0; padding: 5px 12px; text-transform: uppercase; font-size: 11px; font-weight: 600; }
+.ef-body button:disabled { color: #aaa; }
+.ef-body button.rec { background: #c0392b; color: #fff; }
+.ef-body select { background: #fff; color: #222; border: 1px solid #ccc; border-radius: 0; padding: 3px 6px; }
+.ef-body .chk, .ef-body .chk span { color: #222; }
+.ef-body .chk.off span { color: #666; }
+.ef-body input[type=range], .ef-body input[type=checkbox], .ef-body input[type=radio] { accent-color: #119eda; }
+.ef-status { background: #000; color: #fff; padding: 6px 10px; font-size: 12px; min-height: 30px; box-sizing: border-box; }
+.ef-extras { padding: 10px; background: var(--bg); }
+.ef-battles { display: flex; min-height: 280px; border: 1px solid #ddd; }
+.ef-tree { width: 210px; border-right: 1px solid #ddd; padding: 5px; overflow: auto; max-height: 420px; }
+.ef-node { cursor: pointer; padding: 2px 4px; }
+.ef-leaf { cursor: pointer; padding: 2px 4px 2px 20px; display: flex; align-items: center; gap: 4px; }
+.ef-node.sel, .ef-leaf.sel, .ef-list div.sel { background: #119eda; color: #fff; }
+.ef-det { flex: 1; padding: 5px; overflow: auto; }
+.ef-itabs { display: flex; gap: 12px; flex-wrap: wrap; border-bottom: 1px solid #eee; margin-bottom: 8px; }
+.ef-itabs span { font-size: 16px; font-weight: 300; color: #9a9a9a; cursor: pointer; }
+.ef-itabs span.on { color: #000; }
+.ef-uni { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.ef-row { display: flex; align-items: center; gap: 8px; margin: 6px 0; flex-wrap: wrap; }
+.ef-lab { min-width: 120px; color: #222; }
+.ef-ro, .ef-to { color: #666; }
+.ef-sl { display: flex; align-items: center; gap: 6px; flex-direction: row-reverse; justify-content: flex-end; }
+.ef-sl output { min-width: 56px; color: #222; font-size: 12px; }
+.ef-sl input { width: 160px; }
+.ef-hint { color: #777; font-size: 12px; margin-top: 4px; }
+.ef-btns { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 8px 0; }
+.ef-group { border: 1px solid #ccc; padding: 6px 10px 10px; margin: 0 0 10px; }
+.ef-group legend { font-size: 12px; font-weight: 600; color: #fff; background: #119eda; padding: 2px 8px; text-transform: uppercase; }
+.ef-cols { display: flex; gap: 10px; flex-wrap: wrap; }
+.ef-2x2 { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 16px; }
+.ef-list { border: 1px solid #ddd; min-height: 110px; max-height: 260px; overflow: auto; }
+.ef-list div { padding: 2px 6px; cursor: pointer; }
+.ef-log { min-height: 300px; max-height: 420px; font-family: Consolas, monospace; font-size: 12px; }
+.ef-routes { display: flex; gap: 10px; }
+.ef-side { display: flex; flex-direction: column; gap: 6px; width: 150px; }
+.ef-radio { display: flex; align-items: center; gap: 6px; }
 </style>
 </head>
 <body>
@@ -1568,163 +1621,218 @@ function trialBox(p, mobNames, run) {
   </div>`;
 }
 
-// ---------- Farming, EasyFarm style (his request 2026-10-21: "i want the farming section to look exactly like easy farm
-// with all its features"): Targets, Battle (seven lists with EasyFarm's conditions), Rest, Routes, Follow, Settings, Log,
-// and Extras (everything Vanguard adds on top) ----------
-let farmSub = "targets";
-try { farmSub = localStorage.getItem("vg.farmsub") || "targets"; } catch (e) {}
-function setFarmSub(v) { farmSub = v; try { localStorage.setItem("vg.farmsub", v); } catch (e) {} bodyKey = ""; render(); }
-let blList = "battle", blEdit = -1;
-function setBlList(l) { blList = l; blEdit = -1; bodyKey = ""; render(); }
-function setBlEdit(i) { blEdit = blEdit === i ? -1 : i; bodyKey = ""; render(); }
-const BL_LISTS = [
-  ["start", "Start", "Used once when a fight with a new mob begins (buffs, opening abilities)."],
-  ["trusts", "Trusts", "Called while not fighting, until the party has the size set under Settings."],
-  ["pull", "Pull", "How to pull: the first one that is ready. Empty = the Pull with choice under Extras."],
-  ["battle", "Battle", "During the fight: the first action (top to bottom) whose conditions are all met."],
-  ["finish", "End", "Used once after the mob dies."],
-  ["healing", "Healing", "Out of a fight, on yourself (cures, Sublimation, items...)."],
-  ["ws", "Weaponskill", "Weapon skills for farming. When this list has any, they replace the normal weapon skill."]];
-const BL_PCT = [0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85, 90, 95, 100];
+// ---------- Farming, laid out like EasyFarm (his requests 2026-10-21: "i want the farming section to look exactly like
+// easy farm with all its features", then "can i make it look exactly like easy farm layout?"). Copied from EasyFarm's own
+// views (MasterView / BattlesView / AbilityView / TargetingView / RestingView / RoutesView / FollowView / SettingsView):
+// a black bar with Start, Select Character, Load / Save Settings; the tabs Battles, Targeting, Resting, Routes, Follow, Log,
+// Settings; a black status bar. Vanguard's own farming extras sit in one more tab at the end. ----------
+let farmSub = "battles";
+try { farmSub = localStorage.getItem("vg.efsub") || "battles"; } catch (e) {}
+function setFarmSub(v) { farmSub = v; try { localStorage.setItem("vg.efsub", v); } catch (e) {} bodyKey = ""; render(); }
+let efSel = {list: "battle", i: -1}, efDet = "Command", efPick = {kind: "ja"}, efTgt = {kill: "", avoid: ""};
+function efSelect(list, i) { efSel = {list, i}; bodyKey = ""; render(); }
+function efDetTab(t) { efDet = t; bodyKey = ""; render(); }
+function efPickKind(k) { efPick.kind = k; bodyKey = ""; render(); }
+let efLists = {kill: [], avoid: []};
+function efTgtSel(which, i) { const n = efLists[which][i] || ""; efTgt[which] = efTgt[which] === n ? "" : n; bodyKey = ""; render(); }
+function efTgtDel(which) {
+  if (!efTgt[which]) return;
+  send(`farmlist remove ${which === "kill" ? "targets" : "ignore"} ${efTgt[which]}`); efTgt[which] = "";
+}
+function efAdd() {
+  if (efSel.i === -2) return;
+  efSel = {list: efSel.list, i: -2}; efDet = "Command"; bodyKey = ""; render();     // -2: picking the new action's name
+}
+function efDelete() {
+  if (efSel.i < 0) return;
+  send(`blist del ${efSel.list} ${efSel.i + 1}`); efSel = {list: efSel.list, i: -1};
+}
+function efClear() { send(`blist clear ${efSel.list}`); efSel = {list: efSel.list, i: -1}; }
+function efName(name) {
+  if (!name) return;
+  if (efSel.i === -2) { send(`blist add ${efSel.list} ${name}`); efSel = {list: efSel.list, i: -3}; }    // -3: select the new last one
+  else if (efSel.i >= 0) send(`blist set ${efSel.list} ${efSel.i + 1} n ${name}`);
+}
+// EasyFarm's list names, in its order (End = our "finish")
+const BL_LISTS = [["start", "Start"], ["trusts", "Trusts"], ["pull", "Pull"], ["battle", "Battle"], ["finish", "End"], ["healing", "Healing"], ["ws", "Weaponskill"]];
 const BL_STATUS = ["Haste", "Protect", "Shell", "Regen", "Refresh", "Phalanx", "Stoneskin", "Blink", "Aquaveil", "Berserk", "Warcry",
   "Aggressor", "Defender", "Last Resort", "Hasso", "Seigan", "Third Eye", "Aftermath", "Aftermath: Lv.1", "Aftermath: Lv.2", "Aftermath: Lv.3",
   "Sneak Attack", "Trick Attack", "Saber Dance", "Fan Dance", "Composure", "Sublimation: Activated", "Sublimation: Complete",
   "Light Arts", "Dark Arts", "Addendum: White", "Addendum: Black", "Reraise", "Food", "Signet", "Sanction", "Sigil", "Ionis",
   "Poison", "Paralysis", "Silence", "Blindness", "Slow", "Weight", "Bind", "Sleep", "Petrification", "Doom", "Curse", "Amnesia",
   "Plague", "Disease", "Bio", "Dia", "Max HP Down", "Accuracy Down", "Attack Down", "Defense Down", "Evasion Down"];
+// EasyFarm's command prefixes
+const EF_PREFIX = [["ja", "/jobability"], ["ma", "/magic"], ["ws", "/weaponskill"], ["item", "/item"], ["ra", "/range"], ["trust", "/trust"]];
 
-function blSummary(a) {
-  const p = [];
-  if (a.d) p.push(`within ${a.d}'`);
-  if (a.rc) p.push(`every ${a.rc}s`);
-  if (a.pl || a.ph < 100) p.push(`my HP ${a.pl}-${a.ph}%`);
-  if (a.tl || a.th < 100) p.push(`mob HP ${a.tl}-${a.th}%`);
-  if (a.ml || a.mh < 100) p.push(`MP ${a.ml}-${a.mh}%`);
-  if (a.tpl || a.tph < 3000) p.push(`TP ${a.tpl}-${a.tph}`);
-  if (a.st) p.push(`${a.sp == 1 ? "with" : "without"} ${a.st}`);
-  if (a.tn) p.push(`only ${a.tn}`);
-  if (a.lim) p.push(`${a.lim}× per mob`);
-  return p.length ? p.join(" · ") : "always";
+// a slider like EasyFarm's: sends <cmd><value> when let go
+const efSlider = (label, cmd, val, min, max, step = 1, unit = "") =>
+  `<div class="ef-row"><label class="ef-lab">${esc(label)}</label><div class="slider ef-sl"><output>${val}${unit}</output>
+    <input type="range" min="${min}" max="${max}" step="${step}" value="${val}" data-cmd="${esc(cmd)}" data-unit="${unit}"></div></div>`;
+const efRange = (label, cmdLo, cmdHi, lo, hi, min, max, step = 1, unit = "") =>
+  `<div class="ef-row"><label class="ef-lab">${esc(label)}</label>
+    <div class="slider ef-sl"><output>${lo}${unit}</output><input type="range" min="${min}" max="${max}" step="${step}" value="${lo}" data-cmd="${esc(cmdLo)}" data-unit="${unit}"></div>
+    <span class="ef-to">to</span>
+    <div class="slider ef-sl"><output>${hi}${unit}</output><input type="range" min="${min}" max="${max}" step="${step}" value="${hi}" data-cmd="${esc(cmdHi)}" data-unit="${unit}"></div></div>`;
+const efBtns = btns => `<div class="ef-btns">${btns.map(([l, js, dis]) => `<button ${dis ? "disabled" : ""} onclick="${js}">${l}</button>`).join("")}</div>`;
+const efGroup = (title, body, style = "") => `<fieldset class="ef-group" style="${style}"><legend>${esc(title)}</legend>${body}</fieldset>`;
+
+function efNames(kind, known, x) {
+  const s = a => arr(a).slice().sort();
+  if (kind === "ja") return s(known.abilities);
+  if (kind === "ma") return s(known.spells);
+  if (kind === "ws") return s(known.ws);
+  if (kind === "trust") return s(known.trusts);
+  if (kind === "item") return Array.from(new Set(arr(known.items).concat(arr(x.inv_items)))).sort();
+  if (kind === "ra") return ["Ranged Attack"];
+  return [];
+}
+function efKindOf(name, known) {
+  if (name === "Ranged Attack") return "ra";
+  if (arr(known.trusts).includes(name)) return "trust";
+  if (arr(known.ws).includes(name)) return "ws";
+  if (arr(known.abilities).includes(name)) return "ja";
+  if (arr(known.spells).includes(name)) return "ma";
+  return "item";
 }
 
-function farmBattle(p, x, known, tgt) {
+function efBattles(p, x, known, tgtNames) {
   const all = (p.config || {}).blists || {};
-  const list = arr(all[blList]);
-  const info = BL_LISTS.find(l => l[0] === blList) || BL_LISTS[3];
-  const o = (v, l) => ({v, l});
-  const set = (i, f) => `blist set ${blList} ${i + 1} ${f} `;
-  // what can be added to this list
-  const ab = arr(known.abilities).slice().sort(), sp = arr(known.spells).slice().sort(), ws = arr(known.ws).slice().sort();
-  const tr = arr(known.trusts).slice().sort(), it = Array.from(new Set(arr(known.items).concat(arr(x.inv_items)))).sort();
-  const groups = blList === "trusts" ? [["Trusts", tr]]
-    : blList === "ws" ? [["Weapon skills", ws]]
-    : blList === "pull" ? [["Job abilities", ab], ["Magic", sp], ["Other", ["Ranged Attack"]]]
-    : [["Job abilities", ab], ["Magic", sp], ["Weapon skills", ws], ["Items", it], ["Other", ["Ranged Attack"]]];
-  const addSel = `<select onchange="if(this.value){send('blist add ${blList} ' + this.value)}"><option value="">+ Add an action...</option>
-    ${groups.filter(g => g[1].length).map(g => `<optgroup label="${esc(g[0])}">${g[1].map(n => `<option value="${esc(n)}">${esc(n)}</option>`).join("")}</optgroup>`).join("")}</select>`;
-  const editor = (a, i) => `<tr><td colspan="4" style="background:var(--panel);text-align:left">
-    <div class="row" style="flex-wrap:wrap;gap:6px 14px;align-items:flex-end">
-      <label class="field">Distance ${sel(set(i, "d"), [o(0, "any")].concat([2, 3, 4, 5, 6, 8, 10, 12, 15, 18, 20, 21, 22, 25].map(v => o(v, v + " yalms"))), a.d)}</label>
-      <label class="field">Recast ${sel(set(i, "rc"), [o(0, "none (its own recast)")].concat([3, 5, 8, 10, 15, 20, 30, 45, 60, 90, 120, 180, 300, 600].map(v => o(v, v + " s"))), a.rc)}</label>
-      <label class="field">Usage limit ${sel(set(i, "lim"), [o(0, "no limit")].concat([1, 2, 3, 4, 5, 10].map(v => o(v, v + "× per mob"))), a.lim)}</label>
-      <label class="field">My HP from ${sel(set(i, "pl"), BL_PCT.map(v => o(v, v + "%")), a.pl)}</label>
-      <label class="field">to ${sel(set(i, "ph"), BL_PCT.map(v => o(v, v + "%")), a.ph)}</label>
-      <label class="field">Target HP from ${sel(set(i, "tl"), BL_PCT.map(v => o(v, v + "%")), a.tl)}</label>
-      <label class="field">to ${sel(set(i, "th"), BL_PCT.map(v => o(v, v + "%")), a.th)}</label>
-      <label class="field">MP reserve from ${sel(set(i, "ml"), BL_PCT.map(v => o(v, v + "%")), a.ml)}</label>
-      <label class="field">to ${sel(set(i, "mh"), BL_PCT.map(v => o(v, v + "%")), a.mh)}</label>
-      <label class="field">TP from ${sel(set(i, "tpl"), [0, 500, 1000, 1500, 2000, 2500, 3000].map(v => o(v, v)), a.tpl)}</label>
-      <label class="field">to ${sel(set(i, "tph"), [0, 500, 1000, 1500, 2000, 2500, 3000].map(v => o(v, v)), a.tph)}</label>
-      <label class="field">Status effect ${sel(set(i, "st"), [o("", "(none)")].concat(BL_STATUS.concat(a.st && !BL_STATUS.includes(a.st) ? [a.st] : []).map(v => o(v, v))), a.st)}</label>
-      ${a.st ? `<label class="field">Use it when the effect is ${sel(set(i, "sp"), [o(0, "NOT on me"), o(1, "on me")], a.sp)}</label>` : ""}
-      <label class="field">Only on ${sel(set(i, "tn"), [o("", "any mob")].concat(Array.from(new Set(tgt.concat(a.tn ? [a.tn] : []))).map(v => o(v, v))), a.tn)}</label>
-    </div>
-    <div class="hint" style="margin-top:4px">All conditions must be met. "Status effect" is checked on you; pick whether it must be on you or not
-      (e.g. Haste: use when NOT on me). Recast is extra time between two uses on top of the game's own.</div></td></tr>`;
-  return `<div class="box"><h3>Battle</h3>
-    <div class="seg" style="flex-wrap:wrap">${BL_LISTS.map(([k, l]) => { const n = arr(all[k]).length;
-      return `<button class="${k === blList ? "on" : ""}" onclick="setBlList('${k}')">${l}${n ? ` <span class="hint">(${n})</span>` : ""}</button>`; }).join("")}</div>
-    <div class="hint" style="margin:6px 0">${esc(info[2])}</div>
-    ${list.length ? `<table class="grid"><thead><tr><th style="text-align:left">On</th><th style="text-align:left">Action</th><th style="text-align:left">When</th><th></th></tr></thead><tbody>
-      ${list.map((a, i) => `<tr><td style="text-align:left">${chk("", a.on == 1, set(i, "on") + "1", set(i, "on") + "0")}</td>
-        <td style="text-align:left"><b>${esc(a.n)}</b></td><td style="text-align:left" class="hint">${esc(blSummary(a))}</td>
-        <td style="white-space:nowrap"><button style="font-size:11px" class="${blEdit === i ? "primary" : ""}" onclick="setBlEdit(${i})">${blEdit === i ? "Done" : "Edit"}</button>
-          <button style="font-size:11px" title="Up" ${i ? "" : "disabled"} onclick="send('blist move ${blList} ${i + 1} up')">↑</button>
-          <button style="font-size:11px" title="Down" ${i < list.length - 1 ? "" : "disabled"} onclick="send('blist move ${blList} ${i + 1} down')">↓</button>
-          <button style="font-size:11px" title="Remove" onclick="send('blist del ${blList} ${i + 1}')">×</button></td></tr>
-        ${blEdit === i ? editor(a, i) : ""}`).join("")}
-    </tbody></table>` : `<div class="hint">Nothing in ${esc(info[1])} yet.</div>`}
-    <div class="row" style="margin-top:8px;align-items:center">${addSel}
-      <span class="hint">Saved for this job (${esc(p.job || "")}).</span></div>
-    ${blList === "battle" || blList === "ws" ? `<div class="hint" style="margin-top:6px">Vanguard's own job abilities and weapon skill (Job &amp; abilities tab) keep working alongside these lists.</div>` : ""}
-  </div>`;
+  if (efSel.i === -3) { efSel.i = arr(all[efSel.list]).length - 1; }
+  const list = arr(all[efSel.list]);
+  if (efSel.i >= list.length) efSel.i = -1;
+  const a = efSel.i >= 0 ? list[efSel.i] : null;
+  const set = f => `blist set ${efSel.list} ${efSel.i + 1} ${f} `;
+  // the tree: lists with their actions underneath (checkbox + name)
+  const tree = BL_LISTS.map(([k, l]) => {
+    const acts = arr(all[k]);
+    return `<div class="ef-node ${efSel.list === k && efSel.i < 0 ? "sel" : ""}" onclick="efSelect('${k}', -1)">${acts.length ? "▾" : "▸"} ${l}</div>
+      ${acts.map((b, i) => `<div class="ef-leaf ${efSel.list === k && efSel.i === i ? "sel" : ""}" onclick="if(event.target.tagName!=='INPUT')efSelect('${k}', ${i})">
+        <input type="checkbox" ${b.on == 1 ? "checked" : ""} data-on="blist set ${k} ${i + 1} on 1" data-off="blist set ${k} ${i + 1} on 0"> ${esc(b.n)}</div>`).join("")}`;
+  }).join("");
+  // the details: EasyFarm's inner tabs
+  const tabs = ["Command", "Action", "MP", "TP", "Status", "Player", "Target", "Misc"];
+  let det = "";
+  if (efSel.i === -2 || a) {
+    const kind = a ? efKindOf(a.n, known) : efPick.kind;
+    const names = efNames(kind, known, x);
+    const cur = a ? a.n : "";
+    const pane = {
+      Command: `<div class="ef-uni">
+          <select onchange="efPickKind(this.value)" ${a ? "disabled" : ""}>${EF_PREFIX.map(([v, l]) => `<option value="${v}" ${v === kind ? "selected" : ""}>${l}</option>`).join("")}</select>
+          <select onchange="efName(this.value)"><option value="">${a ? "" : "- pick one -"}</option>${names.concat(cur && !names.includes(cur) ? [cur] : []).map(n => `<option value="${esc(n)}" ${n === cur ? "selected" : ""}>${esc(n)}</option>`).join("")}</select>
+          <select disabled><option>${kind === "ma" || kind === "ja" || kind === "item" ? "auto (&lt;t&gt; or &lt;me&gt;)" : kind === "trust" ? "&lt;me&gt;" : "&lt;t&gt;"}</option></select></div>
+        <div class="ef-hint">${a ? "Change the name to swap this action. MP / TP cost, recast and target are filled in from the game's data (EasyFarm's Auto-Fill), every time." : "Pick the prefix, then the action: it's added to " + esc((BL_LISTS.find(l => l[0] === efSel.list) || [])[1]) + "."}</div>`,
+      Action: a ? efSlider("Distance", set("d"), a.d, 0, 25, 1, a.d ? "" : " (any)") +
+        `<div class="ef-row"><label class="ef-lab">Max Use</label>${sel(set("lim"), [{v: 0, l: "0 (no limit)"}].concat([1, 2, 3, 4, 5, 10].map(v => ({v, l: v + " per mob"}))), a.lim)}</div>
+         <div class="ef-row"><label class="ef-lab">Recast</label>${sel(set("rc"), [{v: 0, l: "0 (the game's own)"}].concat([3, 5, 8, 10, 15, 20, 30, 45, 60, 90, 120, 180, 300, 600].map(v => ({v, l: v + " s"}))), a.rc)}</div>` : "",
+      MP: a ? `<div class="ef-row"><label class="ef-lab">MP Cost</label><span class="ef-ro">from the game</span></div>` + efRange("MP Range", set("ml"), set("mh"), a.ml, a.mh, 0, 100, 1, "%") : "",
+      TP: a ? `<div class="ef-row"><label class="ef-lab">TP Cost</label><span class="ef-ro">${kind === "ws" ? "1000+" : "from the game"}</span></div>` + efRange("TP Range", set("tpl"), set("tph"), a.tpl, a.tph, 0, 3000, 100) : "",
+      Status: a ? `<div class="ef-row"><label class="ef-lab">On Status</label>${sel(set("st"), [{v: "", l: "(none)"}].concat(BL_STATUS.concat(a.st && !BL_STATUS.includes(a.st) ? [a.st] : []).map(v => ({v, l: v}))), a.st)}
+          ${a.st ? sel(set("sp"), [{v: 0, l: "when NOT on me"}, {v: 1, l: "when on me"}], a.sp) : ""}</div>` : "",
+      Player: a ? efRange("Player HPP", set("pl"), set("ph"), a.pl, a.ph, 0, 100, 1, "%") : "",
+      Target: a ? `<div class="ef-row"><label class="ef-lab">Mob Name</label>${sel(set("tn"), [{v: "", l: "(any)"}].concat(Array.from(new Set(tgtNames.concat(a.tn ? [a.tn] : []))).map(v => ({v, l: v}))), a.tn)}</div>` +
+        efRange("Mob HPP", set("tl"), set("th"), a.tl, a.th, 0, 100, 1, "%") : "",
+      Misc: a ? `<div class="ef-row"><label class="ef-lab">Index</label><span class="ef-ro">${efSel.i + 1}</span>
+          <button ${efSel.i ? "" : "disabled"} onclick="send('blist move ${efSel.list} ${efSel.i + 1} up');efSel.i--">▲</button>
+          <button ${efSel.i < list.length - 1 ? "" : "disabled"} onclick="send('blist move ${efSel.list} ${efSel.i + 1} down');efSel.i++">▼</button></div>
+          <div class="ef-hint">Actions are tried top to bottom.</div>` : "",
+    };
+    const shown = a ? tabs : ["Command"];
+    if (!shown.includes(efDet)) efDet = "Command";
+    det = `<div class="ef-itabs">${shown.map(t => `<span class="${t === efDet ? "on" : ""}" onclick="efDetTab('${t}')">${t}</span>`).join("")}</div>
+      <div class="ef-ipane">${pane[efDet] || ""}</div>`;
+  } else {
+    det = `<div class="ef-hint" style="padding:10px">${{start: "Start: used once when a fight with a new mob begins.", trusts: "Trusts: called while not fighting, until the party has the Trust Party Size (Settings).",
+      pull: "Pull: how to pull - the first one that's ready. Empty: walk up and attack (or the Pull with choice in Vanguard extras).", battle: "Battle: during the fight, the first action whose conditions are all met.",
+      finish: "End: used once after the mob dies.", healing: "Healing: out of a fight, on yourself.", ws: "Weaponskill: when it has any, they replace the normal weapon skill while farming."}[efSel.list] || ""}
+      <br><br>Click <b>Add</b> to add an action, or click an action on the left to change it.</div>`;
+  }
+  return `<div class="ef-battles"><div class="ef-tree">${tree}</div><div class="ef-det">${det}</div></div>
+    ${efBtns([["Add", "efAdd()"], ["Delete", "efDelete()", efSel.i < 0], ["Clear", "efClear()", !list.length]])}`;
 }
 
-function farmTargetsExtra(x) {
-  return `<div class="box"><h3>Filters</h3>
-    <div class="row" style="flex-wrap:wrap;gap:6px 18px">
-      ${chk("Aggro: fight mobs that attack us", x.farm_aggro !== false, "set farm.aggro_first true", "set farm.aggro_first false")}
-      ${chk("Party: help with mobs the party claimed", x.farm_f_party !== false, "set farm.f_party true", "set farm.f_party false")}
-      ${chk("Unclaimed: pull mobs nobody has claimed", x.farm_f_unclaimed !== false, "set farm.f_unclaimed true", "set farm.f_unclaimed false")}
-      ${chk("Claimed: also mobs other players claimed", !!x.farm_f_claimed, "set farm.f_claimed true", "set farm.f_claimed false")}
-    </div>
-    <div class="hint" style="margin-top:4px">Like EasyFarm's filters. Mobs on Leave alone are never fought.</div></div>`;
+function efTargeting(x, tgt, ign, mobNames) {
+  const box = (which, list, cmdList, filters) => {
+    const avail = mobNames.filter(n => !list.some(t => lc(t) === lc(n)));
+    return efGroup(which === "kill" ? "Mobs to Kill" : "Mobs to Avoid", `
+      <div class="ef-row"><label class="ef-lab">Name</label>
+        <select id="ef_${which}" style="flex:1"><option value="">- mobs nearby -</option>${avail.map(n => `<option value="${esc(n)}">${esc(n)}</option>`).join("")}</select>
+        <button onclick="send('nearby')" title="Look for mobs around you">↻</button></div>
+      ${filters ? `<div class="ef-row" style="align-items:flex-start"><label class="ef-lab">Kill</label><div class="ef-2x2">
+        ${chk("Aggro", x.farm_aggro !== false, "set farm.aggro_first true", "set farm.aggro_first false")}
+        ${chk("Party Claimed", x.farm_f_party !== false, "set farm.f_party true", "set farm.f_party false")}
+        ${chk("Unclaimed", x.farm_f_unclaimed !== false, "set farm.f_unclaimed true", "set farm.f_unclaimed false")}
+        ${chk("Claimed", !!x.farm_f_claimed, "set farm.f_claimed true", "set farm.f_claimed false")}</div></div>` : ""}
+      ${efBtns([["Add", `(function(){var v=document.getElementById('ef_${which}').value;if(v)send('farmlist add ${cmdList} '+v)})()`],
+        ["Delete", `efTgtDel('${which}')`, !efTgt[which]], ["Clear", `send('farmlist clear ${cmdList}')`, !list.length]])}
+      <div class="ef-list">${list.length ? list.map((n, i) => `<div class="${efTgt[which] === n ? "sel" : ""}" onclick="efTgtSel('${which}', ${i})">${esc(n)}</div>`).join("")
+        : `<div class="ef-hint">Empty.</div>`}</div>`, "flex:1");
+  };
+  const mode = x.farm_mode || "list";
+  efLists = {kill: tgt, avoid: ign};
+  return `<div class="ef-cols">${box("kill", tgt, "targets", true)}${box("avoid", ign, "ignore", false)}</div>
+    ${mode !== "list" ? `<div class="ef-hint">Vanguard extras has "${mode === "aggro" ? "Only what attacks us" : "Anything nearby"}" picked, so Mobs to Kill isn't used.
+      <a href="#" onclick="send('set farm.mode list');return false">Use Mobs to Kill</a></div>` : ""}`;
 }
 
-function farmRest(x, mods) {
-  const pct = (cmd, cur) => sel(cmd, BL_PCT.map(v => ({v, l: v + "%"})), cur);
-  return `<div class="box"><h3>Rest</h3>
-    <div class="row" style="flex-wrap:wrap;gap:6px 18px">${modChk("Rest when low (/heal)", mods, "rest", "Sits down with /heal out of a fight")}
-      ${chk("Rest at camp while there's nothing to fight", x.farm_rest_idle !== false, "set farm.rest_idle true", "set farm.rest_idle false")}</div>
-    <div class="row" style="margin-top:8px;flex-wrap:wrap">
-      <label class="field">Health: rest when under ${pct("set rest.hp_low ", x.rest_hp_low ?? 40)}</label>
-      <label class="field">get up at ${pct("set rest.hp_high ", x.rest_hp_high ?? 95)}</label></div>
-    <div class="row" style="margin-top:8px;flex-wrap:wrap">
-      <label class="field">Magic: rest when under ${pct("set rest.mp_low ", x.rest_mp_low ?? 25)}</label>
-      <label class="field">get up at ${pct("set rest.mp_high ", x.rest_mp_high ?? 95)}</label></div>
-    <div class="hint" style="margin-top:6px">A mob that attacks wakes it up. Healing actions out of a fight go in Battle &gt; Healing.</div></div>`;
+function efResting(x, mods) {
+  return efGroup("Resting", `
+    <div class="ef-row">${modChk("HP", mods, "rest", "Rest with /heal when HP is low")}</div>
+    ${efSlider("Down", "set rest.hp_low ", x.rest_hp_low ?? 40, 0, 100, 1, "%")}${efSlider("Up", "set rest.hp_high ", x.rest_hp_high ?? 95, 0, 100, 1, "%")}
+    <div class="ef-row">${chk("MP", (x.rest_mp_low ?? 25) > 0, "set rest.mp_low 25", "set rest.mp_low 0")}</div>
+    ${(x.rest_mp_low ?? 25) > 0 ? efSlider("Down", "set rest.mp_low ", x.rest_mp_low ?? 25, 1, 100, 1, "%") : ""}${efSlider("Up", "set rest.mp_high ", x.rest_mp_high ?? 95, 0, 100, 1, "%")}
+    <div class="ef-hint">Down: sit down (/heal) under this. Up: get up at this. A mob that attacks gets it up.</div>`);
 }
 
-function farmFollow(p, x, mods) {
-  const lead = p.leader || "";
+function efRoutes(x, f, spots) {
+  const route = f.rec != null ? f.rec : (x.farm_route || 0), rec = f.rec != null, area = x.farm_area || "camp";
+  return `<div class="ef-routes"><div class="ef-list" style="flex:1;min-height:180px">${route ? Array.from({length: Math.min(route, 200)}, (_, i) => `<div>Waypoint ${i + 1}</div>`).join("") : `<div class="ef-hint">No waypoints. Click Record and walk your path.</div>`}</div>
+    <div class="ef-side">
+      <label class="ef-radio"><input type="radio" name="efroute" ${x.farm_loop === false ? "checked" : ""} onclick="send('set farm.loop false')"> Straight</label>
+      <label class="ef-radio"><input type="radio" name="efroute" ${x.farm_loop === false ? "" : "checked"} onclick="send('set farm.loop true')"> Circular</label>
+      <button onclick="send('farming camp')" title="EasyFarm's Reset Character: here Vanguard sets the camp where you stand">Reset Character</button>
+      <button class="${rec ? "rec" : ""}" onclick="send('${rec ? "route stop" : "route record"}')">${rec ? "Stop" : "Record"}</button>
+      <button onclick="send('route clear')" ${route ? "" : "disabled"}>Clear</button>
+      <button onclick="send('farmspot save')">Save</button>
+      <select onchange="if(this.value)send('farmspot load ' + this.value)"><option value="">Load</option>${spots.filter(q => q.here).map(q => `<option value="${q.k}">${esc(q.name)}</option>`).join("")}</select>
+    </div></div>
+    <div class="ef-row" style="margin-top:6px">${chk("Use the route (off: stay around the camp)", area === "route", "set farm.area route", "set farm.area camp")}
+      <span class="ef-hint">${area === "camp" ? (x.farm_camp ? "Camp is set." : "No camp yet: Reset Character sets it.") : ""}</span></div>`;
+}
+
+function efFollow(p, x, mods) {
   const names = Object.keys(chars).filter(n => n !== selected);
-  return `<div class="box"><h3>Follow</h3>
-    <div class="row" style="flex-wrap:wrap;align-items:flex-end">
-      <label class="field">Follow player ${sel("leader ", [{v: "none", l: "nobody (farm on my own)"}].concat(names.map(n => ({v: n, l: n}))), lead || "none")}</label>
-      <label class="field">Distance ${sel("set follow.distance ", [1, 1.5, 2, 2.5, 3, 4, 5, 6, 8, 10].map(v => ({v, l: v + " yalms"})), x.follow_distance ?? 2.5)}</label>
-      ${modChk("Follow on", mods, "follow")}</div>
-    <div class="hint" style="margin-top:6px">Like EasyFarm's Follow: this character stays with that player and helps with what they fight.
-      Leave it on "nobody" for the character that farms.</div></div>`;
+  return efGroup("Follow", `
+    <div class="ef-row"><label class="ef-lab">Player</label>${sel("leader ", [{v: "none", l: "(nobody)"}].concat(names.map(n => ({v: n, l: n}))), p.leader || "none")}
+      ${modChk("Follow", mods, "follow")}</div>
+    ${efSlider("Distance", "set follow.distance ", x.follow_distance ?? 2.5, 1, 10, 0.5)}
+    <div class="ef-hint">Follows that player and helps with what they fight. Leave it on (nobody) for the character that farms.</div>`);
 }
 
-function farmSettings(x) {
-  const y = (cmd, list, cur, unit = " yalms") => sel(cmd, list.map(v => ({v, l: v + unit})), cur);
-  return `<div class="box"><h3>Settings</h3>
-    <div class="row" style="flex-wrap:wrap;gap:8px 16px;align-items:flex-end">
-      <label class="field">Detection distance ${sel("set farm.detect ", [{v: 0, l: "same as Wander"}].concat([10, 15, 17, 20, 25, 30, 40, 50].map(v => ({v, l: v + " yalms"}))), x.farm_detect ?? 0)}</label>
-      <label class="field">Wander distance ${y("set farm.range ", [10, 15, 20, 25, 30, 40, 50, 100, 150, 200, 300, 500], x.farm_range ?? 20)}</label>
-      <label class="field">Height threshold ${y("set farm.height ", [3, 5, 8, 12, 20], x.farm_height ?? 5)}</label>
-      <label class="field">Melee distance ${y("set assist.melee_range ", [2, 2.5, 3, 3.5, 4, 5, 6], x.melee_range ?? 3)}</label>
-      <label class="field">Global cooldown ${sel("set farm.gcd ", [0, 500, 1000, 1500, 2000, 2500, 3000].map(v => ({v, l: v + " ms"})), x.farm_gcd ?? 1000)}</label>
-      <label class="field">Trust party size ${sel("set trusts.party_size ", [2, 3, 4, 5, 6].map(v => ({v, l: v + " members"})), x.trusts_size ?? 5)}</label>
+function efSettings(x) {
+  return `<div class="ef-cols">
+    ${efGroup("Battle Settings", `
+      <div>${chk("Engage", x.farm_engage !== false, "set farm.engage true", "set farm.engage false", "Off: fight with spells / abilities only, no /attack")}</div>
+      <div>${chk("Approach", x.farm_approach !== false, "set farm.approach true", "set farm.approach false", "Off: let the mob come")}</div>
+      <div><label class="chk off" title="Needs key presses - Vanguard doesn't do that"><input type="checkbox" disabled><span>Use Tab Targeting</span></label></div>
+      <div><label class="chk off" title="Needs menu selection by memory - Vanguard doesn't do that"><input type="checkbox" disabled><span>Home Point On Death</span></label></div>`, "flex:1")}
+    ${efGroup("Trust Settings", `<div class="ef-row"><label class="ef-lab">Trust Party Size</label>${sel("set trusts.party_size ", [1, 2, 3, 4, 5, 6].map(v => ({v, l: v})), x.trusts_size ?? 5)}</div>`, "flex:1")}
     </div>
-    <div class="row" style="margin-top:8px;flex-wrap:wrap;gap:6px 18px">
-      ${chk("Approach: walk up to the mob", x.farm_approach !== false, "set farm.approach true", "set farm.approach false")}
-      ${chk("Engage: /attack the mob (off = fight with spells / abilities only)", x.farm_engage !== false, "set farm.engage true", "set farm.engage false")}
-    </div>
-    <div class="hint" style="margin-top:6px">Detection: how far it looks for mobs. Wander: how far from camp (or the route) it goes.
-      Global cooldown: the wait between any two battle list actions.<br>
-      Not here on purpose (they'd need memory reading or keyboard tricks, which Vanguard doesn't do): Home point on death,
-      Tab targeting, Object avoidance.</div></div>`;
+    ${efGroup("Misc Settings", `
+      ${efSlider("Detection Distance", "set farm.detect ", x.farm_detect ?? 0, 0, 50, 1, (x.farm_detect ?? 0) ? "" : " (= Wander)")}
+      ${efSlider("Height Threshold", "set farm.height ", x.farm_height ?? 5, 1, 20)}
+      ${efSlider("Melee Distance", "set assist.melee_range ", x.melee_range ?? 3, 1, 10, 0.5)}
+      ${efSlider("Wander Distance", "set farm.range ", x.farm_range ?? 20, 5, 500, 5)}
+      ${efSlider("Global Cooldown", "set farm.gcd ", x.farm_gcd ?? 1000, 0, 5000, 100, " ms")}
+      <div><label class="chk off" title="Needs the map from memory - Vanguard doesn't do that"><input type="checkbox" disabled><span>Avoid Objects</span></label></div>
+      <button onclick="['set farm.engage true','set farm.approach true','set farm.detect 0','set farm.height 5','set assist.melee_range 3','set farm.range 20','set farm.gcd 1000','set trusts.party_size 5'].forEach(c=>send(c))">Restore Defaults</button>`)}`;
 }
 
 let farmLogLines = [];
-function farmLog(runsHtml) {
-  const mine = farmLogLines.filter(l => lc(l.text).startsWith(lc(selected) + ":") || lc(l.text).startsWith("[" + lc(selected)));
-  const rows = (mine.length ? mine : farmLogLines).slice(-80).reverse();
-  return `<div class="box"><h3>Log</h3>
-    ${rows.length ? `<div style="max-height:320px;overflow:auto;font-family:Consolas,monospace;font-size:12px">${rows.map(l => `<div><span class="hint">${esc(l.time)}</span> ${esc(l.text)}</div>`).join("")}</div>`
-      : `<div class="hint">Nothing yet.</div>`}</div>` + runsHtml;
+function efLog() {
+  const mine = farmLogLines.filter(l => lc(l.text).startsWith(lc(selected) + ":"));
+  const rows = (mine.length ? mine : farmLogLines).slice(-200);
+  return `<div class="ef-list ef-log" id="eflog">${rows.length ? rows.map(l => `<div>${esc(l.time)} ${esc(l.text)}</div>`).join("") : `<div class="ef-hint">Nothing yet.</div>`}</div>`;
 }
 
 function farmTab(c, p) {
@@ -1789,8 +1897,27 @@ function farmTab(c, p) {
       : `<div class="hint">Each farming run is kept here when it ends: how long, kills, XP / CP, loot and why it stopped.</div>`}
     </div>
 `;
-  return `<div class="stack">
-    <div class="seg" style="flex-wrap:wrap">${[["targets", "Targets"], ["battle", "Battle"], ["rest", "Rest"], ["routes", "Routes"], ["follow", "Follow"], ["settings", "Settings"], ["log", "Log"], ["extras", "Extras"]].map(([k, l]) => `<button class="${sub === k ? "on" : ""}" onclick="setFarmSub('${k}')">${l}</button>`).join("")}</div>
+  const EF_TABS = [["battles", "Battles"], ["targeting", "Targeting"], ["resting", "Resting"], ["routes", "Routes"], ["follow", "Follow"], ["log", "Log"], ["settings", "Settings"], ["extras", "Vanguard extras"]];
+  const efStart = paused ? `<button class="ef-go" onclick="send('farming resume')">Resume</button>`
+    : farming ? `<button class="ef-go" onclick="send('farming pause')">Pause</button><button onclick="send('farming stop')">Stop</button>`
+    : `<button class="ef-go" ${ready ? "" : "disabled title='Add Mobs to Kill first (Targeting)'"} onclick="send('farming start')">Start</button>`;
+  const chooser = `<select title="Select Character" onchange="selectChar(this.value)">${Object.keys(chars).sort().map(n => `<option value="${esc(n)}" ${n === selected ? "selected" : ""}>${esc(n)}${chars[n].online ? "" : " (offline)"}</option>`).join("")}</select>`;
+  const efBody = {
+    battles: () => efBattles(p, x, known, tgtNames),
+    targeting: () => efTargeting(x, tgt, ign, tgtNames),
+    resting: () => efResting(x, mods),
+    routes: () => efRoutes(x, f, spots),
+    follow: () => efFollow(p, x, mods),
+    log: () => efLog(),
+    settings: () => efSettings(x),
+  };
+  return `<div class="ef">
+    <div class="ef-top">${efStart}<span class="ef-lbl">Select Character</span>${chooser}<span class="ef-sep"></span>
+      <select class="ef-small" title="Load Settings (a saved farm spot)" onchange="if(this.value)send('farmspot load ' + this.value)"><option value="">Load Settings</option>${here.map(q => `<option value="${q.k}">${esc(q.name)}</option>`).join("")}</select>
+      <button class="ef-small" onclick="send('farmspot save')" title="Save Settings (as a farm spot here)">Save Settings</button><span class="ef-sep"></span>
+      <button class="ef-small ${x.farm_stay ? "ef-stay" : ""}" title="Never move this character" onclick="send('set farm.stay ${x.farm_stay ? "false" : "true"}')">${x.farm_stay ? "DO NOT MOVE: ON" : "DO NOT MOVE"}</button></div>
+    <div class="ef-tabs">${EF_TABS.map(([k, l]) => `<span class="${sub === k ? "on" : ""} ${k === "extras" ? "ef-x" : ""}" onclick="setFarmSub('${k}')">${l}</span>`).join("")}</div>
+    ${sub === "extras" ? `<div class="stack ef-extras">
     <div class="box" style="border-color:${farming ? "var(--good)" : "var(--line)"}">
       <div class="fdash">
         <div>
@@ -1856,8 +1983,6 @@ function farmTab(c, p) {
       </div>
     </div>
 
-
-    ${sub === "targets" ? `<div class="fgrid">
     ${card(1, "What to fight", `
       ${segBtns(mode, [{v: "list", l: "Mobs I pick", cmd: "set farm.mode list"}, {v: "aggro", l: "Only what attacks us", cmd: "set farm.mode aggro"}, {v: "any", l: "Anything nearby", cmd: "set farm.mode any"}])}
       ${mode === "list" ? `
@@ -1886,10 +2011,6 @@ function farmTab(c, p) {
         ${chk("Leave a mob another player is standing next to", x.farm_polite !== false, "set farm.polite true", "set farm.polite false")}
       </div>`)}
 
-    </div>${farmTargetsExtra(x)}` : ""}
-    ${sub === "battle" ? farmBattle(p, x, known, tgtNames) : ""}
-    ${sub === "rest" ? farmRest(x, mods) : ""}
-    ${sub === "routes" ? `<div class="fgrid">
     ${card(2, "Where", `
       ${segBtns(area, [{v: "camp", l: "Stay around a camp", cmd: "set farm.area camp"}, {v: "route", l: "Walk a route", cmd: "set farm.area route"}])}
       ${area === "camp" ? `
@@ -1917,8 +2038,6 @@ function farmTab(c, p) {
       </div>
       <div class="hint" style="margin-top:6px">The radar shows the camp area (dashed ring) or the route (blue line).</div>`)}
 
-    </div>` : ""}
-    ${sub === "follow" ? farmFollow(p, x, mods) + `<div class="fgrid">
     ${!all ? "" : card(4, "The team", `
       <div class="row" style="align-items:center">
         ${others.length ? `<button class="primary" onclick="bringTeam('${esc(selected)}')">Others follow and help ${esc(selected)}</button>
@@ -1939,10 +2058,6 @@ function farmTab(c, p) {
         Something already attacking you is always fought.</div>
       <div class="row" style="margin-top:8px">${chk("Keep the XP / CP chain going (while a chain runs, wait only if HP is under 40% or MP under 15%)", !!x.farm_keep_chain, "set farm.keep_chain true", "set farm.keep_chain false")}</div>` : ""}`)}
 
-    </div>` : ""}
-    ${sub === "settings" ? farmSettings(x) : ""}
-    ${sub === "log" ? farmLog(runsHtml) : ""}
-    ${sub === "extras" ? `
     ${(() => {
       const rd = f.radar, inRange = rd ? arr(rd.mobs).filter(m => m.s === "target" || m.s === "aggro").length : null;
       const free = run.free ?? x.inv_free;
@@ -2082,7 +2197,8 @@ function farmTab(c, p) {
         ${avail.length ? `<div class="row" style="margin-top:8px">${trustSelect(avail)}</div>`
           : `<div class="hint" style="margin-top:6px">${arr(known.trusts).length ? "All its trusts are picked." : "No trusts known by this character."}</div>`}`;
     })())}
-    </div>` : ""}
+    </div>      ${runsHtml}</div>` : `<div class="ef-body">${(efBody[sub] || efBody.battles)()}</div>`}
+    <div class="ef-status">${esc(statusText)}${farming && run.kills != null ? ` · ${run.kills} kills${run.kph ? ` · ${run.kph} / hour` : ""}` : ""}</div>
   </div>`;
 }
 
@@ -2266,7 +2382,7 @@ function renderPanel() {
     (chars[n].snapshot || {}).mpp, (chars[n].snapshot || {}).tp, (chars[n].snapshot || {}).status, (chars[n].snapshot || {}).target,
     (chars[n].snapshot || {}).foe]) : 0;
   const bk = JSON.stringify([tab, p, s.leader, Object.keys(chars), team, tab === "app" ? [addon, crashes] : 0, tab === "strat" ? s.strat : 0, tab === "adv" || tab === "farm" ? c.nearby : 0,
-    tab === "farm" ? [farmRuns.length, s.farm, s.enabled, s.stats, s.modules, s.status, Object.keys(chars).map(n => { const q = chars[n].snapshot || {}; return [q.leader, chars[n].online, q.hpp, q.mpp, q.status, q.target, q.target_hpp]; })] : 0,
+    tab === "farm" ? [farmRuns.length, farmSub === "log" ? farmLogLines.length : 0, s.farm, s.enabled, s.stats, s.modules, s.status, Object.keys(chars).map(n => { const q = chars[n].snapshot || {}; return [q.leader, chars[n].online, q.hpp, q.mpp, q.status, q.target, q.target_hpp]; })] : 0,
     tab === "team" ? [warpArm, Object.keys(chars).map(n => ((((chars[n].profile || {}).config || {}).known) || {}).warp), stopTimer.until, Math.floor((stopTimer.left || 0) / 60)] : 0]);
   if (bk === bodyKey) return;
   bodyKey = bk;

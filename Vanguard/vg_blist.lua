@@ -279,7 +279,7 @@ function blist.on_kill(mob)
     if mob and state.blist_fight == mob.id then state.blist_dead, state.blist_dead_name = mob.id, mob.name end
 end
 
--- the app's editor: //vg blist add <list> <name> | del <list> <i> | move <list> <i> up|down | set <list> <i> <field> <value>
+-- the app's editor: //vg blist add <list> <name> | del <list> <i> | clear <list> | move <list> <i> up|down | set <list> <i> <field> <value>
 function blist.command(args)
     local sub, list = (args[1] or ''):lower(), (args[2] or ''):lower()
     local valid = false
@@ -296,6 +296,8 @@ function blist.command(args)
         acts[#acts + 1] = a
     elseif sub == 'del' then
         table.remove(acts, tonumber(args[3]) or 0)
+    elseif sub == 'clear' then
+        acts = {}
     elseif sub == 'move' then
         local i = tonumber(args[3]) or 0
         local j = (args[4] or ''):lower() == 'up' and i - 1 or i + 1
@@ -304,6 +306,11 @@ function blist.command(args)
         local i, f, v = tonumber(args[3]) or 0, args[4], table.concat(args, ' ', 5)
         local a = acts[i]
         if not a or a[f] == nil then return false, 'no such action / field' end
+        if f == 'n' then                                   -- a new name (the Command tab): must be something usable
+            local kind, r = blist.kind(v)
+            if not kind then return false, v .. ' is not an ability, spell, weapon skill or item' end
+            v = r and r.en or v
+        end
         if type(a[f]) == 'number' then a[f] = tonumber(v) or a[f] else a[f] = v end
     else
         return false, 'usage'
