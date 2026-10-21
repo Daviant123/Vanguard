@@ -1,5 +1,15 @@
 [
   {
+    "version": "1.86.0",
+    "date": "2026-10-21",
+    "items": [
+      "Farming now runs EasyFarm's own engine, rebuilt from EasyFarm's source: the same steps in the same order (target, trusts, follow, start, pull, battle, end, rest, weapon skills, healing, route, approach), the same rules for which mob to fight (Mobs to Kill / Avoid, the Kill filters, Detection and Wander distance, height) and the same rules for each action (distance, recast, max use, HP / MP / TP ranges, status effect, mob name and HP).",
+      "No EasyFarm DLL and no EliteAPI: it uses normal game commands and Windower's own functions (targeting with /ta <bt> and /targetbnpc, walking and facing like the rest of Vanguard, /attack, /heal, /ja, /ma, /ws).",
+      "Resting and Follow now use EasyFarm's own settings (off by default; rest at 50%, up at 100%; follow distance 5). Restore Defaults puts back EasyFarm's defaults (Detection 17, Height 5, Melee 3, Wander 17, Global Cooldown 1000 ms).",
+      "Prefer Vanguard's own farming (camp, pulling back to camp, waiting for the party)? Vanguard extras > Farming engine."
+    ]
+  },
+  {
     "version": "1.85.4",
     "date": "2026-10-21",
     "items": [

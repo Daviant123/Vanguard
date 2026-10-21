@@ -1770,43 +1770,45 @@ function efTargeting(x, tgt, ign, mobNames) {
   };
   const mode = x.farm_mode || "list";
   efLists = {kill: tgt, avoid: ign};
-  return `<div class="ef-cols">${box("kill", tgt, "targets", true)}${box("avoid", ign, "ignore", false)}</div>
-    ${mode === "any" && tgt.length ? `<div class="ef-hint">Vanguard extras has "Anything nearby" picked, so it fights more than Mobs to Kill.
+  return `<div class="ef-hint" style="margin:0 0 6px">Mobs to Kill empty: it fights any mob the Kill filters allow.</div>
+    <div class="ef-cols">${box("kill", tgt, "targets", true)}${box("avoid", ign, "ignore", false)}</div>
+    ${mode === "any" && tgt.length && x.farm_engine === "vanguard" ? `<div class="ef-hint">Vanguard extras has "Anything nearby" picked, so it fights more than Mobs to Kill.
       <a href="#" onclick="send('set farm.mode list');return false">Use Mobs to Kill</a></div>` : ""}`;
 }
 
 function efResting(x, mods) {
+  const hp = !!x.farm_rest_hp, mp = !!x.farm_rest_mp;
   return efGroup("Resting", `
-    <div class="ef-row">${modChk("HP", mods, "rest", "Rest with /heal when HP is low")}</div>
-    ${efSlider("Down", "set rest.hp_low ", x.rest_hp_low ?? 40, 0, 100, 1, "%")}${efSlider("Up", "set rest.hp_high ", x.rest_hp_high ?? 95, 0, 100, 1, "%")}
-    <div class="ef-row">${chk("MP", (x.rest_mp_low ?? 25) > 0, "set rest.mp_low 25", "set rest.mp_low 0")}</div>
-    ${(x.rest_mp_low ?? 25) > 0 ? efSlider("Down", "set rest.mp_low ", x.rest_mp_low ?? 25, 1, 100, 1, "%") : ""}${efSlider("Up", "set rest.mp_high ", x.rest_mp_high ?? 95, 0, 100, 1, "%")}
-    <div class="ef-hint">Down: sit down (/heal) under this. Up: get up at this. A mob that attacks gets it up.</div>`);
+    <div class="ef-row">${chk("HP", hp, "set farm.rest_hp true", "set farm.rest_hp false", "Rest with /heal when HP is low")}</div>
+    ${efSlider("Down", "set farm.rest_hp_low ", x.farm_rest_hp_low ?? 50, 0, 100, 1, "%")}${efSlider("Up", "set farm.rest_hp_high ", x.farm_rest_hp_high ?? 100, 0, 100, 1, "%")}
+    <div class="ef-row">${chk("MP", mp, "set farm.rest_mp true", "set farm.rest_mp false", "Rest with /heal when MP is low")}</div>
+    ${efSlider("Down", "set farm.rest_mp_low ", x.farm_rest_mp_low ?? 50, 0, 100, 1, "%")}${efSlider("Up", "set farm.rest_mp_high ", x.farm_rest_mp_high ?? 100, 0, 100, 1, "%")}
+    <div class="ef-hint">Down: sit down (/heal) at or under this. Up: get up at this. Not while a mob has aggro, while fighting, or with a damage-over-time effect (EasyFarm's rules).</div>`);
 }
 
 function efRoutes(x, f, spots) {
-  const route = f.rec != null ? f.rec : (x.farm_route || 0), rec = f.rec != null, area = x.farm_area || "camp";
-  return `<div class="ef-routes"><div class="ef-list" style="flex:1;min-height:180px">${route ? Array.from({length: Math.min(route, 200)}, (_, i) => `<div>Waypoint ${i + 1}</div>`).join("") : `<div class="ef-hint">No waypoints. Click Record and walk your path.</div>`}</div>
+  const route = f.rec != null ? f.rec : (x.farm_route_n ?? x.farm_route ?? 0), rec = f.rec != null;
+  return `<div class="ef-routes"><div class="ef-list" style="flex:1;min-height:180px">${route ? Array.from({length: Math.min(route, 300)}, (_, i) => `<div>Waypoint ${i + 1}</div>`).join("") : `<div class="ef-hint">No waypoints. Click Record and walk your path.</div>`}</div>
     <div class="ef-side">
       <label class="ef-radio"><input type="radio" name="efroute" ${x.farm_loop === false ? "checked" : ""} onclick="send('set farm.loop false')"> Straight</label>
       <label class="ef-radio"><input type="radio" name="efroute" ${x.farm_loop === false ? "" : "checked"} onclick="send('set farm.loop true')"> Circular</label>
-      <button onclick="send('farming camp')" title="EasyFarm's Reset Character: here Vanguard sets the camp where you stand">Reset Character</button>
+      <button onclick="send('farming camp')" title="Reset Character">Reset Character</button>
       <button class="${rec ? "rec" : ""}" onclick="send('${rec ? "route stop" : "route record"}')">${rec ? "Stop" : "Record"}</button>
       <button onclick="send('route clear')" ${route ? "" : "disabled"}>Clear</button>
       <button onclick="send('farmspot save')">Save</button>
       <select onchange="if(this.value)send('farmspot load ' + this.value)"><option value="">Load</option>${spots.filter(q => q.here).map(q => `<option value="${q.k}">${esc(q.name)}</option>`).join("")}</select>
     </div></div>
-    <div class="ef-row" style="margin-top:6px">${chk("Use the route (off: stay around the camp)", area === "route", "set farm.area route", "set farm.area camp")}
-      <span class="ef-hint">${area === "camp" ? (x.farm_camp ? "Camp is set." : "No camp yet: Reset Character sets it.") : ""}</span></div>`;
+    <div class="ef-hint">With waypoints, it walks the route while there's nothing to fight and only fights mobs within Wander Distance of it (Settings).
+      Straight: there and back. Circular: round and round. Without waypoints it fights what it finds within Detection Distance of where it is.</div>`;
 }
 
 function efFollow(p, x, mods) {
-  const names = Object.keys(chars).filter(n => n !== selected);
+  const names = Array.from(new Set(Object.keys(chars).filter(n => n !== selected).concat(arr(p.party).map(m => m.name || m).filter(n => n && n !== selected)))).sort();
+  const cur = x.farm_follow || "";
   return efGroup("Follow", `
-    <div class="ef-row"><label class="ef-lab">Player</label>${sel("leader ", [{v: "none", l: "(nobody)"}].concat(names.map(n => ({v: n, l: n}))), p.leader || "none")}
-      ${modChk("Follow", mods, "follow")}</div>
-    ${efSlider("Distance", "set follow.distance ", x.follow_distance ?? 2.5, 1, 10, 0.5)}
-    <div class="ef-hint">Follows that player and helps with what they fight. Leave it on (nobody) for the character that farms.</div>`);
+    <div class="ef-row"><label class="ef-lab">Player</label>${sel("set farm.follow ", [{v: "", l: "(nobody)"}].concat(names.concat(cur && !names.includes(cur) ? [cur] : []).map(n => ({v: n, l: n}))), cur, "")}</div>
+    ${efSlider("Distance", "set farm.follow_dist ", x.farm_follow_dist ?? 5, 1, 20, 0.5)}
+    <div class="ef-hint">While not fighting, it keeps within this distance of that player (EasyFarm's Follow).</div>`);
 }
 
 function efSettings(x) {
@@ -1819,13 +1821,13 @@ function efSettings(x) {
     ${efGroup("Trust Settings", `<div class="ef-row"><label class="ef-lab">Trust Party Size</label>${sel("set trusts.party_size ", [1, 2, 3, 4, 5, 6].map(v => ({v, l: v})), x.trusts_size ?? 5)}</div>`, "flex:1")}
     </div>
     ${efGroup("Misc Settings", `
-      ${efSlider("Detection Distance", "set farm.detect ", x.farm_detect ?? 0, 0, 50, 1, (x.farm_detect ?? 0) ? "" : " (= Wander)")}
+      ${efSlider("Detection Distance", "set farm.detect ", (x.farm_detect || 17), 1, 50, 1)}
       ${efSlider("Height Threshold", "set farm.height ", x.farm_height ?? 5, 1, 20)}
       ${efSlider("Melee Distance", "set assist.melee_range ", x.melee_range ?? 3, 1, 10, 0.5)}
-      ${efSlider("Wander Distance", "set farm.range ", x.farm_range ?? 20, 5, 500, 5)}
+      ${efSlider("Wander Distance", "set farm.range ", x.farm_range ?? 17, 1, 100, 1)}
       ${efSlider("Global Cooldown", "set farm.gcd ", x.farm_gcd ?? 1000, 0, 5000, 100, " ms")}
       <div><label class="chk off" title="Needs the map from memory - Vanguard doesn't do that"><input type="checkbox" disabled><span>Avoid Objects</span></label></div>
-      <button onclick="['set farm.engage true','set farm.approach true','set farm.detect 0','set farm.height 5','set assist.melee_range 3','set farm.range 20','set farm.gcd 1000','set trusts.party_size 5'].forEach(c=>send(c))">Restore Defaults</button>`)}`;
+      <button onclick="['set farm.engage true','set farm.approach true','set farm.detect 17','set farm.height 5','set assist.melee_range 3','set farm.range 17','set farm.gcd 1000','set trusts.party_size 5'].forEach(c=>send(c))">Restore Defaults</button>`)}`;
 }
 
 let farmLogLines = [];
@@ -1843,7 +1845,7 @@ function farmTab(c, p) {
   const nb = c.nearby, mobs = arr(nb && nb.mobs);
   const on = (n, list) => list.some(t => lc(t) === lc(n));
   const mode = x.farm_mode || "list", area = x.farm_area || "camp";
-  const ready = mode !== "list" || tgt.length > 0;
+  const ready = x.farm_engine !== "vanguard" || mode !== "list" || tgt.length > 0;
   const farming = !!mods.farm && s.enabled;
   const paused = !!mods.farm && !s.enabled && ((s.farm || {}).run || {}).paused;
   const f = s.farm || {}, run = f.run || {}, st = s.stats || {};
@@ -1918,6 +1920,9 @@ function farmTab(c, p) {
       <button class="ef-small ${x.farm_stay ? "ef-stay" : ""}" title="Never move this character" onclick="send('set farm.stay ${x.farm_stay ? "false" : "true"}')">${x.farm_stay ? "DO NOT MOVE: ON" : "DO NOT MOVE"}</button></div>
     <div class="ef-tabs">${EF_TABS.map(([k, l]) => `<span class="${sub === k ? "on" : ""} ${k === "extras" ? "ef-x" : ""}" onclick="setFarmSub('${k}')">${l}</span>`).join("")}</div>
     ${sub === "extras" ? `<div class="stack ef-extras">
+    <div class="box"><h3>Farming engine</h3>
+      ${chk("Farm with Vanguard's own engine instead of EasyFarm's", x.farm_engine === "vanguard", "set farm.engine vanguard", "set farm.engine easyfarm")}
+      <div class="hint" style="margin-top:4px">${x.farm_engine === "vanguard" ? "Vanguard's engine: camp, pulling back to camp, waiting for the party, the settings below." : "EasyFarm's engine (the tabs above) is running the farming; most settings below are for Vanguard's own engine."}</div></div>
     <div class="box" style="border-color:${farming ? "var(--good)" : "var(--line)"}">
       <div class="fdash">
         <div>

@@ -1,6 +1,6 @@
 _addon.name = 'Vanguard'
 _addon.author = 'Daviant'
-_addon.version = '0.89.3'
+_addon.version = '0.90.0'
 _addon.commands = {'vanguard', 'vg'}
 
 --[[
@@ -49,6 +49,7 @@ local strat = require('vg_strat')
 local bard = require('vg_bard')
 local wschain = require('vg_wschain')
 local blist = require('vg_blist')
+local easyfarm = require('vg_easyfarm')
 local stats = require('vg_stats')
 local crash = require('vg_crash')
 local warp = require('vg_warp')
@@ -116,6 +117,9 @@ local defaults = {
     -- pulling (HP / MP %, within yalms); stop when the inventory is full / after stop_kills kills (0 = never)
     farm = { targets = '', ignore = '', claim = 'unclaimed', aggro_first = true, range = 20, stay = false, respawn = 0,
              f_unclaimed = true, f_party = true, f_claimed = false, detect = 0, gcd = 1000, engage = true,
+             engine = 'easyfarm',   -- 'easyfarm' (vg_easyfarm: EasyFarm's engine) or 'vanguard' (vg_farm's own)
+             rest_hp = false, rest_hp_low = 50, rest_hp_high = 100, rest_mp = false, rest_mp_low = 50, rest_mp_high = 100,
+             follow = '', follow_dist = 5,
              height = 5, approach = true, pull_cmd = '', route = '', loop = true,
              mode = 'list', area = 'camp', camp = '', camp_zone = 0, back_to_camp = true,
              wait_party = true, wait_hp = 70, wait_mp = 40, wait_near = 20, stop_full = true, stop_kills = 0,
@@ -1319,6 +1323,11 @@ farm.init(settings, state, { log = log, run_toward = run_toward, stop_running = 
 finish.init(settings, state, { log = log, use_ws = use_ws, ws_in_range = ws_in_range, recently = recently, mark = mark,
     save = function() store.save(settings) end })
 wschain.init(settings, state, {})
+easyfarm.init(settings, state, { stop_running = function() return stop_running() end,
+    run_toward = function(...) return run_toward(...) end, face = function(...) return face(...) end,
+    recently = function(...) return recently(...) end, mark = function(...) return mark(...) end, log = function(...) return log(...) end,
+    try_cast = function(...) return try_cast(...) end, use_ws = function(...) return use_ws(...) end,
+    status = function(s) return farm.status(s) end })
 blist.init(settings, state, { try_cast = function(...) return try_cast(...) end, use_ja = function(...) return use_ja(...) end,
     use_ws = function(...) return use_ws(...) end, amnesia = function(...) return amnesia(...) end,
     recently = function(...) return recently(...) end, mark = function(...) return mark(...) end, log = function(...) return log(...) end })
@@ -1409,6 +1418,13 @@ local function tick()
     if not settings.enabled then return end
     alts.alerts(player)
     if safety.away(player) then return end
+    -- farming with EasyFarm's engine (vg_easyfarm): it alone drives this character, as EasyFarm would
+    if easyfarm.active() then
+        if not state.ef_started then state.ef_started = true easyfarm.start() end
+        easyfarm.tick(player)
+        return
+    end
+    state.ef_started = nil
 
     if player.status == 33 then
         if farm.rest_check(player) then return end                 -- resting at camp: up when a mob shows up
@@ -2254,7 +2270,9 @@ windower.register_event('addon command', function(cmd, ...)
             settings.enabled = true
             farm.start(windower.ffxi.get_player(), windower.ffxi.get_mob_by_target('me'))
             farm.share_camp(windower.ffxi.get_player(), true)
-            if settings.farm.mode == 'list' and #util.split(settings.farm.targets, ',') == 0 then log('Farming on, but no mobs are picked yet: pick what to fight') else log('Farming started') end
+            state.ef_started = nil                      -- EasyFarm's engine starts fresh (its StartEngineState)
+            if (settings.farm.engine or 'easyfarm') == 'easyfarm' then log("Farming started (EasyFarm's engine)")
+            elseif settings.farm.mode == 'list' and #util.split(settings.farm.targets, ',') == 0 then log('Farming on, but no mobs are picked yet: pick what to fight') else log('Farming started') end
         elseif sub == 'stop' then
             farm.forget_rezone()
             farm.send_run(windower.ffxi.get_player(), 'stopped by you')
