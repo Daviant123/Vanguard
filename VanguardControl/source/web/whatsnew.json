@@ -1,5 +1,15 @@
 [
   {
+    "version": "1.85.0",
+    "date": "2026-10-21",
+    "items": [
+      "Farming now looks and works like EasyFarm: sections Targets, Battle, Rest, Routes, Follow, Settings and Log across the top (Vanguard's extra farming features are under Extras).",
+      "Battle has EasyFarm's seven lists - Start, Trusts, Pull, Battle, End, Healing and Weaponskill. Add job abilities, magic, weapon skills, items or trusts from a menu, put them in order, and click Edit for EasyFarm's conditions: distance, recast, your HP %, the target's HP %, MP and TP ranges, a status effect that must (or must not) be on you, only on a certain mob, and a usage limit per mob.",
+      "Targets has EasyFarm's filters (Aggro, Party, Unclaimed, Claimed). Settings has Detection and Wander distance, Height threshold, Melee distance, a Global cooldown between actions, Approach and Engage (Engage off fights with spells and abilities only, no /attack). Rest has HP and MP rest / get-up levels; Follow picks who to follow and how close.",
+      "Not included on purpose (they'd need memory reading or keyboard tricks): Home point on death, Tab targeting, Object avoidance."
+    ]
+  },
+  {
     "version": "1.84.3",
     "date": "2026-10-20",
     "items": [

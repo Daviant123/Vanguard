@@ -1,6 +1,6 @@
 _addon.name = 'Vanguard'
 _addon.author = 'Daviant'
-_addon.version = '0.88.3'
+_addon.version = '0.89.0'
 _addon.commands = {'vanguard', 'vg'}
 
 --[[
@@ -48,6 +48,7 @@ local link = require('vg_link')
 local strat = require('vg_strat')
 local bard = require('vg_bard')
 local wschain = require('vg_wschain')
+local blist = require('vg_blist')
 local stats = require('vg_stats')
 local crash = require('vg_crash')
 local warp = require('vg_warp')
@@ -82,8 +83,9 @@ local defaults = {
     profiles = {},
     -- Saved per-job menu choices from the panel (buff grid, songs, geo, enfeebles, modules).
     menus = {},
-    wschains = {},
-    customs = {},            -- the player's own abilities / spells per job (vg_jobs.custom): "kind#target#Name+..."           -- weapon skill chain per job (vg_wschain): "1|WS,WS,..." (1 = repeat)
+    wschains = {},           -- weapon skill chain per job (vg_wschain): "1|WS,WS,..." (1 = repeat)
+    customs = {},            -- the player's own abilities / spells per job (vg_jobs.custom): "kind#target#Name+..."
+    blists = {},             -- EasyFarm-style battle lists per job (vg_blist): ["<job>_<list>"] = actions
     pause_on_zone = true,   -- stop the bot on a zone change (his request 2026-10-17: "when it changes zones i want you to stop the bot")
     stop_on_job = true,     -- ...and when the job or sub job changes (same request)
     -- formation: spread (fan behind the leader), line (single file) or off (plain follow)
@@ -113,6 +115,7 @@ local defaults = {
     -- farming (vg_farm): mode list|aggro|any; area camp|route; camp "x:y:z" in camp_zone; wait for the party before
     -- pulling (HP / MP %, within yalms); stop when the inventory is full / after stop_kills kills (0 = never)
     farm = { targets = '', ignore = '', claim = 'unclaimed', aggro_first = true, range = 20, stay = false, respawn = 0,
+             f_unclaimed = true, f_party = true, f_claimed = false, detect = 0, gcd = 1000, engage = true,
              height = 5, approach = true, pull_cmd = '', route = '', loop = true,
              mode = 'list', area = 'camp', camp = '', camp_zone = 0, back_to_camp = true,
              wait_party = true, wait_hp = 70, wait_mp = 40, wait_near = 20, stop_full = true, stop_kills = 0,
@@ -839,6 +842,15 @@ local function do_ws(player)
             return use_ws(am_ws)
         end
     end
+    -- farming with a Weaponskill battle list (EasyFarm): its weapon skills instead
+    local ba, br = blist.ws(player, t)
+    if ba == 'hold' then return false end
+    if ba then
+        if recently('ws:' .. br.en, 3) then return false end
+        use_ws(br.en)
+        blist.ws_used(ba, t)
+        return true
+    end
     -- a weapon skill chain for this character (AutoSkillchain, vg_wschain): its next weapon skill instead
     local nx = wschain.next(player, t)
     if nx == 'hold' then return false end
@@ -1211,6 +1223,7 @@ local function send_profile(player)
             local c = menu.config(settings)
             c.strat_info = strat.info(player)
             if player.main_job == 'BRD' then c.bard_info = bard.info(player) end
+            c.blists = blist.all()
             c.wschain = { presets = wschain.presets(player), weapon = wschain.weapon_type(), step = wschain.step(),
                           list = wschain.list(), rep = wschain.rep() }
             if player.main_job == 'GEO' then c.geo_info = support.geo_info(player) end
@@ -1297,7 +1310,7 @@ local function ja_ready(name)
 end
 quick.init(settings, state, { log = log })
 warp.init(settings, state, { log = log })
-stats.kill_hook = function(mob) farm.on_kill(mob) trials.on_kill(mob) end
+stats.kill_hook = function(mob) farm.on_kill(mob) trials.on_kill(mob) blist.on_kill(mob) end
 trials.init(settings, state, { log = log, save = function() store.save(settings) send_profile() end })
 stats.chain_hook = function(n) farm.on_points(n) end
 farm.init(settings, state, { log = log, run_toward = run_toward, stop_running = stop_running, face = face,
@@ -1306,6 +1319,9 @@ farm.init(settings, state, { log = log, run_toward = run_toward, stop_running = 
 finish.init(settings, state, { log = log, use_ws = use_ws, ws_in_range = ws_in_range, recently = recently, mark = mark,
     save = function() store.save(settings) end })
 wschain.init(settings, state, {})
+blist.init(settings, state, { try_cast = function(...) return try_cast(...) end, use_ja = function(...) return use_ja(...) end,
+    use_ws = function(...) return use_ws(...) end, amnesia = function(...) return amnesia(...) end,
+    recently = function(...) return recently(...) end, mark = function(...) return mark(...) end, log = function(...) return log(...) end })
 jobs.custom_provider = function(job)
     local out = {}
     for _, e in ipairs(util.split(tostring(util.job_get(settings.customs, job) or ''), '+')) do
@@ -1446,7 +1462,7 @@ local function tick()
     -- a bard's songs come right after raise / cures / status removal (Singer's order): behind steps, Elegy and the rest
     -- the Troubadour minute ran out before the songs were done (2026-10-18)
     local function bard_first() return player.main_job == 'BRD' and (do_songs(player) or support.pianissimo(player)) end
-    local _ = do_raise(player) or do_heal(player) or do_status(player) or bard_first() or strat.arts(player) or mages.crowd(player)
+    local _ = do_raise(player) or do_heal(player) or do_status(player) or bard_first() or blist.tick(player) or strat.arts(player) or mages.crowd(player)
         or do_assist(player) or farm.pull(player) or support.double_up(ctx, engine) or mages.bar(player)
         or engine.run(ctx, pr, pre_ws_filter) or do_skillchain(player) or do_ws(player)
         or do_burst(player) or mages.sch(player) or engine.run(ctx, pr, normal_filter) or do_mana(player)
@@ -1988,6 +2004,12 @@ windower.register_event('addon command', function(cmd, ...)
             -- from the panel: //vg pianissimo set <name> <1|2> <song|none>
             if bard.pian_set(args[2], args[3], table.concat(args, ' ', 4)) then store.save(settings) send_profile() end
         elseif support.set_pianissimo(rest) then store.save(settings) send_profile() end
+    elseif cmd == 'blist' then
+        -- the Farming tab's battle lists (EasyFarm): //vg blist add|del|move|set <list> ...
+        local okb, why = blist.command(args)
+        if not okb then log('Battle list: ' .. tostring(why)) end
+        store.save(settings)
+        send_profile()
     elseif cmd == 'custom' then
         -- the app's "Add your own": //vg custom add <ja|ma> <me|mob|leader> <name> | del <id>
         local sub = (args[1] or ''):lower()

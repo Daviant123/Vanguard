@@ -28,6 +28,7 @@ Normal game commands only: /targetbnpc, /attack, the pull command, /heal; walkin
 ]]
 
 local util = require('vg_util')
+local function BL() return require('vg_blist') end      -- the battle lists (EasyFarm), loaded when first used
 local res = require('resources')
 
 local farm = {}
@@ -196,8 +197,21 @@ function farm.judge(mob, me, ids, center)
     local claimed_us = mob.claim_id and mob.claim_id ~= 0 and ids[mob.claim_id]
     local claimed_other = mob.claim_id and mob.claim_id ~= 0 and not claimed_us
     if blacklisted(mob.id) then return nil, 'skipped' end
-    if claimed_other and S.farm.claim ~= 'any' then return nil, 'theirs' end
-    if S.farm.claim == 'party' and not claimed_us then return nil, 'unclaimed' end
+    -- EasyFarm's target filters: Claimed (other players' mobs), Party (our party's), Unclaimed - with the older "Claim"
+    -- choice still read (any = Claimed on, party = Unclaimed off)
+    local f_claimed = S.farm.f_claimed == true or S.farm.claim == 'any'
+    local f_unclaimed = S.farm.f_unclaimed ~= false and S.farm.claim ~= 'party'
+    local f_party = S.farm.f_party ~= false
+    if claimed_other and not f_claimed then return nil, 'theirs' end
+    if not claimed_us and not claimed_other and not f_unclaimed then return nil, 'unclaimed' end
+    if claimed_us and not f_party then                  -- (only other party members' claims - never the farmer's own mob)
+        local me_p = windower.ffxi.get_player()
+        if not (me_p and mob.claim_id == me_p.id) and not (mob.target_index and farm.on_party_member(mob.target_index)) then
+            return nil, "the party's (Party filter off)"
+        end
+    end
+    -- EasyFarm's Detection distance: how far from the farmer it looks (the range is from the camp - its Wander distance)
+    if (tonumber(S.farm.detect) or 0) > 0 and not claimed_us and util.dist(mob) > tonumber(S.farm.detect) then return nil, 'beyond the detection distance' end
     if math.abs((mob.z or 0) - (me.z or 0)) > S.farm.height then return nil, 'too high/low' end
     -- courtesy (upgrade 14): an unclaimed mob with another player (not in our party) right next to it is probably
     -- theirs in a second - leave it rather than race them for the claim
@@ -386,7 +400,7 @@ local function engage(me, mob)
         if pr and not mine and (not try or now() - try.t > 6) then
             if d > pr then walk_to(me, t, d) return false end
             -- the pull ready? (spell recast / MP / set blue magic, ability recast) - wait for it instead of wasting the mob
-            local ready, why = farm.pull_ready()
+            local ready, why = farm.pull_ready(t)
             if not ready then
                 h.stop_running()
                 h.face(me, t)
@@ -394,27 +408,41 @@ local function engage(me, mob)
                 status(('waiting to pull %s: %s'):format(t.name, why))
                 if why ~= 'recast' and not h.recently('farm:pullwhy', 60) then
                     h.mark('farm:pullwhy')
-                    h.log(("Farming: can't pull with %s - %s"):format(S.farm.pull_cmd:match('"(.-)"') or S.farm.pull_cmd, why))
+                    h.log(("Farming: can't pull with %s - %s"):format((S.farm.pull_cmd or ''):match('"(.-)"') or 'the Pull list', why))
                 end
                 return false
             end
+            local cmd, act = farm.pull_now(windower.ffxi.get_player(), t)
+            if not cmd then return false end
             state.farm_pull_try[t.id] = { n = (try and try.n or 0) + 1, t = now() }
             state.farm_pulled[t.id] = true
             h.stop_running()
             h.face(me, t)
-            windower.send_command(S.farm.pull_cmd)
+            windower.send_command(cmd)
+            if act then BL().pull_used(act, t) end
             status(('pulling %s (%d yalms)'):format(t.name, math.floor(d + 0.5)))
             -- in the log too, so a pull can be seen (his question 2026-10-19: "pulling the monster should have worked")
-            h.log(('Pulling %s with %s (%d yalms)'):format(t.name, (S.farm.pull_cmd:match('"(.-)"') or S.farm.pull_cmd), math.floor(d + 0.5)))
+            h.log(('Pulling %s with %s (%d yalms)'):format(t.name, (cmd:match('"(.-)"') or cmd), math.floor(d + 0.5)))
             state.busy_until = math.max(state.busy_until or 0, now() + 2)
             return true
         end
         -- pulled and "let it come to me": stand still facing it until it's close enough to engage (he saw his BLU walk
         -- to every mob it had pulled with Glutinous Dart, 2026-10-19)
-        if mine and S.farm.approach == false and (S.farm.pull_cmd or '') ~= '' and d > ATTACK_RANGE then
+        if mine and S.farm.approach == false and farm.has_pull() and d > ATTACK_RANGE then
             h.stop_running()
             h.face(me, t)
             status(('waiting for %s to come (%d yalms)'):format(t.name, math.floor(d + 0.5)))
+            return false
+        end
+        -- EasyFarm's "Engage" off (a mage): no /attack - the mob stays targeted and the Battle list fights it
+        if S.farm.engage == false then
+            h.stop_running()
+            h.face(me, t)
+            if state.farm_engageless ~= t.id then
+                state.farm_engageless, state.farm_engageless_t = t.id, now()
+                h.log(('Fighting %s without engaging (Engage is off)'):format(t.name))
+            end
+            status(('fighting %s (not engaged)'):format(t.name))
             return false
         end
         -- too far to engage: walk first (the old code sent /attack from 35 yalms every 3 s and never moved)
@@ -450,12 +478,24 @@ local function engage(me, mob)
     return true
 end
 
+-- the battle lists' Pull list (EasyFarm, vg_blist) replaces the single "Pull with" when it has actions
+function farm.has_pull() return (S.farm.pull_cmd or '') ~= '' or BL().any('pull') end
+-- the command to pull with now (and the list action), or nil (no pull), or false (the pull list has none ready now)
+function farm.pull_now(player, mob)
+    if BL().any('pull') then return BL().pull(player, mob) end
+    return (S.farm.pull_cmd or '') ~= '' and S.farm.pull_cmd or nil
+end
+
 -- how far the pull command reaches (a ranged attack about 24 yalms, a spell 20, an ability like Provoke 16)
 -- Is the pull ready to use now? true, or false and why ('recast', 'not enough MP', 'not set / not learned', 'silenced')
-function farm.pull_ready()
+function farm.pull_ready(mob)
     local c = S.farm.pull_cmd or ''
     local player = windower.ffxi.get_player()
     if not player then return false, 'no player' end
+    if BL().any('pull') then
+        if farm.pull_now(player, mob) then return true end
+        return false, 'recast'                      -- (nothing in the Pull list can go right now)
+    end
     local kind, name = c:match('^input /(%a+) "(.-)"')
     if kind == 'ma' then
         local sp = util.spell(name)
@@ -472,8 +512,10 @@ function farm.pull_ready()
 end
 
 function farm.pull_range()
+    if state.farm_no_pull then return nil end
+    if BL().any('pull') then return BL().reach() end
     local c = S.farm.pull_cmd or ''
-    if c == '' or state.farm_no_pull then return nil end
+    if c == '' then return nil end
     if c:find('/ra ', 1, true) then return 23 end
     if c:find('/ma ', 1, true) then return 19 end
     if c:find('/ja ', 1, true) then return 15 end
@@ -541,11 +583,14 @@ end
 
 -- the pull command once per mob, right after engaging while it's still away (before any abilities)
 function farm.pull(player)
-    if not S.modules.farm or player.status ~= 1 or (S.farm.pull_cmd or '') == '' then return false end
+    if not S.modules.farm or player.status ~= 1 or not farm.has_pull() then return false end
     local t = windower.ffxi.get_mob_by_target('t')
     if t and not state.farm_pulled[t.id] and util.dist(t) > 5 then
+        local cmd, act = farm.pull_now(player, t)
+        if not cmd then return false end
         state.farm_pulled[t.id] = true
-        windower.send_command(S.farm.pull_cmd)
+        windower.send_command(cmd)
+        if act then BL().pull_used(act, t) end
         state.busy_until = now() + 3
         return true
     end
@@ -1222,6 +1267,18 @@ function farm.tick(player)
     farm.pops_tick()
     state.route_moving = false
     if player.status == 1 then return false end
+    -- fighting without engaging (Engage off): stay on that mob while it lives (and is ours, or was just picked)
+    if state.farm_engageless then
+        local m = windower.ffxi.get_mob_by_id(state.farm_engageless)
+        local t = windower.ffxi.get_mob_by_target('t')
+        local _, ids = party()
+        local ours = m and m.claim_id and m.claim_id ~= 0 and ids[m.claim_id]
+        if m and (m.hpp or 0) > 0 and m.valid_target ~= false and t and t.id == m.id and (ours or now() - (state.farm_engageless_t or 0) < 20) then
+            status(('fighting %s (not engaged)'):format(m.name))
+            return false
+        end
+        state.farm_engageless = nil
+    end
     if not S.enabled then status(state.farm_run and state.farm_run.paused and 'paused' or 'stopped') return false end
     if state.resting or player.status == 33 then status('resting') return false end
     if player.status ~= 0 then status('waiting') return false end

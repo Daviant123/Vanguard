@@ -260,6 +260,15 @@ on the radar). Mobs attacking you are always fought.
 
 ## Farming (Farming tab)
 
+**EasyFarm layout (new in 0.89.0 / Vanguard Control 1.85.0).** Sub-tabs across the top like EasyFarm: **Targets**
+(what to fight + Aggro / Party / Unclaimed / Claimed filters), **Battle** (seven lists: Start, Trusts, Pull, Battle,
+End, Healing, Weaponskill - add abilities, magic, weapon skills, items or trusts from the menu, order them with the
+arrows, **Edit** for the conditions: distance, recast, your HP %, target HP %, MP and TP ranges, a status effect on or
+not on you, only on one mob, uses per mob), **Rest**, **Routes**, **Follow**, **Settings** (detection / wander distance,
+height, melee distance, global cooldown, Approach, Engage), **Log**, and **Extras** for everything else below. Lists
+are saved per job. Not included: home point on death, tab targeting, object avoidance (they need memory reading or
+key presses).
+
 **The fastest way:** stand where you want to farm and click **⚡ Quick start: farm what's here**. It farms the most
 common unclaimed mob within 30 yalms, with the camp where you stand. Or:
 
