@@ -260,6 +260,11 @@ on the radar). Mobs attacking you are always fought.
 
 ## Farming (Farming tab)
 
+**EasyFarm's engine (new in 0.90.0 / Vanguard Control 1.86.0).** Farming runs EasyFarm's own logic, rebuilt from its
+source (the same steps, order, mob filter and action rules) on normal game commands - no EasyFarm DLL, no EliteAPI.
+Vanguard's own farming engine (camp, pull back to camp, wait for the party) is still there: Vanguard extras > Farming
+engine.
+
 **EasyFarm layout (new in 0.89.0 / Vanguard Control 1.85.0).** Sub-tabs across the top like EasyFarm: **Targets**
 (what to fight + Aggro / Party / Unclaimed / Claimed filters), **Battle** (seven lists: Start, Trusts, Pull, Battle,
 End, Healing, Weaponskill - add abilities, magic, weapon skills, items or trusts from the menu, order them with the

@@ -2329,6 +2329,9 @@ document.addEventListener("change", e => {
   if (el.dataset.on !== undefined) { send(el.checked ? el.dataset.on : el.dataset.off); el.closest(".chk")?.classList.toggle("off", !el.checked); return; }
   if (el.dataset.cmd !== undefined) { send(el.dataset.cmd + (el.value || el.dataset.empty || "")); el.blur(); }
 });
+var sliding = false;   // (var: render may run before this line)
+document.addEventListener("pointerdown", e => { if (e.target && e.target.type === "range") { sliding = true; e.target.focus(); } }, true);
+window.addEventListener("pointerup", () => { if (sliding) setTimeout(() => { sliding = false; }, 1200); }, true);
 document.addEventListener("input", e => {
   const el = e.target;
   if (el.type === "range") el.parentElement.querySelector("output").textContent = el.value + (el.dataset.unit || "");
@@ -2381,6 +2384,9 @@ function renderPanel() {
   const a = document.activeElement;
   // (a drop-down menu too: redrawing while it's open closed it before you could pick anything)
   if (a && $("tabbody").contains(a) && (a.type === "range" || a.type === "text" || a.type === "number" || a.tagName === "SELECT")) return;
+  // (a slider being dragged, focused or not: the Farming tab redraws twice a second while farming, which replaced the
+  // slider under the mouse - the new value was never sent and it jumped back, his report 2026-10-21)
+  if (sliding) return;
   const team = tab === "team" ? Object.keys(chars).map(n => [n, (chars[n].snapshot || {}).hold, (chars[n].snapshot || {}).camp,
     (chars[n].snapshot || {}).retreat, (chars[n].snapshot || {}).defense, (chars[n].snapshot || {}).leader,
     (chars[n].snapshot || {}).stats, chars[n].online, (chars[n].snapshot || {}).buffs, (chars[n].snapshot || {}).hpp,

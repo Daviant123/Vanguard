@@ -1,5 +1,12 @@
 [
   {
+    "version": "1.86.1",
+    "date": "2026-10-21",
+    "items": [
+      "Fix: sliders on the Farming tab (Detection, Wander, Height, Melee distance, Global Cooldown, Resting, Follow) jumped back while farming and the change never reached the game. The window refreshes twice a second while farming and replaced the slider under your mouse; it now waits until you let go."
+    ]
+  },
+  {
     "version": "1.86.0",
     "date": "2026-10-21",
     "items": [
