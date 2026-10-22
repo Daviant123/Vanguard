@@ -1,6 +1,6 @@
 _addon.name = 'Vanguard'
 _addon.author = 'Daviant'
-_addon.version = '0.90.3'
+_addon.version = '0.90.4'
 _addon.commands = {'vanguard', 'vg'}
 
 --[[
@@ -511,6 +511,13 @@ local function do_movement(player)
         end
     end
 
+    -- Engaged but not closing in (a healer, a mage, "close in" off): still turn to the mob - the game doesn't, and
+    -- facing away blocks weapon skills and melee (his report 2026-10-22: "sometimes the vanguard will not face the
+    -- monsters")
+    if player.status == 1 then
+        local t = windower.ffxi.get_mob_by_target('t')
+        if t and (t.hpp or 0) > 0 and t.is_npc then face(me, t) end
+    end
     -- Camp spot / formation behind the leader (vg_party), else plain follow - not for the farmer: it leads.
     if not settings.modules.farm and party.movement(player, me) then return end
     if settings.modules.follow and not settings.modules.farm then

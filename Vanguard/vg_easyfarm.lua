@@ -660,6 +660,16 @@ function ef.tick(player)
     if not M.started then ef.start() end
     local me = windower.ffxi.get_mob_by_target('me')
     if not me then return true end
+    -- Engaged: always face the mob being fought, every pass - also during the pauses below, and when the game's
+    -- target isn't the one picked (then that one is the target now) (his report 2026-10-22: "sometimes the vanguard
+    -- will not face the monsters")
+    if player.status == 1 then
+        local t = windower.ffxi.get_mob_by_target('t') or windower.ffxi.get_mob_by_target('bt')
+        if t and t.is_npc and t.spawn_type == 16 and (t.hpp or 0) > 0 then
+            if not M.target or M.target.id ~= t.id then M.target = t end
+            face(me, t)
+        end
+    end
     -- the Executor's waits (global cooldown, a cast in progress): EasyFarm's thread sleeps; nothing happens meanwhile
     -- (and standing still meanwhile: EasyFarm's walking always finishes before a pause; left running, he ran past the
     -- mob and back again and again - his report 2026-10-21: "approach just makes him run back and forth")

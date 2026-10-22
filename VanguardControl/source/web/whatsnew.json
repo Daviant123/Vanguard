@@ -1,5 +1,12 @@
 [
   {
+    "version": "1.86.5",
+    "date": "2026-10-22",
+    "items": [
+      "Fix: characters sometimes didn't face the mob. Engaged characters that don't run in to melee (healers, mages, \"close in\" off) are now turned to the mob as it moves, and the farming character keeps facing the mob it's fighting all the time (also right after an ability or spell, and when the game targeted a different mob than the one picked)."
+    ]
+  },
+  {
     "version": "1.86.4",
     "date": "2026-10-22",
     "items": [
