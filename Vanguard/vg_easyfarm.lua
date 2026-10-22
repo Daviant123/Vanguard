@@ -436,19 +436,27 @@ local STATES = {
       end },
     { name = 'SetTarget', pri = 7,
       check = function(player, ids)
-          if not target_ok(ids) then
-              if h.recently('ef:scan', 1) then return false end            -- UnitArrayCheckRate 1 s
-              h.mark('ef:scan')
-              local best, bk
-              for _, m in pairs(windower.ffxi.get_mob_array() or {}) do
-                  if type(m) == 'table' and m.is_npc and m.spawn_type == 16 and ef.mob_filter(m, ids) then
-                      -- PartyClaim first, then HasAggroed, then the nearest
-                      local k = { party_claim(m, ids) and 0 or 1, has_aggroed(m) and 0 or 1, dist(m) }
-                      if not bk or k[1] < bk[1] or (k[1] == bk[1] and (k[2] < bk[2] or (k[2] == bk[2] and k[3] < bk[3]))) then best, bk = m, k end
-                  end
+          -- The nearest enemy (his request 2026-10-22: "make sure that the farming section targets the nearest enemy").
+          -- EasyFarm sorts party-claimed, then aggroed, then nearest, and keeps its pick; here it's simply the nearest
+          -- one the filters allow, and until the fight starts a nearer one that shows up takes over. A mob that is
+          -- already ours (claimed by the party, or fighting) is kept until it dies.
+          local cur = target_ok(ids) and windower.ffxi.get_mob_by_id(M.target.id) or nil
+          if cur and (party_claim(cur, ids) or fighting(cur) or player.status == 1) then return false end
+          if h.recently('ef:scan', 1) then return false end            -- UnitArrayCheckRate 1 s
+          h.mark('ef:scan')
+          local best, bd
+          for _, m in pairs(windower.ffxi.get_mob_array() or {}) do
+              if type(m) == 'table' and m.is_npc and m.spawn_type == 16 and ef.mob_filter(m, ids) then
+                  local d = dist(m)
+                  if not bd or d < bd then best, bd = m, d end
               end
+          end
+          if cur and best and best.id ~= cur.id and bd >= dist(cur) - 1 then return false end   -- (not worth switching)
+          if best and (not cur or best.id ~= cur.id) then
               M.target = best
-              if best then h.log(('[EasyFarm] Now targeting %s : %d'):format(best.name, best.id)) end
+              h.log(('[EasyFarm] Now targeting %s : %d (%.1f yalms)'):format(best.name, best.id, bd))
+          elseif not best then
+              M.target = nil
           end
           return false
       end },

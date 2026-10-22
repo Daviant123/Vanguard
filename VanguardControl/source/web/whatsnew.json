@@ -1,5 +1,12 @@
 [
   {
+    "version": "1.86.4",
+    "date": "2026-10-22",
+    "items": [
+      "Farming always goes for the nearest enemy the Targeting settings allow. Until the fight starts, a nearer one that shows up takes over; once a mob is engaged or claimed it is kept until it dies. The Log shows how far each target is."
+    ]
+  },
+  {
     "version": "1.86.3",
     "date": "2026-10-21",
     "items": [
