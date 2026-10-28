@@ -20,7 +20,7 @@ import (
 	"time"
 )
 
-var panelVersion = "1.86.6" // set by -X for tests; the published version
+var panelVersion = "1.87.0" // set by -X for tests; the published version
 
 // how often the panel looks for a newer version (was 6 hours: his open window stayed several versions behind)
 var updateEvery = time.Hour
@@ -91,11 +91,11 @@ func installUpdate(version string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	data, err := fetch(updateBase+"Vanguard%20Control.exe", 64<<20)
+	data, err := fetch(updateBase+updateAsset, 64<<20) // ("Vanguard Control.exe", or the Linux program)
 	if err != nil {
 		return "", err
 	}
-	if len(data) < 1<<20 || !bytes.HasPrefix(data, []byte("MZ")) {
+	if len(data) < 1<<20 || !bytes.HasPrefix(data, []byte(programMagic)) {
 		return "", fmt.Errorf("the download doesn't look like a program (%d bytes)", len(data))
 	}
 	if err := swapIn(exe, data); err != nil {
@@ -110,7 +110,7 @@ func installUpdate(version string) (string, error) {
 // updating: "Access is denied") - a fresh name is used instead.
 func swapIn(exe string, data []byte) error {
 	tmp := exe + ".new"
-	if err := os.WriteFile(tmp, data, 0o755); err != nil {
+	if err := os.WriteFile(tmp, data, 0o755); err != nil { // (0o755: runnable on Linux too)
 		return err
 	}
 	old := oldPath(exe)

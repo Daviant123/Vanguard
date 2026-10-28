@@ -1,5 +1,12 @@
 [
   {
+    "version": "1.87.0",
+    "date": "2026-10-27",
+    "items": [
+      "Vanguard for Ubuntu / Linux: friends who play FFXI on Linux with Wine (or Lutris, Steam / Proton, Bottles) can use Vanguard too. The game and the addon run in Wine as usual; Vanguard Control runs as a normal Linux app (Vanguard-linux.tar.gz on the GitHub page, with an installer that adds it to the applications menu). It finds Windower inside the Wine folders and gets the same automatic updates as the Windows version."
+    ]
+  },
+  {
     "version": "1.86.6",
     "date": "2026-10-27",
     "items": [

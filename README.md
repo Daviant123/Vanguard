@@ -21,6 +21,23 @@ Vanguard is free and always will be: no paid features, subscriptions, keys, ads 
 
 Tip: right-click the exe > **Send to** > **Desktop (create shortcut)** for an icon on your desktop.
 
+### Ubuntu / Linux (FFXI in Wine, Lutris, Steam / Proton or Bottles)
+
+### [⬇ Download Vanguard for Linux (tar.gz)](https://github.com/Daviant123/Vanguard/raw/main/Vanguard-linux.tar.gz)
+
+The game, Windower and the Vanguard addon run inside Wine as usual; Vanguard Control runs as a normal Linux app and
+talks to them on your own PC (127.0.0.1), the same as on Windows. It gets the same updates as the Windows version.
+
+1. Unpack it, open a terminal in the `Vanguard` folder and run `./install.sh` (it puts the app in
+   `~/.local/share/vanguard-control`, adds **Vanguard Control** to your applications menu and starts it).
+   Or just run `./vanguard-control-linux` from the folder.
+2. The app looks for Windower inside your Wine prefixes (`~/.wine`, Lutris `~/Games`, Steam / Proton `compatdata`,
+   Bottles, PlayOnLinux). If it doesn't find it, click **Choose folder** and pick the folder with `Windower.exe`
+   (for example `~/.wine/drive_c/Program Files (x86)/Windower4`). The folder picker needs `zenity` (`sudo apt install
+   zenity`) - Ubuntu usually has it.
+3. Start the game; your characters appear in the app's window (it opens in your browser, or in Chrome / Chromium's
+   app window when you have one).
+
 ## Updates (automatic)
 
 The app checks this page when it starts and every hour. A newer version downloads by itself, restarts the app,

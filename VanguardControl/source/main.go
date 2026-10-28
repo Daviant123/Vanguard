@@ -16,7 +16,6 @@ import (
 	"net"
 	"net/http"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -317,25 +316,11 @@ func handleOpenSettings(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-func openFolder(dir string) { exec.Command("explorer", filepath.Clean(dir)).Start() }
+func openFolder(dir string) { openFolderOS(dir) }
 
 // ---------------------------------------------------------------- launch
 
-func openWindow() {
-	// Edge app mode gives a clean standalone window; fall back to the default browser.
-	edges := []string{
-		filepath.Join(os.Getenv("ProgramFiles(x86)"), `Microsoft\Edge\Application\msedge.exe`),
-		filepath.Join(os.Getenv("ProgramFiles"), `Microsoft\Edge\Application\msedge.exe`),
-	}
-	for _, e := range edges {
-		if _, err := os.Stat(e); err == nil {
-			if exec.Command(e, "--app="+uiURL, "--window-size=1180,860").Start() == nil {
-				return
-			}
-		}
-	}
-	exec.Command("rundll32", "url.dll,FileProtocolHandler", uiURL).Start()
-}
+func openWindow() { openAppWindow(uiURL) }
 
 func main() {
 	// --no-window: started by the self-update; the old panel's window stays open and keeps working.

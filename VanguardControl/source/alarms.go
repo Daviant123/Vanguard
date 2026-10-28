@@ -14,7 +14,6 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"syscall"
 	"time"
 )
 
@@ -50,11 +49,8 @@ var alarmPrev = map[string]*alarmSeen{}
 var alarmQuietUntil time.Time // after a stop-timer logout or a Log out order: going offline is expected
 var alarmLastRing time.Time
 
-// The sound: Windows' warning sound (MessageBeep, no extra program). Tests replace it.
-var playAlarm = func() {
-	defer func() { recover() }()
-	syscall.NewLazyDLL("user32.dll").NewProc("MessageBeep").Call(0x30)
-}
+// The sound: Windows' warning sound / the Linux desktop's (platform_*.go). Tests replace it.
+var playAlarm = playAlarmOS
 
 func defaultAlarms() alarmConfig {
 	return alarmConfig{On: true, Sound: true, KO: true, HP: false, HPAt: 30, MP: false, MPAt: 10, Disabled: true,

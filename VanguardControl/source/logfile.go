@@ -12,13 +12,11 @@ import (
 	"fmt"
 	"net/url"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"runtime"
 	"sort"
 	"strings"
 	"time"
-	"unicode/utf16"
 )
 
 const logFileMax = 3 << 20 // trimmed to the newest half past 3 MB
@@ -85,18 +83,8 @@ func lastLogLines(n int) ([]string, []string) {
 	return lines, names
 }
 
-// copyText puts text on the Windows clipboard (clip.exe, which reads UTF-16 with a BOM).
-var copyText = func(text string) error {
-	u := utf16.Encode([]rune(text))
-	b := make([]byte, 2, 2+len(u)*2)
-	b[0], b[1] = 0xFF, 0xFE
-	for _, c := range u {
-		b = append(b, byte(c), byte(c>>8))
-	}
-	cmd := exec.Command("clip")
-	cmd.Stdin = strings.NewReader(string(b))
-	return cmd.Run()
-}
+// copyText puts text on the clipboard (clip.exe on Windows, wl-copy / xclip / xsel on Linux). Tests replace it.
+var copyText = copyTextOS
 
 func (h *hub) sendLogs(n int) {
 	switch {
@@ -138,7 +126,7 @@ func (h *hub) sendLogs(n int) {
 
 	addon := currentAddonState()
 	head := "**What happened:** (please describe what you were doing and what went wrong)\n\n" +
-		fmt.Sprintf("**App:** %s  **Addon:** %s (installed %s)  **Windows:** %s/%s\n", panelVersion, addon.Bundled, addon.Installed, runtime.GOOS, runtime.GOARCH)
+		fmt.Sprintf("**App:** %s  **Addon:** %s (installed %s)  **System:** %s/%s\n", panelVersion, addon.Bundled, addon.Installed, runtime.GOOS, runtime.GOARCH)
 	if copied {
 		head += fmt.Sprintf("\n**The full log (%d lines) is on your clipboard: click at the end of this box and press Ctrl+V.**\n", len(lines))
 	} else {

@@ -11,7 +11,6 @@ import (
 	"io/fs"
 	"net/http"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -88,20 +87,6 @@ func isWindower(dir string) bool {
 	return err1 == nil && err2 == nil && a.IsDir() && p.IsDir()
 }
 
-// runningWindower asks Windows where a running Windower.exe lives.
-func runningWindower() string {
-	out, err := exec.Command("powershell", "-NoProfile", "-Command",
-		"(Get-Process -Name Windower -ErrorAction SilentlyContinue | Select-Object -First 1).Path").Output()
-	if err != nil {
-		return ""
-	}
-	p := strings.TrimSpace(string(out))
-	if p == "" {
-		return ""
-	}
-	return filepath.Dir(p)
-}
-
 // findWindower tries: the saved folder, next to / above this exe, a running Windower, the usual install places.
 func findWindower(saved string) string {
 	exe, _ := os.Executable()
@@ -111,15 +96,7 @@ func findWindower(saved string) string {
 	if rw := runningWindower(); rw != "" {
 		cands = append(cands, rw)
 	}
-	for _, base := range []string{os.Getenv("ProgramFiles(x86)"), os.Getenv("ProgramFiles"), `C:\`, `D:\`,
-		filepath.Join(home, "Desktop"), filepath.Join(home, "Documents"), filepath.Join(home, "Downloads"), home} {
-		if base == "" {
-			continue
-		}
-		for _, name := range []string{"Windower4", "Windower 4", "Windower"} {
-			cands = append(cands, filepath.Join(base, name))
-		}
-	}
+	cands = append(cands, windowerPlaces(home)...) // (the usual places on Windows, the Wine prefixes on Linux)
 	for _, c := range cands {
 		if isWindower(c) {
 			return filepath.Clean(c)
@@ -181,17 +158,8 @@ func addAutoload(windower string) error {
 	return os.WriteFile(p, []byte(text), 0o644)
 }
 
-// pickFolder shows the Windows folder picker.
-func pickFolder() string {
-	script := `Add-Type -AssemblyName System.Windows.Forms; $d = New-Object System.Windows.Forms.FolderBrowserDialog; ` +
-		`$d.Description = 'Choose your Windower folder (the one with Windower.exe)'; ` +
-		`if ($d.ShowDialog() -eq 'OK') { $d.SelectedPath }`
-	out, err := exec.Command("powershell", "-NoProfile", "-STA", "-Command", script).Output()
-	if err != nil {
-		return ""
-	}
-	return strings.TrimSpace(string(out))
-}
+// pickFolder shows the folder picker (Windows' own, or zenity / kdialog on Linux).
+func pickFolder() string { return pickFolderOS() }
 
 // ---------------------------------------------------------------- state + HTTP
 

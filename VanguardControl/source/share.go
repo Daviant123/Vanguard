@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -18,30 +17,10 @@ const shareExt = ".vgprofile.json"
 
 var jobRe = regexp.MustCompile(`^[A-Z]{3}$`)
 
-// psQuote makes a string safe inside a single-quoted PowerShell literal.
-func psQuote(s string) string { return strings.ReplaceAll(s, "'", "''") }
+// the save / open pickers: Windows' own, or zenity / kdialog on Linux (platform_*.go). Tests replace them.
+var saveDialog = saveDialogOS
 
-var saveDialog = func(defaultName string) string {
-	script := `Add-Type -AssemblyName System.Windows.Forms; $d = New-Object System.Windows.Forms.SaveFileDialog; ` +
-		`$d.Filter = 'Vanguard profile (*` + shareExt + `)|*` + shareExt + `'; $d.FileName = '` + psQuote(defaultName) + `'; ` +
-		`$d.InitialDirectory = [Environment]::GetFolderPath('Desktop'); if ($d.ShowDialog() -eq 'OK') { $d.FileName }`
-	out, err := exec.Command("powershell", "-NoProfile", "-STA", "-Command", script).Output()
-	if err != nil {
-		return ""
-	}
-	return strings.TrimSpace(string(out))
-}
-
-var openDialog = func() string {
-	script := `Add-Type -AssemblyName System.Windows.Forms; $d = New-Object System.Windows.Forms.OpenFileDialog; ` +
-		`$d.Filter = 'Vanguard profile (*` + shareExt + `;*.json)|*` + shareExt + `;*.json'; ` +
-		`$d.InitialDirectory = [Environment]::GetFolderPath('Desktop'); if ($d.ShowDialog() -eq 'OK') { $d.FileName }`
-	out, err := exec.Command("powershell", "-NoProfile", "-STA", "-Command", script).Output()
-	if err != nil {
-		return ""
-	}
-	return strings.TrimSpace(string(out))
-}
+var openDialog = openDialogOS
 
 // exportProfile writes the profile to dest, without who it came from.
 func exportProfile(job, name, dest string) error {

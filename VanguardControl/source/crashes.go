@@ -11,7 +11,6 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"regexp"
 	"runtime"
@@ -38,7 +37,7 @@ type crashReport struct {
 }
 
 var crashMu sync.Mutex
-var openURL = func(u string) { exec.Command("rundll32", "url.dll,FileProtocolHandler", u).Start() }
+var openURL = openURLOS
 
 func crashPath() string {
 	exe, _ := os.Executable()
@@ -170,7 +169,7 @@ func (h *hub) reportURL(c *crashReport) string {
 		title = "[problem] Vanguard Control"
 		b.WriteString("**What happened:** (please describe what you were doing and what went wrong)\n")
 	}
-	fmt.Fprintf(&b, "**App:** %s  **Addon:** %s (installed %s)  **Windows:** %s/%s\n", panelVersion, addon.Bundled, addon.Installed, runtime.GOOS, runtime.GOARCH)
+	fmt.Fprintf(&b, "**App:** %s  **Addon:** %s (installed %s)  **System:** %s/%s\n", panelVersion, addon.Bundled, addon.Installed, runtime.GOOS, runtime.GOARCH)
 	if c != nil && c.Trace != "" {
 		trace := c.Trace
 		if len(trace) > 2500 {
