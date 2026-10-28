@@ -1,5 +1,13 @@
 [
   {
+    "version": "1.90.0",
+    "date": "2026-10-28",
+    "items": [
+      "Choose what goes first: the Job tab has a Priority box (like Silmaril's) - Raise, Cures, Remove ailments, Songs, Fighting, Job abilities, Weapon skills, Magic bursts, Other abilities / rolls, Enfeebles, Geomancy, Buffs - move any up or down with the arrows; saved for each job. \"Back to the usual order\" puts it back.",
+      "Corsair: a Corsair that farms rolls where it stands (it waited for, or walked to, a far-off leader); rolls keep going while farming with the EasyFarm engine (yesterday's missing rolls); Crooked Cards before a roll you pick, like AutoCOR (Job tab > Corsair)."
+    ]
+  },
+  {
     "version": "1.89.0",
     "date": "2026-10-28",
     "items": [

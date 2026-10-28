@@ -300,6 +300,8 @@ local function try(a, ctx)
         if ctx.amnesia(p) then return false end
         local ja = util.ability(a.name)
         if not util.ability_ready(ja) then return false end
+        -- Crooked Cards right before the chosen roll (AutoCOR's option): a stronger roll
+        if a.kind == 'roll' and ctx.crooked and ctx.crooked(a.name, p) then return true end
         done = ctx.use_ja(ja, target)
         if done then ctx.log(a.label) end
     elseif a.kind == 'ma' then

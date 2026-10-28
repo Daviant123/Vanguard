@@ -91,12 +91,16 @@ end
 
 -- Rolls only reach party members within cor.range: is the leader close enough?
 function support.roll_in_range(player)
+    -- a Corsair that farms is where the fighting is: it rolls where it stands (it waited for a far-off leader, or
+    -- walked over to them and pulled against the farming - his report 2026-10-28: "daviant was not using cor rolls")
+    if S.modules.farm then return true end
     local l = h.leader_mob(player)
     if not l then return true end
     return util.dist(l) <= (tonumber(S.cor.range) or 8)
 end
 
 function support.roll_approach(player)
+    if S.farm and S.farm.stay then return end                     -- (DO NOT MOVE)
     local l = h.leader_mob(player)
     local me = windower.ffxi.get_mob_by_target('me')
     if not l or not me or util.dist(l) > 40 then return end

@@ -1,6 +1,6 @@
 _addon.name = 'Vanguard'
 _addon.author = 'Daviant'
-_addon.version = '0.92.0'
+_addon.version = '0.93.0'
 _addon.commands = {'vanguard', 'vg'}
 
 --[[
@@ -88,6 +88,7 @@ local defaults = {
     wschains = {},           -- weapon skill chain per job (vg_wschain): "1|WS,WS,..." (1 = repeat)
     customs = {},            -- the player's own abilities / spells per job (vg_jobs.custom): "kind#target#Name+..."
     blists = {},             -- EasyFarm-style battle lists per job (vg_blist): ["<job>_<list>"] = actions
+    priorities = {},         -- what goes first, per job: ["<JOB>"] = "raise,cures,..." (empty = the default order)
     pause_on_zone = true,   -- stop the bot on a zone change (his request 2026-10-17: "when it changes zones i want you to stop the bot")
     stop_on_job = true,     -- ...and when the job or sub job changes (same request)
     -- formation: spread (fan behind the leader), line (single file) or off (plain follow)
@@ -194,7 +195,7 @@ local defaults = {
     -- Corsair: risk = highest bust chance % to Double-Up into (0 = never bust), range = roll reach in yalms
     -- //vg update: GitHub page (owner/name) and folder that hold the newest Vanguard
     updater = { repo = 'Daviant123/Vanguard', path = 'Vanguard', branch = 'main', check = true },   -- //vg update (see take_old_update_section)
-    cor = { risk = 0, snake_eye = true, fold = true, range = 8 },
+    cor = { risk = 0, snake_eye = true, fold = true, range = 8, crooked = '' },   -- crooked: Crooked Cards before this roll
     -- Scholar stratagems, main or sub SCH (vg_strat): which spells get which stratagem, reserve, Arts upkeep
     strat = { enabled = true, arts = 'auto', reserve = 1, jp_gift = false,
               perpetuance = 'Regen V,Regen IV,Regen III,Adloquium,Embrava,Haste,Haste II,Refresh,Refresh II,Refresh III,Phalanx,Phalanx II,Flurry,Flurry II,Aquaveil',
@@ -787,6 +788,28 @@ local function do_items(player)
 end
 
 ------------------------------------------------------------------------
+-- What goes first (his request 2026-10-28: "Choose the order of priorities yourself" - Silmaril's Priority page).
+-- Twelve groups in the order they're tried every tick; the first that acts wins. Saved per job as text
+-- (settings.priorities["<JOB>"] = "raise,cures,..."); empty = this default, the order Vanguard always used.
+------------------------------------------------------------------------
+local PRIORITY_DEFAULT = { 'raise', 'cures', 'ailments', 'songs', 'fighting', 'abilities', 'ws', 'bursts', 'abilities2',
+                           'enfeebles', 'geo', 'buffs' }
+local PRIORITY_LABEL = { raise = 'Raise', cures = 'Cures', ailments = 'Remove ailments (-na, items)', songs = 'Songs',
+    fighting = 'Fighting: engage, pull, battle lists', abilities = 'Job abilities before weapon skills',
+    ws = 'Weapon skills and skillchains', bursts = 'Magic bursts', abilities2 = 'Other job abilities, rolls, MP',
+    enfeebles = 'Dispel and enfeebles', geo = 'Geomancy', buffs = 'Buffs' }
+local function priority_order(job)
+    local raw = tostring(util.job_get(settings.priorities, job or '') or '')
+    local out, seen = {}, {}
+    for _, k in ipairs(util.split(raw, ',')) do
+        k = util.trim(k):lower()
+        if PRIORITY_LABEL[k] and not seen[k] then out[#out + 1] = k seen[k] = true end
+    end
+    for _, k in ipairs(PRIORITY_DEFAULT) do if not seen[k] then out[#out + 1] = k end end   -- (new / missing groups)
+    return out
+end
+
+------------------------------------------------------------------------
 -- Buff upkeep
 ------------------------------------------------------------------------
 local function do_buffs(player)
@@ -1221,6 +1244,16 @@ local function make_ctx(player)
         buffs_of = buffs_of, party_engaged = party_engaged, battle_target = battle_target,
         pld_in_party = function(p) return mages.pld_in_party(p) end,
         roll_in_range = support.roll_in_range, roll_approach = support.roll_approach,
+        crooked = function(roll, p)
+            local want = settings.cor.crooked or ''
+            if want == '' or want:lower() ~= roll:lower() then return false end
+            if util.has_buff(p.buffs, 601) or recently('ja:Crooked Cards', 10) then return false end   -- (on already)
+            local cc = util.ability('Crooked Cards')
+            if not cc or not util.ability_ready(cc) then return false end
+            mark('ja:Crooked Cards')
+            log('Crooked Cards before ' .. roll)
+            return use_ja(cc, '<me>')
+        end,
     }
 end
 
@@ -1322,6 +1355,8 @@ local function send_profile(player)
             if player.main_job == 'BRD' then c.bard_info = bard.info(player) end
             c.blists = blist.all()
             c.bufftime = bufftime.info()
+            c.priority = {}
+            for _, k in ipairs(priority_order(player.main_job)) do c.priority[#c.priority + 1] = { k = k, l = PRIORITY_LABEL[k] } end
             c.wschain = { presets = wschain.presets(player), weapon = wschain.weapon_type(), step = wschain.step(),
                           list = wschain.list(), rep = wschain.rep() }
             if player.main_job == 'GEO' then c.geo_info = support.geo_info(player) end
@@ -1596,13 +1631,25 @@ local function tick()
     local function unless_list(list, f) return function(...) if ef_gap and blist.any(list) then return false end return f(...) end end
     local do_assist, do_rest, do_ws, do_trusts = vg_only(do_assist), vg_only(do_rest), unless_list('ws', do_ws), unless_list('trusts', do_trusts)
     local farm_pull, farm_tick, blist_tick = vg_only(farm.pull), vg_only(farm.tick), vg_only(blist.tick)
-    local _ = do_raise(player) or do_heal(player) or do_status(player) or do_items(player) or bard_first() or blist_tick(player) or strat.arts(player) or mages.crowd(player)
-        or do_assist(player) or farm_pull(player) or support.double_up(ctx, engine) or mages.bar(player)
-        or engine.run(ctx, pr, pre_ws_filter) or do_skillchain(player) or do_ws(player)
-        or do_burst(player) or mages.sch(player) or engine.run(ctx, pr, normal_filter) or do_mana(player)
-        or do_dispel(player) or do_debuff(player)
-        or support.radial(player) or do_geo(player) or do_songs(player) or support.pianissimo(player) or do_buffs(player) or alts.upkeep(player)
-        or do_rest(player) or do_trusts(player) or farm_tick(player)
+    -- the twelve groups, in the order picked for this job (the Job tab's Priority box)
+    local groups = {
+        raise = function() return do_raise(player) end,
+        cures = function() return do_heal(player) end,
+        ailments = function() return do_status(player) or do_items(player) end,
+        songs = function() return bard_first() or do_songs(player) or support.pianissimo(player) end,
+        fighting = function() return blist_tick(player) or strat.arts(player) or mages.crowd(player) or do_assist(player) or farm_pull(player) end,
+        abilities = function() return support.double_up(ctx, engine) or mages.bar(player) or engine.run(ctx, pr, pre_ws_filter) end,
+        ws = function() return do_skillchain(player) or do_ws(player) end,
+        bursts = function() return do_burst(player) or mages.sch(player) end,
+        abilities2 = function() return engine.run(ctx, pr, normal_filter) or do_mana(player) end,
+        enfeebles = function() return do_dispel(player) or do_debuff(player) end,
+        geo = function() return support.radial(player) or do_geo(player) end,
+        buffs = function() return do_buffs(player) end,
+    }
+    for _, k in ipairs(priority_order(player.main_job)) do
+        if groups[k]() then return end
+    end
+    local _ = alts.upkeep(player) or do_rest(player) or do_trusts(player) or farm_tick(player)
 end
 
 windower.register_event('prerender', function()
@@ -2151,6 +2198,32 @@ windower.register_event('addon command', function(cmd, ...)
             -- from the panel: //vg pianissimo set <name> <1|2> <song|none>
             if bard.pian_set(args[2], args[3], table.concat(args, ' ', 4)) then store.save(settings) send_profile() end
         elseif support.set_pianissimo(rest) then store.save(settings) send_profile() end
+    elseif cmd == 'priority' then
+        -- the Job tab's Priority box: //vg priority up|down <group> | reset | set raise,cures,...
+        local player = windower.ffxi.get_player()
+        local job = player and player.main_job or ''
+        local order = priority_order(job)
+        local sub, key = (args[1] or ''):lower(), (args[2] or ''):lower()
+        if sub == 'reset' then
+            order = nil
+        elseif (sub == 'up' or sub == 'down') and PRIORITY_LABEL[key] then
+            for i, k in ipairs(order) do
+                if k == key then
+                    local j = sub == 'up' and i - 1 or i + 1
+                    if order[j] then order[i], order[j] = order[j], order[i] end
+                    break
+                end
+            end
+        elseif sub == 'set' then
+            settings.priorities = settings.priorities or {}
+            util.job_set(settings.priorities, job, table.concat(args, ',', 2))
+            order = priority_order(job)
+        end
+        settings.priorities = settings.priorities or {}
+        util.job_set(settings.priorities, job, order and table.concat(order, ',') or '')
+        log('Priority (' .. job .. '): ' .. table.concat(priority_order(job), ' > '))
+        store.save(settings)
+        send_profile()
     elseif cmd == 'bufftime' then
         -- the Buffs tab: //vg bufftime <spell> <seconds|default>  (seconds before it wears off to cast it again)
         local secs = args[#args]

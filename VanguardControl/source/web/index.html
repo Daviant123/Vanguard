@@ -349,6 +349,7 @@ function jobTab(c, p) {
       ${customAdd(p)}</div>`
       : `<div class="empty">Waiting for ${esc(selected)}'s job info…</div>`}
     ${jobExtras(p)}
+    ${priorityBox(p)}
     <div class="hint">Only abilities ${esc(selected)} can use right now are listed (sub-job included). Changing the role re-ticks the recommended set.</div>
   </div>`;
 }
@@ -406,6 +407,21 @@ function profDelete() {
 }
 
 // Job know-how from the community guides (rounds 9-10): only the boxes for this character's job.
+// What goes first (his request 2026-10-28, like Silmaril's Priority page): the groups in the order they're tried, moved
+// with the arrows; saved for this job.
+function priorityBox(p) {
+  const pr = arr((p.config || {}).priority);
+  if (!pr.length) return "";
+  return `<div class="box"><h3>Priority: what goes first (${esc(p.job || "")})</h3>
+    <table class="grid"><tbody>${pr.map((g, i) => `<tr><td style="width:28px;text-align:right" class="hint">${i + 1}.</td><td style="text-align:left">${esc(g.l)}</td>
+      <td style="white-space:nowrap;text-align:right"><button style="font-size:11px" ${i ? "" : "disabled"} title="Earlier" onclick="send('priority up ${g.k}')">▲</button>
+        <button style="font-size:11px" ${i < pr.length - 1 ? "" : "disabled"} title="Later" onclick="send('priority down ${g.k}')">▼</button></td></tr>`).join("")}
+    </tbody></table>
+    <div class="row" style="margin-top:6px;align-items:center"><button style="font-size:11px" onclick="send('priority reset')">Back to the usual order</button>
+      <span class="hint">Every moment the first group with something to do acts. Raise, cures and ailments still go first when farming with the EasyFarm engine. Food / Reraise, resting and trusts come after these.</span></div>
+  </div>`;
+}
+
 function jobExtras(p) {
   const x = (p.config || {}).extra || {}, job = p.job || "", out = [];
   const set = (k, v) => `set ${k} ${v}`;
@@ -424,7 +440,10 @@ function jobExtras(p) {
       {v: "accuracy", l: "Accuracy: Hunter's + Chaos"}, {v: "tank", l: "Tank: Fighter's + Samurai"}, {v: "crit", l: "Crit: Rogue's + Chaos"},
       {v: "refresh", l: "Refresh: Evoker's + Wizard's"}, {v: "exp", l: "EXP: Corsair's + Chaos"}, {v: "fastcast", l: "Fast Cast: Caster's + Wizard's"}], "")}</label>
     <label class="field">Double-Up risk ${sel("set cor.risk ", [{v: "0", l: "Never bust (up to 5)"}, {v: "17", l: "Low (also on 6)"}, {v: "33", l: "Medium (also on 7)"}, {v: "50", l: "High (also on 8)"}], String(x.cor_risk ?? 0))}</label>
-    <label class="field">Roll reach ${sel("set cor.range ", [{v: "8", l: "8 yalms"}, {v: "16", l: "16 yalms (Luzaf's Ring)"}], String(x.cor_range ?? 8))}</label></div>
+    <label class="field">Roll reach ${sel("set cor.range ", [{v: "8", l: "8 yalms"}, {v: "16", l: "16 yalms (Luzaf's Ring)"}], String(x.cor_range ?? 8))}</label>
+    <label class="field" title="Crooked Cards (Corsair ability) right before this roll makes it stronger - like AutoCOR">Crooked Cards before ${sel("set cor.crooked ",
+      [{v: "", l: "no roll"}].concat(arr(p.actions).filter(a => / Roll/.test(a.label || "") && a.on).map(a => ({v: String(a.label).replace(/\s*\(.*\)$/, ""), l: String(a.label).replace(/\s*\(.*\)$/, "")}))),
+      x.cor_crooked || "", "")}</label></div>
     <div class="hint">Stops on the lucky number or 11, Snake Eye at 10 / one short of lucky / unlucky, Fold on a bust. Walks into range to roll.</div></div>`);
   if (job === "GEO") out.push(`<div class="box"><h3>Geomancer</h3>
     ${chk("Dia first, so Geo debuffs work (get on the hate list)", x.hate_first, set("geo.hate_first", "true"), set("geo.hate_first", "false"))}
