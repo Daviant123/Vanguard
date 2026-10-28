@@ -1,6 +1,6 @@
 _addon.name = 'Vanguard'
 _addon.author = 'Daviant'
-_addon.version = '0.90.4'
+_addon.version = '0.90.5'
 _addon.commands = {'vanguard', 'vg'}
 
 --[[
@@ -344,6 +344,8 @@ local function cast(spell, target, why)
     if strat.before_cast(spell, target, why) then return true end      -- a stratagem first; the spell follows
     stop_running()
     windower.send_command(('input /ma "%s" %s'):format(spell.en, target))
+    -- stand still until the game says the cast began (then for its cast time) - 1.5 s if it never does (refused)
+    state.casting_until = math.max(state.casting_until or 0, now() + 1.5)
     state.busy_until = now() + (spell.cast_time or 2) + 3
     state.no_move_until = now() + (spell.cast_time or 2) + 1     -- casting: can't walk, not "stuck"
     mark('ma:' .. spell.en .. ':' .. target)
@@ -440,16 +442,23 @@ end
 ------------------------------------------------------------------------
 -- Movement: follow and combat positioning
 ------------------------------------------------------------------------
+-- Casting or singing right now? From the game's own "casting begins / finished / interrupted" messages (and the moment
+-- Vanguard sends a spell), so spells cast by hand or by GearSwap count too. Moving cancels a spell or song (his question
+-- 2026-10-27: "does vanguard know, if the bard is singing songs or casting is happening, not to move the character").
+local function casting() return now() < (state.casting_until or 0) end
+
 local function run_toward(me, mob)
     -- DO NOT MOVE (his request 2026-10-19: "a DO NOT MOVE button ... that overrides all the other movements"): every
     -- walk Vanguard makes - farming, back to camp, follow, closing in, formation, travel - comes through here
-    if settings.farm.stay then stop_running() return end
+    if settings.farm.stay then stop_running() return false end
+    if casting() then stop_running() return false end                 -- (a spell / song in progress: stand still)
     local dx, dy = mob.x - me.x, mob.y - me.y
     local len = math.sqrt(dx * dx + dy * dy)
     if len < 0.01 then return end
     windower.ffxi.run(dx / len, dy / len)
     state.running = true
     state.run_dir = { dx / len, dy / len }
+    return true
 end
 
 local function face(me, mob)
@@ -1593,8 +1602,13 @@ windower.register_event('action', function(act)
         if act.category == 8 then
             -- casting begins (24931): remember which spell; interrupted (28787): say so - a song sung again right after
             -- looked like a bug in his log (Honor March three times in 16 s while his bard was fighting), 2026-10-19
-            if act.param == 24931 and first_action then state.casting_spell = first_action.param end
+            if act.param == 24931 and first_action then
+                state.casting_spell = first_action.param
+                local sp = res.spells[first_action.param]
+                state.casting_until = now() + ((sp and sp.cast_time) or 3) + 0.5     -- stand still while it's cast
+            end
             if act.param == 28787 then
+                state.casting_until = 0
                 state.busy_until = now() + 1
                 local sp = res.spells[(first_action and first_action.param ~= 0 and first_action.param) or state.casting_spell or 0]
                 if sp and not recently('interrupted:' .. sp.en, 3) then
@@ -1604,6 +1618,7 @@ windower.register_event('action', function(act)
                 state.casting_spell = nil
             end
         elseif act.category == 4 then
+            state.casting_until = 0                                 -- cast finished: free to move
             state.busy_until = now() + 2.5
             local spell = res.spells[act.param]
             if spell then

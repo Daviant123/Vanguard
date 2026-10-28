@@ -253,8 +253,7 @@ end
 local function goto_pos(me, pos, tol)                   -- Navigator.GotoNPC / GotoWaypoint, one step per pass
     local dx, dy = pos.x - me.x, pos.y - me.y
     if math.sqrt(dx * dx + dy * dy) <= tol then reset_nav() return true end
-    h.run_toward(me, pos)
-    if not (S.farm and S.farm.stay) then moving = true end
+    if h.run_toward(me, pos) then moving = true end       -- (not while DO NOT MOVE or a spell / song is being cast)
     return false
 end
 local function face(me, mob) h.face(me, mob) end

@@ -1,5 +1,12 @@
 [
   {
+    "version": "1.86.6",
+    "date": "2026-10-27",
+    "items": [
+      "Characters never start walking while they're casting a spell or singing a song - also spells and songs you cast yourself or through GearSwap (Vanguard reads the game's \"casting begins / finished / interrupted\" messages). Following, farming, the EasyFarm engine, camp and formation moves all wait until the cast is done, so nothing gets interrupted by moving."
+    ]
+  },
+  {
     "version": "1.86.5",
     "date": "2026-10-22",
     "items": [
