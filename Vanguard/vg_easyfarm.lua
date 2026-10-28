@@ -42,6 +42,7 @@ local function cfg()
         melee = num(S.assist and S.assist.melee_range, 3),              -- MeleeDistance 3
         gcd = num(f.gcd, 1000) / 1000,                                  -- GlobalCooldown 1000 ms
         approach = f.approach ~= false, engage = f.engage ~= false,     -- IsApproachEnabled, IsEngageEnabled
+        approach_wait = num(f.approach_wait, 0),                        -- seconds before walking to the mob (his request)
         aggro = f.aggro_first ~= false, party = f.f_party ~= false,     -- AggroFilter, PartyFilter
         unclaimed = f.f_unclaimed ~= false, claimed = f.f_claimed == true,
         trust_size = num(S.trusts and S.trusts.party_size, 5),         -- TrustPartySize 5
@@ -615,8 +616,13 @@ local STATES = {
       end,
       run = function(player, ids, plist, me)
           local t = windower.ffxi.get_mob_by_id(M.target.id)
+          -- "Wait before approaching" (his request 2026-10-27: "immediately, wait 1,2,3,4,5 seconds before approaching"):
+          -- the clock starts when this mob first needs approaching (picked, or pulled and coming); until then he stays put,
+          -- facing it (engaging still happens if it's close enough)
+          if M.approach_for ~= t.id then M.approach_for, M.approach_at = t.id, clock() end
+          local waiting = C.approach_wait > 0 and clock() - M.approach_at < C.approach_wait
           -- (goto_pos stops once within Melee Distance; before, nothing stopped him there and he ran past the mob)
-          if C.approach then goto_pos(me, t, C.melee) else reset_nav() end
+          if C.approach and not waiting then goto_pos(me, t, C.melee) else reset_nav() end
           face(me, t)
           local targeted = set_target(t)
           if C.engage and targeted and player.status ~= 1 and dist(t) < 25 and not h.recently('ef:attack', 2) then

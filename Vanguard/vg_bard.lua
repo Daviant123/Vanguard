@@ -431,6 +431,129 @@ local function needs(name, troub_up, sv_up)
     return false
 end
 
+------------------------------------------------------------------------
+-- A party member missing our songs (his request 2026-10-27: "if the bard is singing 4 or 5 songs, and notices someone
+-- in the party does not have the songs, it needs to do a dummy song so that the songs can be done correctly").
+-- A member who was out of range, zoned, died or was dispelled has fewer of our songs than we do. Singing the missing
+-- song again only adds it while they hold under 2 of our songs: past that a song sung without the harp replaces their
+-- oldest one. So, like a bard would: a dummy song (sung with the harp, it opens a slot on them), then the missing
+-- song (it replaces the dummy on them; on us it's only refreshed). Whatever the dummy knocked off us is sung again by
+-- the normal upkeep right after (missing songs go first). Songs are compared by their buff (every Minuet shares one
+-- icon), from the party buff icons (0x076). Only members within 10' and alive; a member's gap must show for 6 s, and
+-- a member who still misses one after 3 tries is left for 5 minutes.
+------------------------------------------------------------------------
+local REACH = 10
+local function member_gaps(player, wanted, dummyset, slots)
+    -- our real songs that are on, by buff id (in list order)
+    local ours, by_status, total = {}, {}, 0
+    for _, name in ipairs(wanted) do
+        local x = on(name)
+        if x and x.status and not dummyset[name:lower()] then
+            ours[#ours + 1] = x
+            by_status[x.status] = by_status[x.status] or {}
+            table.insert(by_status[x.status], x)
+            total = total + 1
+        end
+    end
+    if total == 0 then return nil end
+    local party = windower.ffxi.get_party() or {}
+    for _, k in ipairs({ 'p1', 'p2', 'p3', 'p4', 'p5' }) do
+        local m = party[k]
+        local mob = m and m.mob
+        local buffs = mob and state.party_buffs and state.party_buffs[mob.id]
+        if mob and buffs and (m.hpp or mob.hpp or 0) > 0 and util.dist(mob) <= REACH then
+            local have = {}
+            for _, b in ipairs(buffs) do have[b] = (have[b] or 0) + 1 end
+            -- our Pianissimo songs on them use their slots too: that many fewer party songs fit (found by the bard
+            -- fuzz test - a Ballad on the leader made it sing the party songs again every 25 s for nothing)
+            -- (only the songs set as Pianissimo songs for them: the party songs that reach them are kept in pmine too)
+            -- (counted from their buff icons: what we remember can be behind, e.g. after a zone)
+            local pian = 0
+            local pmap = bard.pian_map()
+            local mine_on = (state.pmine or {})[m.name:lower()] or {}
+            for key, songs_ in pairs(pmap) do
+                if key:lower() == m.name:lower() then
+                    for _, sn in ipairs(songs_) do
+                        local sp_ = util.spell(sn)
+                        if mine_on[sn:lower()] or (sp_ and sp_.status and have[sp_.status]) then pian = pian + 1 end
+                    end
+                end
+            end
+            -- (they hold as many of our songs as we do - the same casts reach them - less those Pianissimo songs)
+            -- and without dummy songs (the harp's slots) nobody holds more than 2 of a bard's songs - another bard's
+            -- songs (same icons) made our count look bigger in the fuzz test
+            local cap = (next(dummyset) ~= nil and (slots or total) > 2) and total or math.min(total, 2)
+            local room = math.max(0, cap - pian)
+            -- which of a kind they lack (every Minuet shows the same icon): they most likely hold the ones sung
+            -- first and missed the later ones; a try that didn't help moves on to the next of that kind
+            local g = (state.song_gap or {})[m.name] or {}
+            local held, missing = 0, nil
+            local used = {}
+            for _, x in ipairs(ours) do
+                local st = x.status
+                local list_ = by_status[st]
+                table.sort(list_, function(a, b) return a.at < b.at end)
+                local n_have = math.min(have[st] or 0, #list_)
+                local rank = 0
+                for i_, y in ipairs(list_) do if y == x then rank = i_ end end
+                if rank <= n_have then
+                    held = held + 1
+                elseif not missing then
+                    missing = x.name
+                    local extra = #list_ - n_have
+                    if extra > 1 and (g.n or 0) > 0 then              -- (rotate among the ones of that kind)
+                        local pick = n_have + 1 + ((g.n or 0) % extra)
+                        missing = list_[pick].name
+                    end
+                end
+            end
+            if missing and held < room then return m.name, missing, held, room end
+        end
+    end
+    return nil
+end
+
+local function member_repair(player, wanted, base, dummies, slots)
+    local dummyset = {}
+    for _, d in ipairs(dummies) do dummyset[d:lower()] = true end
+    local who, song, held, room = member_gaps(player, wanted, dummyset, slots)
+    state.song_gap = state.song_gap or {}
+    if not who then
+        state.song_gap_seen = nil
+        return false
+    end
+    local g = state.song_gap[who] or { n = 0, last = -100, held = held }
+    state.song_gap[who] = g
+    -- (only tries that didn't help count: a member missing all 4 songs needs 4 of them)
+    if held > (g.held or 0) then g.n = 0 end
+    g.held = held
+    if g.n >= 3 and clock() - g.last < 300 then return false end      -- tried 3 times: leave it a while
+    if g.n >= 3 then g.n = 0 end
+    -- the gap must still be there a few seconds later (the party icons come in a moment after a song lands)
+    local seen = state.song_gap_seen
+    if not seen or seen.who ~= who or seen.song ~= song then
+        state.song_gap_seen = { who = who, song = song, t = clock() }
+        return false
+    end
+    if clock() - seen.t < 6 or clock() - g.last < 12 then return false end
+    local sp = util.spell(song)
+    if not (sp and util.can_cast(sp, player) and util.spell_ready(sp, player)) then return false end
+    g.n, g.last = g.n + 1, clock()
+    state.song_gap_seen = nil
+    -- 2+ of our songs on them already: a dummy (with the harp) first, so the missing song has a slot on them
+    if held >= 2 and base > 2 and #dummies > 0 then
+        local d = util.spell(dummies[1])
+        if d and util.spell_ready(d, player) then
+            state.song_repair = { song = sp.en, who = who, t = clock() }
+            h.log(('Songs: %s is missing %s (has %d of our %d songs) - a dummy song first (opens a slot on them), then %s'):format(who, sp.en, held, room, sp.en))
+            return h.try_cast(d.en, '<me>', 'dummy song (for ' .. who .. ')', player)
+        end
+        return false
+    end
+    h.log(('Songs: %s is missing %s (has %d of our %d songs) - singing it again'):format(who, sp.en, held, room))
+    return h.try_cast(sp.en, '<me>', 'song (for ' .. who .. ')', player)
+end
+
 -- One song (or Marcato / NiTro / a dummy) if something is due. Returns true when it acted.
 function bard.sing(player)
     local wanted, slots, base = bard.wanted(player)
@@ -450,6 +573,20 @@ function bard.sing(player)
     reconcile(player, pickup)
     -- just reloaded with songs already on (mid-session - maybe mid-cast): a few seconds' wait
     if clock() - loaded_at < 4 and next(mine()) ~= nil then return false end
+    -- a member's missing song after its dummy (member_repair): that song now, then the usual upkeep
+    local rep_ = state.song_repair
+    if rep_ then
+        if clock() - rep_.t > 25 then
+            state.song_repair = nil
+        else
+            local sp = util.spell(rep_.song)
+            if sp and util.spell_ready(sp, player) then
+                state.song_repair = nil
+                return h.try_cast(sp.en, '<me>', 'song (for ' .. rep_.who .. ')', player)
+            end
+            return false                                    -- (its recast: wait for it, don't sing others in between)
+        end
+    end
     local troub_up = util.has_buff(player.buffs, 348)
     local sv_up = util.has_buff(player.buffs, 52)
     local function singable(name)
@@ -482,6 +619,13 @@ function bard.sing(player)
         if not left or clock() - state.redo_at > 180 then state.redo_at = nil end
     end
     if #due == 0 then
+        -- a party member missing some of our songs (out of range, zoned, KO'd, dispelled): dummy + the song
+        do
+            local ok_, _ = bard.in_range()
+            local ds = {}
+            for _, d in ipairs(list(S.songs.dummy)) do if singable(d) then ds[#ds + 1] = d end end
+            if ok_ and S.songs.party_fix ~= false and member_repair(player, wanted, base, ds, slots) then return true end
+        end
         -- NiTro as soon as it's ready in a fight when the songs up weren't sung under Troubadour: they're all sung
         -- again and last twice as long (his request 2026-10-18: "strive to use Nightingale, Troubadour in sync")
         if state.nitro_until then return h.nitro(player, true) end

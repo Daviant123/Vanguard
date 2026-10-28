@@ -1,5 +1,15 @@
 [
   {
+    "version": "1.88.0",
+    "date": "2026-10-27",
+    "items": [
+      "Bard: a party member who came back into range, was raised or zoned in without some of the songs now gets them. Vanguard sees it from the party's buff icons and, when they already hold 2 of the songs, sings a dummy song first (with the harp, it opens a slot on them) and then the missing song; anything the dummy knocked off the bard is sung again right after. Songs tab: \"Fix party members missing songs\".",
+      "Buffs tab: choose when buffs are cast again - \"when they wear off\" (as before) or 10 seconds to 5 minutes before, for all buffs and for each buff on its own (the Recast column). On yourself the game's own timers are used; on party members Vanguard learns how long each buff really lasts (shown as \"lasts 3:32\").",
+      "Red Mage: Enfire, Enblizzard and the other first-tier enspells show up again next to the II versions.",
+      "Farming > Settings: next to Approach, choose how long to wait before walking to the mob - immediately, or 1 to 5 seconds (it still faces the mob meanwhile)."
+    ]
+  },
+  {
     "version": "1.87.0",
     "date": "2026-10-27",
     "items": [

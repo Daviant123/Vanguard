@@ -55,11 +55,16 @@ local function sort_buffs(list)
     end)
 end
 
--- Keep only the highest tier of each family ("Protect V", not I-IV).
+-- Keep only the highest tier of each family ("Protect V", not I-IV) - except where the tiers are different spells you
+-- pick between: the Red Mage's enspells (his report 2026-10-27: "level 1 -en spells are missing for red mage" - Enfire
+-- was hidden behind Enfire II).
+local all_tiers = { enfire = true, enblizzard = true, enaero = true, enstone = true, enthunder = true, enwater = true,
+                    enlight = true, endark = true }
 local function best_tiers(names)
     local best = {}
     for _, n in ipairs(names) do
         local fam, tier = family(n)
+        if all_tiers[fam:lower()] then fam = n end                  -- (each tier its own entry)
         local cur = best[fam]
         if not cur or tier > cur.tier then best[fam] = { name = n, tier = tier } end
     end
@@ -207,7 +212,7 @@ function menu.extra(settings)
         nitro = settings.songs.nitro, nitro_when = settings.songs.nitro_when, marcato = settings.songs.marcato, pianissimo = settings.songs.pianissimo,
         song_slots = settings.songs.slots, dummy = settings.songs.dummy, marcato_song = settings.songs.marcato_song,
         clarion_song = settings.songs.clarion_song, aoe_names = settings.songs.aoe_names,
-        song_duration = settings.songs.duration, refresh_before = settings.songs.refresh_before,
+        song_duration = settings.songs.duration, refresh_before = settings.songs.refresh_before, song_party_fix = settings.songs.party_fix,
         hate_first = settings.geo.hate_first, party_mp = settings.geo.party_mp,
         disengage = settings.assist.disengage, defend = settings.assist.defend, autotarget = settings.assist.autotarget,
         setups = setups,
@@ -219,7 +224,7 @@ function menu.extra(settings)
         rest_hp_low = settings.rest.hp_low, rest_mp_low = settings.rest.mp_low,
         ws_am = settings.ws.am, ws_am_ws = settings.ws.am_ws, ws_finish = settings.ws.finish, ws_finish_at = settings.ws.finish_at, ws_finish_trial_only = settings.ws.finish_trial_only, ws_finish_learned = require('vg_finish').learned_list(), ws_finish_save = settings.ws.finish_save,
         ws_finish_others = settings.ws.finish_others, ws_finish_wait = settings.ws.finish_wait,
-        farm_approach = settings.farm.approach, farm_stay = settings.farm.stay, farm_engine = settings.farm.engine, farm_rest_hp = settings.farm.rest_hp, farm_rest_hp_low = settings.farm.rest_hp_low, farm_rest_hp_high = settings.farm.rest_hp_high, farm_rest_mp = settings.farm.rest_mp, farm_rest_mp_low = settings.farm.rest_mp_low, farm_rest_mp_high = settings.farm.rest_mp_high, farm_follow = settings.farm.follow, farm_follow_dist = settings.farm.follow_dist, farm_route_n = #require('vg_util').split(settings.farm.route or '', ';'), farm_f_unclaimed = settings.farm.f_unclaimed, farm_f_party = settings.farm.f_party, farm_f_claimed = settings.farm.f_claimed, farm_detect = settings.farm.detect, farm_gcd = settings.farm.gcd, farm_engage = settings.farm.engage, melee_range = settings.assist.melee_range, follow_distance = settings.follow.distance, rest_hp_high = settings.rest.hp_high, rest_mp_high = settings.rest.mp_high, rest_on = settings.modules.rest, farm_respawn = settings.farm.respawn, farm_respawn_learned = require('vg_farm').learned_respawn(), farm_mode = settings.farm.mode, farm_area = settings.farm.area,
+        farm_approach = settings.farm.approach, farm_stay = settings.farm.stay, farm_engine = settings.farm.engine, farm_approach_wait = settings.farm.approach_wait, farm_rest_hp = settings.farm.rest_hp, farm_rest_hp_low = settings.farm.rest_hp_low, farm_rest_hp_high = settings.farm.rest_hp_high, farm_rest_mp = settings.farm.rest_mp, farm_rest_mp_low = settings.farm.rest_mp_low, farm_rest_mp_high = settings.farm.rest_mp_high, farm_follow = settings.farm.follow, farm_follow_dist = settings.farm.follow_dist, farm_route_n = #require('vg_util').split(settings.farm.route or '', ';'), farm_f_unclaimed = settings.farm.f_unclaimed, farm_f_party = settings.farm.f_party, farm_f_claimed = settings.farm.f_claimed, farm_detect = settings.farm.detect, farm_gcd = settings.farm.gcd, farm_engage = settings.farm.engage, melee_range = settings.assist.melee_range, follow_distance = settings.follow.distance, rest_hp_high = settings.rest.hp_high, rest_mp_high = settings.rest.mp_high, rest_on = settings.modules.rest, farm_respawn = settings.farm.respawn, farm_respawn_learned = require('vg_farm').learned_respawn(), farm_mode = settings.farm.mode, farm_area = settings.farm.area,
         farm_camp = settings.farm.camp ~= '' and require('vg_farm').camp() ~= nil, farm_back = settings.farm.back_to_camp,
         farm_wait = settings.farm.wait_party, farm_wait_hp = settings.farm.wait_hp, farm_wait_mp = settings.farm.wait_mp,
         farm_wait_near = settings.farm.wait_near, farm_packs = settings.farm.packs, farm_pack_range = settings.farm.pack_range,

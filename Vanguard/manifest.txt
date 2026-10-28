@@ -4,6 +4,7 @@ vg_alts.lua
 vg_bard.lua
 vg_blist.lua
 vg_bridge.lua
+vg_bufftime.lua
 vg_combat.lua
 vg_crash.lua
 vg_easyfarm.lua

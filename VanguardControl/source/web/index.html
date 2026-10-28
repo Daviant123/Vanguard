@@ -1191,21 +1191,34 @@ function buffsTab(p) {
   }));
   const tgt = (n, i) => i === 0 ? "me" : n;
   const pb = arr(m.party_buffs), sb = arr(m.self_buffs);
+  // recasting before they wear off (his request 2026-10-27): a general time, and one per buff
+  const bt = cfg.bufftime || {}, times = bt.times || {}, learned = bt.learned || {};
+  const fam = sp => lc(String(sp).replace(/\s+[IVX]+$/, ""));
+  const SECS = [10, 15, 20, 30, 45, 60, 90, 120, 180, 300];
+  const mmss = v => v >= 60 ? `${Math.floor(v / 60)}:${String(Math.round(v % 60)).padStart(2, "0")}` : `${Math.round(v)} s`;
+  const general = sel("set buffs.before ", [{v: "0", l: "when they wear off"}].concat(SECS.map(v => ({v: String(v), l: mmss(v) + " before"}))), String(bt.before ?? 0));
+  const perBuff = sp => sel(`bufftime ${sp} `, [{v: "default", l: "general setting"}, {v: "0", l: "when it wears off"}]
+    .concat(SECS.map(v => ({v: String(v), l: mmss(v) + " before"}))), times[fam(sp)] != null ? String(times[fam(sp)]) : "default");
+  const lasts = sp => learned[lc(sp)] ? `<span class="hint" title="How long it really lasted on your party (learned)">lasts ${mmss(learned[lc(sp)])}</span>` : "";
   return `<div class="stack">
-    <div class="master">${modChk("Keep the ticked buffs up", mods, "buffs")}</div>
+    <div class="master">${modChk("Keep the ticked buffs up", mods, "buffs")}
+      <label class="field" title="Cast each buff again this long before it wears off (on yourself from the game's timers; on others from when it landed and how long it lasts)">Recast ${general}</label></div>
     ${pb.length ? `<div class="box"><h3>Party buffs: tick who gets each one</h3>
-      <table class="grid"><thead><tr><th>Spell</th>${party.map((n, i) => `<th class="${i === 0 ? "me" : ""}">${esc(n)}</th>`).join("")}</tr></thead><tbody>
-      ${pb.map(sp => `<tr><td>${esc(sp)}</td>${party.map((n, i) => {
+      <table class="grid"><thead><tr><th>Spell</th>${party.map((n, i) => `<th class="${i === 0 ? "me" : ""}">${esc(n)}</th>`).join("")}<th>Recast</th></tr></thead><tbody>
+      ${pb.map(sp => `<tr><td>${esc(sp)} ${lasts(sp)}</td>${party.map((n, i) => {
         const t = tgt(n, i), on = have.has(lc(sp) + ">" + lc(t));
         return `<td><input type="checkbox" ${on ? "checked" : ""} data-on="menu buff ${esc(t)} on ${esc(sp)}" data-off="menu buff ${esc(t)} off ${esc(sp)}"></td>`;
-      }).join("")}</tr>`).join("")}
+      }).join("")}<td>${perBuff(sp)}</td></tr>`).join("")}
       </tbody></table>
       ${party.length < 2 ? `<div class="hint" style="margin-top:6px">Party members appear here once ${esc(selected)} is in a party.</div>` : ""}
     </div>` : ""}
-    ${sb.length ? `<div class="box"><h3>Self buffs</h3><div class="checks">
-      ${sb.map(sp => chk(sp, have.has(lc(sp) + ">me"), `menu buff me on ${sp}`, `menu buff me off ${sp}`)).join("")}
-    </div></div>` : ""}
-    <div class="hint">Buffs are recast when they wear off. Only the highest tier known is shown. Job abilities like Composure or Light Arts are on the Job tab.</div>
+    ${sb.length ? `<div class="box"><h3>Self buffs</h3>
+      <table class="grid"><thead><tr><th style="text-align:left">Spell</th><th>Recast</th></tr></thead><tbody>
+      ${sb.map(sp => `<tr><td style="text-align:left">${chk(sp, have.has(lc(sp) + ">me"), `menu buff me on ${sp}`, `menu buff me off ${sp}`)} ${lasts(sp)}</td><td>${perBuff(sp)}</td></tr>`).join("")}
+      </tbody></table></div>` : ""}
+    <div class="hint">Recast: "when it wears off" waits until it's gone; "30 s before" casts it again while 30 seconds are left, so it never drops.
+      On yourself the game's own timers are used; on others the time since it landed and how long it lasted last time (learned, shown as "lasts").
+      Only the highest tier known is shown (Red Mage enspells: every tier). Job abilities like Composure or Light Arts are on the Job tab.</div>
   </div>`;
 }
 
@@ -1240,6 +1253,8 @@ function songsTab(p) {
   return `<div class="stack">
     <div class="master">${modChk("Sing these songs", mods, "songs")}
       ${chk("NiTro (Nightingale + Troubadour)", x.nitro, "set songs.nitro true", "set songs.nitro false")}
+      ${chk("Fix party members missing songs (dummy song, then the song)", x.song_party_fix !== false, "set songs.party_fix true", "set songs.party_fix false",
+        "Someone back in range, raised or zoned in without some of the songs: a dummy song (with the harp) opens a slot on them, then the missing song")}
       ${x.nitro ? sel("set songs.nitro_when ", [{v: "fight", l: "when the party is fighting"}, {v: "always", l: "any time (also before the pull)"}], x.nitro_when || "fight") : ""}
       ${chk("Marcato", x.marcato, "set songs.marcato true", "set songs.marcato false")}</div>
     <div class="cols">
@@ -1815,7 +1830,8 @@ function efSettings(x) {
   return `<div class="ef-cols">
     ${efGroup("Battle Settings", `
       <div>${chk("Engage", x.farm_engage !== false, "set farm.engage true", "set farm.engage false", "Off: fight with spells / abilities only, no /attack")}</div>
-      <div>${chk("Approach", x.farm_approach !== false, "set farm.approach true", "set farm.approach false", "Off: let the mob come")}</div>
+      <div>${chk("Approach", x.farm_approach !== false, "set farm.approach true", "set farm.approach false", "Off: let the mob come")}
+        ${sel("set farm.approach_wait ", [{v: "0", l: "immediately"}].concat([1, 2, 3, 4, 5].map(n => ({v: String(n), l: `wait ${n} second${n > 1 ? "s" : ""}`}))), String(x.farm_approach_wait ?? 0))}</div>
       <div><label class="chk off" title="Needs key presses - Vanguard doesn't do that"><input type="checkbox" disabled><span>Use Tab Targeting</span></label></div>
       <div><label class="chk off" title="Needs menu selection by memory - Vanguard doesn't do that"><input type="checkbox" disabled><span>Home Point On Death</span></label></div>`, "flex:1")}
     ${efGroup("Trust Settings", `<div class="ef-row"><label class="ef-lab">Trust Party Size</label>${sel("set trusts.party_size ", [1, 2, 3, 4, 5, 6].map(v => ({v, l: v})), x.trusts_size ?? 5)}</div>`, "flex:1")}

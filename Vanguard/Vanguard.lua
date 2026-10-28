@@ -1,6 +1,6 @@
 _addon.name = 'Vanguard'
 _addon.author = 'Daviant'
-_addon.version = '0.90.6'
+_addon.version = '0.91.0'
 _addon.commands = {'vanguard', 'vg'}
 
 --[[
@@ -50,6 +50,7 @@ local bard = require('vg_bard')
 local wschain = require('vg_wschain')
 local blist = require('vg_blist')
 local easyfarm = require('vg_easyfarm')
+local bufftime = require('vg_bufftime')
 local stats = require('vg_stats')
 local crash = require('vg_crash')
 local warp = require('vg_warp')
@@ -117,7 +118,7 @@ local defaults = {
     -- pulling (HP / MP %, within yalms); stop when the inventory is full / after stop_kills kills (0 = never)
     farm = { targets = '', ignore = '', claim = 'unclaimed', aggro_first = true, range = 20, stay = false, respawn = 0,
              f_unclaimed = true, f_party = true, f_claimed = false, detect = 0, gcd = 1000, engage = true,
-             engine = 'easyfarm',   -- 'easyfarm' (vg_easyfarm: EasyFarm's engine) or 'vanguard' (vg_farm's own)
+             engine = 'easyfarm', approach_wait = 0,   -- approach_wait: seconds before walking to the mob (0-5)   -- 'easyfarm' (vg_easyfarm: EasyFarm's engine) or 'vanguard' (vg_farm's own)
              rest_hp = false, rest_hp_low = 50, rest_hp_high = 100, rest_mp = false, rest_mp_low = 50, rest_mp_high = 100,
              follow = '', follow_dist = 5,
              height = 5, approach = true, pull_cmd = '', route = '', loop = true,
@@ -148,7 +149,7 @@ local defaults = {
     farmspots = { s0 = '' },
     trials = { t0 = '' }, trial_assist = '',   -- Magian trials (vg_trials): t1 = "kind|goal|ws|mobs|count"      -- saved farm spots (vg_farm): s1, s2, ... = "name|zone|field=value|..." 
     -- "Spell>target" pairs. target = me or a party member name. "ja:" prefix = job ability.
-    buffs = { list = '' },
+    buffs = { list = '', before = 0, times = '', learned = '' },   -- before / times: recast early (vg_bufftime)
     -- finish*: the weapon skill that lands the kill (vg_finish): at mob HP% finish_at, saving TP, others stop attacking
     ws = { name = '', tp = 1000, min_mob_hpp = 1, max_range = 6, am = 0, am_ws = '',
            finish = '', finish_at = 0, learned = '', finish_trial_only = true, finish_save = true, finish_others = true, finish_wait = false },
@@ -165,7 +166,7 @@ local defaults = {
     -- nitro: Nightingale + Troubadour (+ Marcato) then all songs; pianissimo = "Song>Name|Name,..." single-target songs
     -- Bard (vg_bard, after the Singer addon): slots 0 = from the instrument owned; dummy = up to 2 dummy songs;
     -- marcato_song / clarion_song ('' = first / next song); aoe_names = members that must be within 10'
-    songs = { list = '', duration = 240, refresh_before = 30, learned = '', when = 'always', nitro = true, nitro_when = 'fight', marcato = true, pianissimo = '',
+    songs = { list = '', party_fix = true, duration = 240, refresh_before = 30, learned = '', when = 'always', nitro = true, nitro_when = 'fight', marcato = true, pianissimo = '',
               slots = 0, dummy = '', marcato_song = '', clarion_song = '', aoe_names = '' },
     -- entrust = 'Indi-Spell>Member'. full_circle_range = recall luopan when target is this far from it.
     -- entrust = 'auto' for Indi-Haste/Fury on the leader; hate_first = Dia before a Geo debuff;
@@ -760,7 +761,18 @@ local function do_buffs(player)
             local action = is_ja and util.ability(what) or util.spell(what)
             if action and bl then
                 local buff_id = action.status or util.buff_id(what:gsub('%s+[IVX]+$', ''))
-                if buff_id and not util.has_buff(bl, buff_id) then
+                local present = buff_id and util.has_buff(bl, buff_id)
+                local due = buff_id and not present
+                if buff_id and not is_ja then
+                    if not present and target_name ~= player.name then bufftime.on_gone(action, target_name) end
+                    -- "Recast this long before it wears off" (Buffs tab): due while it still has that long or less
+                    if present then
+                        local before = bufftime.before(action.en)
+                        local left = before > 0 and bufftime.left(action, target_name, target_name == player.name)
+                        if left and left <= before then due = true end
+                    end
+                end
+                if due then
                     local tgt = (target_name == player.name) and '<me>' or target_name
                     if is_ja then
                         if not amnesia(player) and util.ability_ready(action)
@@ -1244,6 +1256,7 @@ local function send_profile(player)
             c.strat_info = strat.info(player)
             if player.main_job == 'BRD' then c.bard_info = bard.info(player) end
             c.blists = blist.all()
+            c.bufftime = bufftime.info()
             c.wschain = { presets = wschain.presets(player), weapon = wschain.weapon_type(), step = wschain.step(),
                           list = wschain.list(), rep = wschain.rep() }
             if player.main_job == 'GEO' then c.geo_info = support.geo_info(player) end
@@ -1339,6 +1352,7 @@ farm.init(settings, state, { log = log, run_toward = run_toward, stop_running = 
 finish.init(settings, state, { log = log, use_ws = use_ws, ws_in_range = ws_in_range, recently = recently, mark = mark,
     save = function() store.save(settings) end })
 wschain.init(settings, state, {})
+bufftime.init(settings, state, { save = function() store.save(settings) end })
 easyfarm.init(settings, state, { stop_running = function() return stop_running() end,
     run_toward = function(...) return run_toward(...) end, face = function(...) return face(...) end,
     recently = function(...) return recently(...) end, mark = function(...) return mark(...) end, log = function(...) return log(...) end,
@@ -1625,6 +1639,13 @@ windower.register_event('action', function(act)
                 local on_me = false
                 for _, t in ipairs(act.targets or {}) do if t.id == player.id then on_me = true end end
                 if spell.type == 'BardSong' and on_me then bard.on_song(spell, player) end
+                -- a buff of ours landed: its timer on that member starts now (Buffs tab: recast before it wears off)
+                if spell.status and spell.type ~= 'BardSong' and not util.targets(spell, 'Enemy') then
+                    for _, t in ipairs(act.targets or {}) do
+                        local mb = windower.ffxi.get_mob_by_id(t.id)
+                        if mb and mb.name then bufftime.on_land(spell, mb.name) end
+                    end
+                end
                 if spell.type == 'BardSong' and spell.status and not util.targets(spell, 'Enemy') then   -- on party members
                     for _, t in ipairs(act.targets or {}) do
                         local mb = t.id ~= player.id and windower.ffxi.get_mob_by_id(t.id)
@@ -2042,6 +2063,16 @@ windower.register_event('addon command', function(cmd, ...)
             -- from the panel: //vg pianissimo set <name> <1|2> <song|none>
             if bard.pian_set(args[2], args[3], table.concat(args, ' ', 4)) then store.save(settings) send_profile() end
         elseif support.set_pianissimo(rest) then store.save(settings) send_profile() end
+    elseif cmd == 'bufftime' then
+        -- the Buffs tab: //vg bufftime <spell> <seconds|default>  (seconds before it wears off to cast it again)
+        local secs = args[#args]
+        local name = table.concat(args, ' ', 1, #args - 1)
+        if name ~= '' then
+            bufftime.set(name, secs)
+            log(('%s: recast %s'):format(name, (secs == 'default') and 'with the general setting' or (secs .. ' s before it wears off')))
+            store.save(settings)
+            send_profile()
+        end
     elseif cmd == 'blist' then
         -- the Farming tab's battle lists (EasyFarm): //vg blist add|del|move|set <list> ...
         local okb, why = blist.command(args)
