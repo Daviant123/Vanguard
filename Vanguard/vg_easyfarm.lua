@@ -679,6 +679,7 @@ function ef.tick(player)
     -- (and standing still meanwhile: EasyFarm's walking always finishes before a pause; left running, he ran past the
     -- mob and back again and again - his report 2026-10-21: "approach just makes him run back and forth")
     if (state.ef_wait or 0) > clock() or (state.busy_until or 0) > clock() then reset_nav() return true end
+    local wait_before = state.ef_wait or 0
     local ids, plist = party_ids()
     state.ef_cache = state.ef_cache or {}
     local doing
@@ -698,7 +699,11 @@ function ef.tick(player)
         if (state.ef_wait or 0) > clock() then break end           -- an action went out: the pause starts now
     end
     if h.status then h.status(doing and describe(doing, player) or 'looking for a target') end
-    return true
+    -- true: EasyFarm acted or is busy (an action sent, walking, resting, following); false: nothing for it to do
+    -- this pass - the job's own features may take a turn (Vanguard.lua)
+    local acted = (state.ef_wait or 0) ~= wait_before or moving or player.status == 33
+        or doing == 'Rest' or doing == 'Dead' or doing == 'Zone'
+    return acted
 end
 
 function ef.target() return M.target end                           -- (for the tests)

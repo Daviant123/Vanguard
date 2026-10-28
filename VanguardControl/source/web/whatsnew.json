@@ -1,5 +1,15 @@
 [
   {
+    "version": "1.89.0",
+    "date": "2026-10-28",
+    "items": [
+      "Farming with the EasyFarm engine no longer switches off the character's own job features: a White Mage still cures and raises (before EasyFarm's actions), a Bard still sings, buffs and abilities still go up - in the gaps when EasyFarm has nothing to do, without moving it or fighting EasyFarm. Farming > Settings: tick it off for EasyFarm alone.",
+      "Where two places set the same thing, the one in charge wins and the app says so: EasyFarm's Weaponskill, Trusts and Pull lists and its Resting are used while it farms (marked ⚑ on the Job tab, Healing tab and Vanguard extras).",
+      "Fixes found by checking the features together: a Weaponskill battle list did nothing unless a normal weapon skill was also set; an alt with trusts on kept trying to call trusts in a party it doesn't lead; the Magian trial finisher and the EasyFarm engine no longer fight over /attack.",
+      "New, from CurePlease / Silmaril: items for your own ailments (Echo Drops when silenced, Holy Water for Doom / Curse, Remedy...) when you can't cast the cure yourself; White Mage Devotion when a party member's MP drops below a set % (Healing tab > Recovery, off by default)."
+    ]
+  },
+  {
     "version": "1.88.0",
     "date": "2026-10-27",
     "items": [

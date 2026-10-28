@@ -144,7 +144,7 @@ function finish.ws(player, t)
             state.finish_told = t.id
             windower.send_ipc_message(('vg_finish %d %s'):format(t.id, player.name))
         end
-        if player.status == 1 and state.finish_wait ~= t.id then
+        if player.status == 1 and state.finish_wait ~= t.id and not state.ef_gap then   -- (EasyFarm's engine re-engages: no hold)
             state.finish_wait, state.finish_wait_t = t.id, clock()
             windower.send_command('input /attackoff')
             h.log(('%s is at %d%% and TP is %d: holding off until TP is 1000, then %s at %d%%'):format(t.name, t.hpp,
@@ -163,7 +163,7 @@ function finish.ws(player, t)
             if h.ws_in_range(t, true) and not h.recently('ws:' .. f, 3) then return h.use_ws(f) and 'used' end
             return 'block'
         end
-        if waits(t) and player.vitals.tp >= HOLD_TP and player.status == 1 and state.finish_wait ~= t.id then
+        if waits(t) and player.vitals.tp >= HOLD_TP and player.status == 1 and state.finish_wait ~= t.id and not state.ef_gap then
             state.finish_wait, state.finish_wait_t = t.id, clock()
             windower.send_command('input /attackoff')
             h.log(('%s is low and TP is %d: stopping until TP is 1000, then %s'):format(t.name, player.vitals.tp, f))

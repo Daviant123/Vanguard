@@ -1,6 +1,6 @@
 _addon.name = 'Vanguard'
 _addon.author = 'Daviant'
-_addon.version = '0.91.0'
+_addon.version = '0.92.0'
 _addon.commands = {'vanguard', 'vg'}
 
 --[[
@@ -104,12 +104,12 @@ local defaults = {
              priority = '', priority_at = 85, wake_sleep = true,
              ignore = '', curaga = true },
     -- Statuses NOT to remove (comma list of status names).
-    cleanse = { skip = '' },
+    cleanse = { skip = '', items = true },   -- items: Echo Drops / Holy Water / Remedy on myself (CurePlease, Silmaril)
     -- Rest (/heal) when idle and low; stand back up when recovered.
     rest = { hp_low = 40, hp_high = 95, mp_low = 25, mp_high = 95 },
     -- Sublimation upkeep and Convert.
     -- reserve: below this MP% only cures / Raise / status removal are cast (0 = off) - MP saved for healing
-    mana = { sublimation = true, sublimation_mpp = 70, convert_mpp = 15, reserve = 0 },
+    mana = { sublimation = true, sublimation_mpp = 70, convert_mpp = 15, reserve = 0, devotion_mpp = 0 },   -- devotion: WHM, 0 = off
     -- Summon trusts (spell names) until the party has party_size members.
     trusts = { list = '', party_size = 5 },
     -- Farming: target names (partial match), ignore list, claim filter (unclaimed|party|any),
@@ -118,7 +118,7 @@ local defaults = {
     -- pulling (HP / MP %, within yalms); stop when the inventory is full / after stop_kills kills (0 = never)
     farm = { targets = '', ignore = '', claim = 'unclaimed', aggro_first = true, range = 20, stay = false, respawn = 0,
              f_unclaimed = true, f_party = true, f_claimed = false, detect = 0, gcd = 1000, engage = true,
-             engine = 'easyfarm', approach_wait = 0,   -- approach_wait: seconds before walking to the mob (0-5)   -- 'easyfarm' (vg_easyfarm: EasyFarm's engine) or 'vanguard' (vg_farm's own)
+             engine = 'easyfarm', approach_wait = 0, ef_jobs = true,   -- ef_jobs: the job's features in EasyFarm's gaps   -- approach_wait: seconds before walking to the mob (0-5)   -- 'easyfarm' (vg_easyfarm: EasyFarm's engine) or 'vanguard' (vg_farm's own)
              rest_hp = false, rest_hp_low = 50, rest_hp_high = 100, rest_mp = false, rest_mp_low = 50, rest_mp_high = 100,
              follow = '', follow_dist = 5,
              height = 5, approach = true, pull_cmd = '', route = '', loop = true,
@@ -740,6 +740,52 @@ local function do_status(player)
     return false
 end
 
+-- Items for my own ailments (CurePlease "use item for Doom / Silence", Silmaril "remove those nasty debuffs" -
+-- compared 2026-10-28): any job, when the item is in the inventory and I can't fix it with my own spell.
+local AILMENT_ITEMS = {
+    { 'silence', { 'Echo Drops', 'Remedy' } }, { 'doom', { 'Holy Water', 'Hallowed Water' } },
+    { 'curse', { 'Holy Water', 'Hallowed Water' } }, { 'paralysis', { 'Remedy' } }, { 'poison', { 'Remedy', 'Antidote' } },
+    { 'blindness', { 'Remedy', 'Eye Drops' } }, { 'disease', { 'Remedy' } }, { 'plague', { 'Remedy' } },
+}
+local item_ids
+local function have_item(name)
+    if not item_ids then
+        item_ids = {}
+        for id, it in pairs(res.items) do if it.en then item_ids[it.en:lower()] = id end end
+    end
+    local id = item_ids[name:lower()]
+    if not id then return false end
+    for _, it in ipairs(windower.ffxi.get_items('inventory') or {}) do
+        if type(it) == 'table' and it.id == id and (it.count or 1) > 0 then return true end
+    end
+    return false
+end
+local function do_items(player)
+    if settings.cleanse.items == false then return false end
+    if player.status ~= 0 and player.status ~= 1 then return false end
+    for _, entry in ipairs(AILMENT_ITEMS) do
+        local id = util.buff_id(entry[1])
+        if id and util.has_buff(player.buffs, id) then
+            -- my own -na spell first, when I can cast it (silence: never)
+            local fix
+            for _, pair in ipairs(status_cures) do if pair[1] == entry[1] then fix = util.spell(pair[2]) end end
+            local own = fix and not silenced(player) and util.can_cast(fix, player)
+            if not own then
+                for _, item in ipairs(entry[2]) do
+                    if have_item(item) and not recently('item:' .. item, 4) then
+                        mark('item:' .. item)
+                        windower.send_command(('input /item "%s" <me>'):format(item))
+                        state.busy_until = now() + 2
+                        log(('%s: %s'):format(entry[1]:gsub('^%l', string.upper), item))
+                        return true
+                    end
+                end
+            end
+        end
+    end
+    return false
+end
+
 ------------------------------------------------------------------------
 -- Buff upkeep
 ------------------------------------------------------------------------
@@ -850,7 +896,8 @@ local function do_ws(player)
     local t = windower.ffxi.get_mob_by_target('t')
     local fin = finish.ws(player, t)                                  -- the finishing weapon skill comes first
     if fin == 'used' then return true elseif fin == 'block' then return false end
-    if settings.ws.name == '' and #wschain.list() == 0 then return false end
+    -- (a Weaponskill battle list counts too: with no normal weapon skill set it was never reached)
+    if settings.ws.name == '' and #wschain.list() == 0 and not blist.any('ws') then return false end
     if settings.modules.sc then
         for _, s in ipairs(sc_steps()) do
             if s.who == player.name:lower() then return false end   -- chain owns our TP
@@ -1103,6 +1150,20 @@ local function do_mana(player)
             end
         end
     end
+    -- Devotion (White Mage; CurePlease / Silmaril): MP to a party member who runs low, while my HP is healthy
+    local dv = tonumber(settings.mana.devotion_mpp) or 0
+    if dv > 0 and player.main_job == 'WHM' and v.hpp >= 70 then
+        local ja = util.ability('Devotion')
+        if ja and util.ability_ready(ja) and not recently('ja:Devotion', 10) then
+            for _, m in ipairs(party_members(10)) do
+                if m.name ~= player.name and (m.hpp or 0) > 0 and (m.mpp or 100) < dv and (m.mp or 0) + 1 > 0 then
+                    mark('ja:Devotion')
+                    log(('Devotion: %s at %d%% MP'):format(m.name, m.mpp))
+                    return use_ja(ja, m.name)
+                end
+            end
+        end
+    end
     -- Convert when MP is very low and HP is healthy.
     if settings.mana.convert_mpp > 0 and v.mpp < settings.mana.convert_mpp and v.hpp > 80 then
         local conv = util.ability('Convert')
@@ -1119,6 +1180,10 @@ local function do_trusts(player)
     if party_engaged(player) or silenced(player) or under_attack(player) or state.finish_wait then return false end
     local members = party_members()
     if #members >= settings.trusts.party_size then return false end
+    -- only the party leader can call trusts: an alt in someone else's party kept trying (the EasyFarm engine already
+    -- knew; found checking the features together, 2026-10-28)
+    local pt = windower.ffxi.get_party() or {}
+    if pt.party1_leader and pt.party1_leader ~= 0 and pt.party1_leader ~= player.id and #members > 1 then return false end
     local present = {}
     for _, m in ipairs(members) do present[m.name:lower()] = true end
     for _, name in ipairs(util.split(settings.trusts.list, ',')) do
@@ -1448,23 +1513,38 @@ local function tick()
     if not settings.enabled then return end
     alts.alerts(player)
     if safety.away(player) then return end
-    -- farming with EasyFarm's engine (vg_easyfarm): it alone drives this character, as EasyFarm would
+    -- farming with EasyFarm's engine (vg_easyfarm): it drives the farming - targets, moving, pulling, its lists,
+    -- resting, trusts. When it has nothing to do this pass, the character's own job features (songs, cures, buffs,
+    -- abilities, Geo, rolls...) get their turn, minus anything that would move it or fight EasyFarm (his request
+    -- 2026-10-28: features checked "when they are being used in conjunction with each other" - a bard or healer
+    -- that farmed with the EasyFarm engine stopped singing / curing altogether). farm.ef_jobs false: EasyFarm alone.
+    local ef_gap = false
     if easyfarm.active() then
         if not state.ef_started then state.ef_started = true easyfarm.start() end
-        easyfarm.tick(player)
-        return
+        -- raising, curing and removing ailments come before EasyFarm's actions: a dying party member can't wait for
+        -- a gap in its Battle list
+        if settings.farm.ef_jobs ~= false and (player.status == 0 or player.status == 1) and can_act(player)
+            and (do_raise(player) or do_heal(player) or do_status(player) or do_items(player)) then return end
+        if easyfarm.tick(player) or settings.farm.ef_jobs == false then return end
+        ef_gap = true
+        state.ef_gap = true                                          -- (vg_finish: no /attackoff holds then)
+    else
+        state.ef_gap = nil
+        state.ef_started = nil
     end
-    state.ef_started = nil
 
     if player.status == 33 then
+        if ef_gap then return end                                   -- (EasyFarm's Rest decides when to get up)
         if farm.rest_check(player) then return end                 -- resting at camp: up when a mob shows up
         if farm.rest_called_check(player) then return end          -- the farmer asked me to rest: up when full
         if not travel.rest_stand(player) then do_rest(player) end
         return
     end
     if player.status ~= 0 and player.status ~= 1 then stop_running() return end
-    do_movement(player)
-    support.roll_walk_tick(player)
+    if not ef_gap then                                              -- (EasyFarm moves this character)
+        do_movement(player)
+        support.roll_walk_tick(player)
+    end
     safety.watch(player)
     safety.auto_defense(player)
     if player.main_job == 'SCH' or player.sub_job == 'SCH' then
@@ -1479,8 +1559,8 @@ local function tick()
         windower.send_command('input /attackoff')
         return
     end
-    if travel.tick(player) then return end
-    if combat.tick(player) then return end
+    if not ef_gap and travel.tick(player) then return end
+    if not ef_gap and combat.tick(player) then return end           -- (assist / self-defense: EasyFarm targets)
 
     if settings.modules.triggers and triggers.run(settings, player, state) then
         state.busy_until = now() + 1.5
@@ -1491,8 +1571,10 @@ local function tick()
     local ctx = make_ctx(player)
     local pr = state.profile
 
-    if state.farm_bringing then return end                          -- running a mob back to camp: nothing else now
-    if settings.modules.farm and player.status == 1 then   -- (abilities run first in a fight, so say it here)
+    if state.farm_bringing and not ef_gap then return end           -- running a mob back to camp: nothing else now
+    if ef_gap then
+        -- (EasyFarm's engine says what it's doing itself)
+    elseif settings.modules.farm and player.status == 1 then   -- (abilities run first in a fight, so say it here)
         local t = windower.ffxi.get_mob_by_target('t')
         farm.status('fighting ' .. (t and t.name or 'a mob'))
     elseif settings.modules.farm then
@@ -1500,7 +1582,7 @@ local function tick()
     end
     -- A mob being finished with a set weapon skill (vg_finish): the others leave it alone, the finisher waits for TP.
     -- Only curing, buffing and songs then.
-    if finish.held(player) or finish.waiting(player) then
+    if not ef_gap and (finish.held(player) or finish.waiting(player)) then
         local _ = do_raise(player) or do_heal(player) or do_status(player) or do_geo(player) or do_songs(player)
             or do_buffs(player)
         return
@@ -1508,13 +1590,19 @@ local function tick()
     -- a bard's songs come right after raise / cures / status removal (Singer's order): behind steps, Elegy and the rest
     -- the Troubadour minute ran out before the songs were done (2026-10-18)
     local function bard_first() return player.main_job == 'BRD' and (do_songs(player) or support.pianissimo(player)) end
-    local _ = do_raise(player) or do_heal(player) or do_status(player) or bard_first() or blist.tick(player) or strat.arts(player) or mages.crowd(player)
-        or do_assist(player) or farm.pull(player) or support.double_up(ctx, engine) or mages.bar(player)
+    -- (with EasyFarm's engine in charge, ef_gap: no assist / pull / rest / farming of our own; the weapon skill and
+    -- trusts only when its Weaponskill / Trusts lists are empty)
+    local function vg_only(f) return function(...) if ef_gap then return false end return f(...) end end
+    local function unless_list(list, f) return function(...) if ef_gap and blist.any(list) then return false end return f(...) end end
+    local do_assist, do_rest, do_ws, do_trusts = vg_only(do_assist), vg_only(do_rest), unless_list('ws', do_ws), unless_list('trusts', do_trusts)
+    local farm_pull, farm_tick, blist_tick = vg_only(farm.pull), vg_only(farm.tick), vg_only(blist.tick)
+    local _ = do_raise(player) or do_heal(player) or do_status(player) or do_items(player) or bard_first() or blist_tick(player) or strat.arts(player) or mages.crowd(player)
+        or do_assist(player) or farm_pull(player) or support.double_up(ctx, engine) or mages.bar(player)
         or engine.run(ctx, pr, pre_ws_filter) or do_skillchain(player) or do_ws(player)
         or do_burst(player) or mages.sch(player) or engine.run(ctx, pr, normal_filter) or do_mana(player)
         or do_dispel(player) or do_debuff(player)
         or support.radial(player) or do_geo(player) or do_songs(player) or support.pianissimo(player) or do_buffs(player) or alts.upkeep(player)
-        or do_rest(player) or do_trusts(player) or farm.tick(player)
+        or do_rest(player) or do_trusts(player) or farm_tick(player)
 end
 
 windower.register_event('prerender', function()

@@ -321,7 +321,8 @@ function jobTab(c, p) {
   return `<div class="stack">
     <div class="row" style="align-items:flex-end">
       <label class="field">Role ${sel("role ", arr(p.roles).map(r => ({v: r.id, l: r.label})), p.role)}</label>
-      <label class="field">Weapon skill ${sel("ws ", [{v: "", l: "None"}].concat(arr(p.ws_list).map(w => ({v: w, l: w}))), p.ws)}</label>
+      <label class="field">Weapon skill ${sel("ws ", [{v: "", l: "None"}].concat(arr(p.ws_list).map(w => ({v: w, l: w}))), p.ws)}
+        ${efInCharge(p).ws ? `<span class="hint" style="color:var(--tp)" title="Farming > Battles > Weaponskill has weapon skills: those are used while it farms">⚑ while farming: the Weaponskill list</span>` : ""}</label>
       <label class="field" title="Mythic / Empyrean / Relic weapons: without the Aftermath picked here (or with under 8 s left), TP is saved to 1000 / 2000 / 3000 and the Aftermath weapon skill used; with it up, the weapon skill above">Keep Aftermath ${sel("set ws.am ", [{v: "0", l: "Off"}, {v: "1", l: "Lv.1 (1000 TP)"}, {v: "2", l: "Lv.2 (2000 TP)"}, {v: "3", l: "Lv.3 (3000 TP)"}], String((p.config || {}).extra ? ((p.config.extra.ws_am) || 0) : 0))}</label>
       ${((p.config || {}).extra || {}).ws_am > 0 ? `<label class="field">Aftermath weapon skill ${sel("set ws.am_ws ", [{v: "", l: "the one above"}].concat(arr(p.ws_list).map(w => ({v: w, l: w}))), ((p.config || {}).extra || {}).ws_am_ws || "")}</label>` : ""}
       ${(() => {
@@ -1167,9 +1168,13 @@ function tierString() {
 }
 function recoveryBox(p) {
   const cfg = p.config || {}, rest = cfg.rest || {}, mana = cfg.mana || {}, mods = cfg.modules || {};
+  const ef = efInCharge(p);
   return `<div class="box"><h3>Recovery</h3>
+    ${ef.on ? efNote("Farming with EasyFarm's engine: resting is set on Farming > Resting while it farms (these rest settings wait until it stops).") : ""}
     <div class="master" style="margin-bottom:8px">${modChk("Rest (/heal) when idle and low", mods, "rest")}${modChk("Convert / Sublimation", mods, "mana")}
-      ${chk("Keep Sublimation going (SCH)", mana.sublimation, "set mana.sublimation true", "set mana.sublimation false")}</div>
+      ${chk("Keep Sublimation going (SCH)", mana.sublimation, "set mana.sublimation true", "set mana.sublimation false")}
+      ${chk("Use items on myself for ailments (Echo Drops, Holy Water, Remedy)", (cfg.cleanse || {}).items !== false, "set cleanse.items true", "set cleanse.items false",
+        "Silenced, Doomed, cursed, poisoned...: the item from the inventory when this character can't fix it with its own spell")}</div>
     <div class="sliders">
       ${slider("Rest when HP is below", "rest.hp_low", rest.hp_low ?? 40, 0, 95, 5)}
       ${slider("...until HP is", "rest.hp_high", rest.hp_high ?? 95, 50, 100, 5)}
@@ -1177,9 +1182,19 @@ function recoveryBox(p) {
       ${slider("...until MP is", "rest.mp_high", rest.mp_high ?? 95, 50, 100, 5)}
       ${slider("Use Sublimation's MP below", "mana.sublimation_mpp", mana.sublimation_mpp ?? 70, 10, 95, 5)}
       ${slider("Convert when MP is below", "mana.convert_mpp", mana.convert_mpp ?? 15, 0, 60, 5)}
+      ${slider("Devotion (WHM): a member's MP below (0 = off)", "mana.devotion_mpp", mana.devotion_mpp ?? 0, 0, 60, 5)}
       ${slider("Keep MP for cures: no other spells below (0 = off)", "mana.reserve", mana.reserve ?? 0, 0, 80, 5)}
     </div></div>`;
 }
+
+// Which setting is in charge when two places set the same thing (his request 2026-10-28: features shouldn't overlap):
+// farming with EasyFarm's engine, its Resting / Follow / lists win over the other tabs - those tabs say so.
+function efInCharge(p) {
+  const cfg = p.config || {}, x = cfg.extra || {}, mods = cfg.modules || {}, bl = cfg.blists || {};
+  const on = !!mods.farm && x.farm_engine !== "vanguard";
+  return {on, ws: on && arr(bl.ws).length > 0, trusts: on && arr(bl.trusts).length > 0, pull: on && arr(bl.pull).length > 0};
+}
+const efNote = text => `<div class="hint" style="margin-top:4px;color:var(--tp)">⚑ ${text}</div>`;
 
 function buffsTab(p) {
   const m = p.menu || {}, cfg = p.config || {}, mods = cfg.modules || {};
@@ -1833,6 +1848,8 @@ function efSettings(x) {
       <div>${chk("Approach", x.farm_approach !== false, "set farm.approach true", "set farm.approach false", "Off: let the mob come")}
         ${sel("set farm.approach_wait ", [{v: "0", l: "immediately"}].concat([1, 2, 3, 4, 5].map(n => ({v: String(n), l: `wait ${n} second${n > 1 ? "s" : ""}`}))), String(x.farm_approach_wait ?? 0))}</div>
       <div><label class="chk off" title="Needs key presses - Vanguard doesn't do that"><input type="checkbox" disabled><span>Use Tab Targeting</span></label></div>
+      <div>${chk("Also use this character's job features between EasyFarm actions (cures, songs, buffs, abilities)", x.farm_ef_jobs !== false, "set farm.ef_jobs true", "set farm.ef_jobs false",
+        "On: EasyFarm does the farming and the job's own Vanguard features fill the gaps (cures and raises come first). Off: EasyFarm alone, exactly like EasyFarm.")}</div>
       <div><label class="chk off" title="Needs menu selection by memory - Vanguard doesn't do that"><input type="checkbox" disabled><span>Home Point On Death</span></label></div>`, "flex:1")}
     ${efGroup("Trust Settings", `<div class="ef-row"><label class="ef-lab">Trust Party Size</label>${sel("set trusts.party_size ", [1, 2, 3, 4, 5, 6].map(v => ({v, l: v})), x.trusts_size ?? 5)}</div>`, "flex:1")}
     </div>
@@ -2138,7 +2155,8 @@ function farmTab(c, p) {
     <div class="fgrid">
     ${!all ? "" : card(3, "How to fight", `
       <div class="row">
-        <label class="field">Pull with ${sel("", pullKinds, kindCur ? kindCur.v : "")}</label>
+        <label class="field">Pull with ${sel("", pullKinds, kindCur ? kindCur.v : "")}
+          ${efInCharge(p).on ? `<span class="hint" style="color:var(--tp)">⚑ EasyFarm's engine pulls with Battles > Pull</span>` : ""}</label>
         ${pullWhich ? `<label class="field">${pullKind === "ja" ? "Ability" : "Spell"} ${pullWhich}</label>` : ""}
         <label class="field">Then ${sel("set farm.approach ", [{v: "true", l: "walk up to it"}, {v: "false", l: "let it come to me"}], x.farm_approach === false ? "false" : "true")}</label>
       </div>
@@ -2208,6 +2226,7 @@ function farmTab(c, p) {
 
     ${!all ? "" : card(6, "Trusts (optional)", (() => {
       const picked = String(x.trusts_list || "").split(",").map(t => t.trim()).filter(Boolean);
+      if (efInCharge(p).trusts) return efNote("Farming > Battles > Trusts has trusts: those are called while it farms, not these.");
       const avail = arr(known.trusts).filter(t => !picked.some(q => lc(q) === lc(t))).sort();
       return `<div class="row" style="align-items:flex-start;gap:18px">
           <div><b style="font-size:12px;color:var(--accent)">Call these</b><div>${picked.length ? picked.map(n => `<span class="btag" style="font-size:12px"><span class="hint">${trustRole(n)}:</span> ${esc(n)}
