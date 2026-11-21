@@ -41,7 +41,7 @@ function engine.has_shield()
     if type(eq) ~= 'table' or eq.sub == nil then return nil end
     if eq.sub == 0 then return false end
     local it = windower.ffxi.get_items(eq.sub_bag or 0, eq.sub)
-    local r = it and it.id and it.id ~= 0 and require('resources').items[it.id]
+    local r = it and it.id and it.id ~= 0 and require('vg_items').get(it.id)
     if not r then return nil end
     return (r.shield_size or 0) > 0
 end
@@ -67,6 +67,122 @@ end
 
 function engine.refused(id) return refused[id] and now() < refused[id] end
 
+-- an Unbridled spell (Unbridled Learning first) or a Scholar's Addendum spell (Addendum first) is listed / tried: prep
+local UNBRIDLED_OK = { unbridled = true, addendum = true }
+
+------------------------------------------------------------------------
+-- "Use these abilities first" (his request 2026-11-09: Mighty Guard with Diffusion, and the same for other spells):
+--   pre       job abilities used on me right before the action, "Diffusion/Chain Affinity" ('none' = none)
+--   pre_mode  go (a prep that isn't ready is left out) | wait (the action waits for it)
+--   ub        an Unbridled spell's opener: learning | wisdom | either (Learning, or Wisdom while Learning is on recast)
+------------------------------------------------------------------------
+function engine.pre_names(a)
+    local out = {}
+    if (a.pre or '') == '' or tostring(a.pre):lower() == 'none' then return out end
+    for _, n in ipairs(util.split(tostring(a.pre), '/')) do
+        n = n:match('^%s*(.-)%s*$')
+        if n ~= '' and n:lower() ~= 'none' then out[#out + 1] = n end
+    end
+    return out
+end
+
+local function prep_ready(ja, p)
+    if ja.recast_id == 231 then                         -- Scholar stratagems: a charge left is enough
+        local ok, strat = pcall(require, 'vg_strat')
+        if ok and strat.charges then return strat.charges(p) > 0 end
+    end
+    return util.ability_ready(ja)
+end
+
+local waitlog = {}
+local function note_wait(ctx, key, text)
+    if waitlog[key] and now() - waitlog[key] < 60 then return end
+    waitlog[key] = now()
+    ctx.log(text)
+end
+
+-- One prep step per call (a /ja, then the 1.5 s wait the next tick keeps). 'sent' = a /ja was sent; 'wait' = the
+-- action waits (the abilities below it get their turn meanwhile); nil = nothing (more) first, the action may go now.
+local function prep(a, ctx, ja_set)
+    local p = ctx.player
+    local amnesia = ctx.amnesia(p)                        -- no job abilities: as if none were ready
+    local function send(ja, key)
+        ctx.use_ja(ja, '<me>')
+        ctx.mark(key)
+        last_used = { id = 'prep:' .. ja.en, label = ja.en, t = now() }
+        ctx.log(('%s before %s'):format(ja.en, a.label))
+        return 'sent'
+    end
+    -- an Unbridled spell: Unbridled Learning / Wisdom has to be up (it can't go without it). Checked before anything else
+    -- is used, so Diffusion isn't spent while Learning is still on recast.
+    local opener
+    local sp = a.kind == 'ma' and util.spell(a.name)
+    if sp and util.unbridled(sp) and not util.unbridled_up(p.buffs) then
+        -- just used it: wait for the buff to show (the spell is never sent without it - after an interrupted or used-up
+        -- Learning the spell went again on its own, which the game refuses: seen in the panel test 2026-11-09)
+        if ctx.recently('prep:unbridled', 8) then return 'wait' end
+        local ul, uw = util.ability('Unbridled Learning'), util.ability('Unbridled Wisdom')
+        local pick = a.ub or 'learning'
+        if amnesia then
+        elseif pick ~= 'wisdom' and ul and ja_set[ul.id] and util.ability_ready(ul) then opener = ul
+        elseif pick ~= 'learning' and uw and ja_set[uw.id] and util.ability_ready(uw) then opener = uw end
+        if not opener then
+            note_wait(ctx, a.id .. 'ub', ('%s waits for %s'):format(a.label,
+                pick == 'wisdom' and 'Unbridled Wisdom' or pick == 'either' and 'Unbridled Learning or Wisdom' or 'Unbridled Learning'))
+            return 'wait'
+        end
+    end
+    -- a Scholar's Addendum spell (Reraise on RDM/SCH, Poisona, Sleep...): Addendum: White / Black first, by itself
+    -- (without it the game refuses the spell: CharB sent Reraise every 11 s for 15 minutes, 2026-11-12)
+    if sp and not opener and util.ADDENDUM[sp.en] and not util.has_buff(p.buffs, util.ADDENDUM[sp.en])
+        and not util.can_cast(sp, p) and util.can_cast(sp, p, { addendum = true }) then
+        if ctx.recently('prep:addendum', 8) then return 'wait' end
+        local ad = util.ability(util.ADDENDUM[sp.en] == 401 and 'Addendum: White' or 'Addendum: Black')
+        if not amnesia and ad and ja_set[ad.id] and prep_ready(ad, p) then return send(ad, 'prep:addendum') end
+        note_wait(ctx, a.id .. 'addendum', ('%s waits for %s'):format(a.label, ad and ad.en or 'Addendum'))
+        return 'wait'
+    end
+    -- the abilities picked to go first, in their order; with "wait for it" all of them have to be ready before any is used
+    local todo = {}
+    for _, name in ipairs(engine.pre_names(a)) do
+        local ja = util.ability(name)
+        -- (an ability I don't have right now - another sub job - is left out)
+        if ja and ja.en:lower() ~= tostring(a.name):lower() and ja_set[ja.id] then
+            local up = (ja.status and util.has_buff(p.buffs, ja.status)) or ctx.recently('prep:' .. ja.en, 8)
+            if not up then
+                if not amnesia and not engine.refused('prep:' .. ja.en) and prep_ready(ja, p) then
+                    todo[#todo + 1] = ja
+                elseif a.pre_mode == 'wait' then
+                    note_wait(ctx, a.id .. ja.en, ('%s waits for %s'):format(a.label, ja.en))
+                    return 'wait'
+                end
+            end
+        end
+    end
+    if todo[1] then return send(todo[1], 'prep:' .. todo[1].en) end
+    if opener then return send(opener, 'prep:unbridled') end
+    return nil
+end
+engine.prep = prep
+
+-- What the game's own data says an ability needs (checked 2026-11-13/14 against BG Wiki: Saber Dance, Fan Dance,
+-- Climactic Flourish): TP for dances, MP for blood pacts, no Waltz under Saber Dance, no Samba under Fan Dance, a
+-- finishing move for a Flourish. Before, these were sent, refused by the game, and paused for a minute.
+local FINISHING = { 381, 382, 383, 384, 385, 588 }
+function engine.ja_rules_ok(ja, p)
+    local v = p.vitals or {}
+    if (ja.tp_cost or 0) > 0 and (v.tp or 0) < ja.tp_cost and not util.has_buff(p.buffs, util.buff_id('Trance')) then return false end
+    if ja.prefix == '/pet' and (ja.mp_cost or 0) > (v.mp or 0) then return false end
+    if ja.type == 'Waltz' and util.has_buff(p.buffs, 410) then return false end
+    if ja.type == 'Samba' and util.has_buff(p.buffs, 411) then return false end
+    if type(ja.type) == 'string' and ja.type:find('^Flourish') then
+        local fm = false
+        for _, id in ipairs(FINISHING) do if util.has_buff(p.buffs, id) then fm = true break end end
+        if not fm then return false end
+    end
+    return true
+end
+
 function engine.available(action, player, ja_set)
     ja_set = ja_set or ability_set()
     if action.shield and engine.has_shield() == false then return false end
@@ -74,7 +190,7 @@ function engine.available(action, player, ja_set)
         local ja = util.ability(action.name)
         return ja ~= nil and ja_set[ja.id] == true
     elseif action.kind == 'ma' then
-        return util.can_cast(util.spell(action.name), player)
+        return util.can_cast(util.spell(action.name), player, UNBRIDLED_OK)
     elseif action.kind == 'nuke' then
         for _, el in ipairs(action.name) do
             if best_nuke(el, player, false) then return true end
@@ -147,7 +263,17 @@ function engine.list(profile, player)
             end
             limits[#limits + 1] = { k = 'cooldown', v = e.cooldown or 5, d = a.cooldown or 5 }
             limits[#limits + 1] = { k = 'when', v = e.when, d = a.when }
-            out[#out + 1] = { id = a.id, label = a.label, group = a.group, on = engine.enabled(a, profile), limits = limits, custom = a.custom or nil }
+            local row = { id = a.id, label = a.label, group = a.group, on = engine.enabled(a, profile), limits = limits, custom = a.custom or nil }
+            row.owned = engine.owner and engine.owner(a) or nil      -- "handled by the Buffs tab / EasyFarm's ... list"
+
+            if a.kind ~= 'roll' then              -- "use these first": the app's First: chips
+                row.pre = engine.pre_names(e)
+                row.pre_d = engine.pre_names(a)
+                row.pre_mode = e.pre_mode or 'go'
+                local sp = a.kind == 'ma' and util.spell(a.name)
+                if sp and util.unbridled(sp) then row.ub = e.ub or 'learning' end
+            end
+            out[#out + 1] = row
         end
     end
     return out
@@ -174,7 +300,8 @@ local function resolve_target(a, ctx)
         local leader = ctx.settings.leader
         if leader == '' or leader:lower() == p.name:lower() then return '<me>', p.buffs end
         local m = member_by_name(ctx, leader)
-        if not m then return nil end
+        -- (not on a KO'd leader: CharB sent Refresh III to CharA every 8 s after he died, 2026-11-12)
+        if not m or (m.hpp or 1) <= 0 then return nil end
         return m.name, ctx.buffs_of(m, p)
     elseif a.target == 'lowest' then
         local worst
@@ -246,6 +373,17 @@ local function conditions_ok(a, ctx)
     if w == 'combat' and not ctx.party_engaged(p) then return false end
     if w == 'idle' and (p.status ~= 0 or ctx.party_engaged(p)) then return false end
     if a.hpp_below and v.hpp >= a.hpp_below then return false end
+    if a.hpp_above and v.hpp <= a.hpp_above then return false end      -- (Berserk and the like: not while hurt)
+    if a.need_buff and not util.has_buff(p.buffs, util.buff_id(a.need_buff)) then return false end   -- Cooldown: Overload
+    if a.need_rune then                                                -- Vallation / Valiance / Pflug work off the runes up
+        local rune = false
+        for id = 523, 530 do if util.has_buff(p.buffs, id) then rune = true break end end
+        if not rune then return false end
+    end
+    if a.avatar then                                                   -- a blood pact belongs to one avatar
+        local pet = windower.ffxi.get_mob_by_target('pet')
+        if not pet or pet.name ~= a.avatar then return false end
+    end
     if a.mpp_below and v.mpp >= a.mpp_below then return false end
     if a.mpp_above and v.mpp <= a.mpp_above then return false end
     if a.tp_min and v.tp < a.tp_min then return false end
@@ -279,8 +417,9 @@ end
 ------------------------------------------------------------------------
 -- Execution
 ------------------------------------------------------------------------
-local function try(a, ctx)
+local function try(a, ctx, ja_set)
     local p = ctx.player
+    ja_set = ja_set or ability_set()
     if ctx.recently('act:' .. a.id, a.cooldown or 5) then return false end
     if not conditions_ok(a, ctx) then return false end
 
@@ -300,22 +439,30 @@ local function try(a, ctx)
         if ctx.amnesia(p) then return false end
         local ja = util.ability(a.name)
         if not util.ability_ready(ja) then return false end
+        if not engine.ja_rules_ok(ja, p) then return false end
         -- Crooked Cards right before the chosen roll (AutoCOR's option): a stronger roll
         if a.kind == 'roll' and ctx.crooked and ctx.crooked(a.name, p) then return true end
+        if a.kind == 'ja' then local pre = prep(a, ctx, ja_set) if pre then return pre == 'sent' end end
         done = ctx.use_ja(ja, target)
         if done then ctx.log(a.label) end
     elseif a.kind == 'ma' then
         if ctx.silenced(p) then return false end
         local spell = util.spell(a.name)
-        if not util.spell_ready(spell, p) then return false end
+        if not util.spell_ready(spell, p, UNBRIDLED_OK) then return false end
+        local pre = prep(a, ctx, ja_set) if pre then return pre == 'sent' end
         done = ctx.cast(spell, target, a.label)
     elseif a.kind == 'nuke' then
         if ctx.silenced(p) then return false end
         for _, el in ipairs(a.name) do
             local spell = best_nuke(el, p, true)
-            if spell then done = ctx.cast(spell, target, 'free nuke') break end
+            if spell then
+                local pre = prep(a, ctx, ja_set) if pre then return pre == 'sent' end
+                done = ctx.cast(spell, target, 'free nuke')
+                break
+            end
         end
     elseif a.kind == 'ra' then
+        local pre = prep(a, ctx, ja_set) if pre then return pre == 'sent' end
         windower.send_command('input /ra <t>')
         ctx.state.busy_until = now() + 2.5
         done = true
@@ -339,9 +486,13 @@ function engine.run(ctx, profile, filter)
         -- Nightingale / Troubadour / Marcato belong to the songs while Songs is on (NiTro right before the songs, Marcato
         -- right before its song): used on their own they went off at random and the songs missed them (2026-10-18)
         local songs_own = a.songs_managed and ctx.settings.modules.songs and (ctx.settings.songs.list or '') ~= ''
-        if not songs_own and (not filter or filter(a)) and engine.enabled(a, profile) and not engine.refused(a.id)
+        -- one owner per spell: the same spell ticked on the Buffs tab (same target) or switched on in one of EasyFarm's
+        -- lists while it farms is left to that feature (his log 2026-11-10..14: Haste II on the leader, Reraise, Aquaveil,
+        -- Auspice from both the Job tab and the Buffs tab; White Wind from the Job tab and EasyFarm's Healing list)
+        local owned = engine.owner and engine.owner(a)
+        if not songs_own and not owned and (not filter or filter(a)) and engine.enabled(a, profile) and not engine.refused(a.id)
             and engine.available(a, ctx.player, ja_set) then
-            if try(engine.effective(a, profile), ctx) then return true end
+            if try(engine.effective(a, profile), ctx, ja_set) then return true end
         end
     end
     return false

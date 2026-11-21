@@ -64,6 +64,32 @@ end
 function util.spell(name)   return name and util.spells[name:lower()] end
 function util.ability(name) return name and util.abilities[name:lower()] end
 function util.wskill(name)  return name and util.wskills[name:lower()] end
+-- Can the weapon in the main hand use it? The game's own list changes with the weapon (his log 2026-10-30: DRK with a scythe, and
+-- Expiacion and Atonement from his BLU's settings sent over and over). An empty list says nothing (just zoned, Amnesia).
+-- "X doesn't work with the weapon in your hand" is said once per weapon, not every minute (his question 2026-11-11: "why do i
+-- keep getting [it] for weaponskills that are not being used" - CharC's Keep Aftermath / Finish with were set for
+-- another weapon). true = say it now. Said again after a weapon it fits (util.ws_fits clears it) or another weapon.
+local unfit_said = {}
+function util.ws_unfit_note(name, where)
+    local ab = windower.ffxi.get_abilities()
+    local sum, n = 0, 0
+    for _, id in pairs(ab and ab.weapon_skills or {}) do sum, n = sum + id, n + 1 end
+    local k = tostring(name):lower()
+    unfit_said[k] = unfit_said[k] or {}
+    local sig = n .. ':' .. sum
+    if unfit_said[k][where or ''] == sig then return false end
+    unfit_said[k][where or ''] = sig
+    return true
+end
+
+function util.ws_fits(name)
+    local w = util.wskill(name)
+    local ab = windower.ffxi.get_abilities()
+    local ids = ab and ab.weapon_skills
+    if not w or not ids or next(ids) == nil then return true end
+    for _, id in pairs(ids) do if id == w.id then unfit_said[w.en:lower()] = nil return true end end
+    return false
+end
 
 -- Buff id by name ("Haste", "poison", ...). Returns nil if unknown.
 function util.buff_id(name)
@@ -94,6 +120,22 @@ end
 ------------------------------------------------------------------------
 -- Player / mob helpers
 ------------------------------------------------------------------------
+-- Everyone in my party AND the other two parties of an alliance (a1x / a2x), by mob id. In FFXI any alliance member
+-- may attack a monster another alliance member claimed (his report 2026-11-21: in an alliance, CharA engaged mobs
+-- claimed by the other parties, Vanguard took them for "someone else's" and sent /attackoff, over and over).
+util.ALLIANCE_KEYS = { 'p0', 'p1', 'p2', 'p3', 'p4', 'p5', 'a10', 'a11', 'a12', 'a13', 'a14', 'a15',
+                       'a20', 'a21', 'a22', 'a23', 'a24', 'a25' }
+function util.alliance_ids(ids)
+    ids = ids or {}
+    local p = windower.ffxi.get_party() or {}
+    for _, k in ipairs(util.ALLIANCE_KEYS) do
+        local m = p[k]
+        local mob = m and (m.mob or (m.name and windower.ffxi.get_mob_by_name(m.name)))
+        if mob and mob.id then ids[mob.id] = true end
+    end
+    return ids
+end
+
 function util.dist(mob)
     if not mob or not mob.distance then return 999 end
     return math.sqrt(mob.distance)
@@ -147,32 +189,80 @@ function util.blu_set()
     return blu_set.ids
 end
 
-function util.can_cast(spell, player)
+-- Unbridled spells (Mighty Guard, Carcharian Verve...): never set; a main-job BLU casts them only while Unbridled
+-- Learning or Unbridled Wisdom is up (his request 2026-11-09: "there is no way to use the spells under unbridled learning")
+util.UNBRIDLED_NAMES = { 'Thunderbolt', 'Harden Shell', 'Absolute Terror', 'Gates of Hades', 'Tourbillion',
+    'Pyric Bulwark', 'Bilgestorm', 'Bloodrake', 'Droning Whirlwind', 'Carcharian Verve', 'Blistering Roar', 'Uproot',
+    'Crashing Thunder', 'Polar Roar', 'Mighty Guard', 'Cruel Joke', 'Cesspool', 'Tearing Gust' }
+local unbridled_set
+function util.unbridled(spell)
+    if not spell or spell.type ~= 'BlueMagic' then return false end
+    if not unbridled_set then
+        unbridled_set = {}
+        for _, n in ipairs(util.UNBRIDLED_NAMES) do unbridled_set[n:lower()] = true end
+    end
+    return unbridled_set[(spell.en or ''):lower()] == true
+end
+util.UNBRIDLED_BUFFS = { 485, 505 }            -- Unbridled Learning, Unbridled Wisdom
+function util.unbridled_up(buffs)
+    return util.has_buff(buffs, 485) or util.has_buff(buffs, 505)
+end
+
+-- opts.unbridled: count an Unbridled spell as castable without the buff (the action engine uses Unbridled Learning first)
+-- Scholar spells that need Addendum: White (401) / Addendum: Black (402) up
+util.ADDENDUM = {}
+for _, n in ipairs({ 'Poisona', 'Paralyna', 'Blindna', 'Silena', 'Stona', 'Viruna', 'Cursna', 'Erase', 'Raise II',
+    'Raise III', 'Reraise', 'Reraise II', 'Reraise III' }) do util.ADDENDUM[n] = 401 end
+for _, n in ipairs({ 'Sleep', 'Sleep II', 'Dispel', 'Break', 'Stone IV', 'Water IV', 'Aero IV', 'Fire IV', 'Blizzard IV',
+    'Thunder IV', 'Stone V', 'Water V', 'Aero V', 'Fire V', 'Blizzard V', 'Thunder V' }) do util.ADDENDUM[n] = 402 end
+
+function util.can_cast(spell, player, opts)
     if not spell then return false end
     local known = windower.ffxi.get_spells()
     if not known or (not known[spell.id] and not util.instrument_song(spell)) then return false end
+    if util.unbridled(spell) then
+        if player.main_job ~= 'BLU' then return false end              -- Unbridled Learning is main-job BLU only
+        if not (util.unbridled_up(player.buffs) or (opts and opts.unbridled)) then return false end
     -- unset blue magic: the game refuses it (pull with a blue spell, quick buttons...; 2026-10-19)
-    if spell.type == 'BlueMagic' and (player.main_job == 'BLU' or player.sub_job == 'BLU')
+    elseif spell.type == 'BlueMagic' and (player.main_job == 'BLU' or player.sub_job == 'BLU')
         and (windower.ffxi.get_mjob_data or windower.ffxi.get_sjob_data) and not util.blu_set()[spell.id] then return false end
     local lv = spell.levels or {}
     local main_lv = lv[player.main_job_id]
     local sub_lv = lv[player.sub_job_id]
+    -- a Scholar's Addendum spell only casts under its Addendum (his RDM/SCH CharB, 2026-11-12: Reraise sent every 11 s
+    -- for 15 minutes without Addendum: White, each one refused)
+    local function sch_ok(job)
+        if job ~= 'SCH' or (opts and opts.addendum) then return true end   -- (opts.addendum: lists to pick from)
+        local need = util.ADDENDUM[spell.en]
+        return not need or util.has_buff(player.buffs, need)
+    end
     -- Job Point spells have levels > 99; treat as usable at level 99.
-    if main_lv and (main_lv <= player.main_job_level or player.main_job_level >= 99) then return true end
-    if sub_lv and sub_lv <= (player.sub_job_level or 0) then return true end
+    if main_lv and (main_lv <= player.main_job_level or player.main_job_level >= 99) and sch_ok(player.main_job) then return true end
+    if sub_lv and sub_lv <= (player.sub_job_level or 0) and sch_ok(player.sub_job) then return true end
     return false
 end
 
-function util.spell_ready(spell, player)
-    if not util.can_cast(spell, player) then return false end
+function util.spell_ready(spell, player, opts)
+    if not util.can_cast(spell, player, opts) then return false end
     local recasts = windower.ffxi.get_spell_recasts()
     if recasts[spell.recast_id] and recasts[spell.recast_id] > 0 then return false end
     if (spell.mp_cost or 0) > player.vitals.mp then return false end
     return true
 end
 
+-- Only an ability this character has on its current jobs: one from another job has no recast timer at all, which read
+-- as "ready" (his report 2026-11-11: CharB on WHM/SCH kept trying Convert, a Red Mage ability, at low MP).
+-- An empty ability list says nothing (just zoned).
+function util.ability_known(ja)
+    local ab = windower.ffxi.get_abilities()
+    local ids = ab and ab.job_abilities
+    if not ja or not ids or next(ids) == nil then return true end
+    for _, id in pairs(ids) do if id == ja.id then return true end end
+    return false
+end
+
 function util.ability_ready(ja)
-    if not ja then return false end
+    if not ja or not util.ability_known(ja) then return false end
     local recasts = windower.ffxi.get_ability_recasts()
     local r = recasts[ja.recast_id]
     return r == nil or r == 0

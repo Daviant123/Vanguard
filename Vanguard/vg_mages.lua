@@ -71,7 +71,9 @@ function mages.aoe_na(player, status_ids, members)
     local sch = job == 'SCH' or player.sub_job == 'SCH'
     if job ~= 'WHM' and not sch then return false end
     for _, entry in ipairs(status_ids) do
-        if entry[2] ~= 'Erase' and entry[2] ~= 'Esuna' or (entry[2] == 'Erase' and job == 'WHM') then
+        -- (Erase only above 40 % MP: the mobs put those back at once, the MP is for cures - CharB 2026-11-21)
+        local low_mp = ((player.vitals or {}).mpp or 100) < 40
+        if (entry[2] ~= 'Erase' and entry[2] ~= 'Esuna' or (entry[2] == 'Erase' and job == 'WHM')) and not (low_mp and entry[2] == 'Erase') then
             local who, count = nil, 0
             for _, m in ipairs(members) do
                 local bl = h.buffs_of(m, player)
@@ -230,6 +232,7 @@ end
 local SLEEPS = { 'Sleep II', 'Sleep', 'Foe Lullaby II', 'Foe Lullaby', 'Sleepga II', 'Sleepga', 'Horde Lullaby II', 'Horde Lullaby' }
 local SLEEP_SET = {}
 for _, n in ipairs(SLEEPS) do SLEEP_SET[n] = true end
+for _, n in ipairs({ 'Repose', 'Dream Flower', 'Sheep Song', 'Yawn', 'Soporific' }) do SLEEP_SET[n] = true end   -- (vg_charm's too)
 local UNDEAD = { 'skeleton', 'ghoul', 'ghast', 'corse', 'wight', 'ghost', 'phantom', 'lich', 'shade', 'bones',
                  'mummy', 'vampyr', 'revenant', 'doom', 'draugar', 'fomor' }
 local NO_EFFECT = { [75] = true, [283] = true, [156] = true }

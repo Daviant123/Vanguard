@@ -37,7 +37,7 @@ combat.attacker = attacker
 local function party_attacker(player)
     local p = windower.ffxi.get_party() or {}
     local idx = {}
-    for _, k in ipairs({ 'p0', 'p1', 'p2', 'p3', 'p4', 'p5' }) do if p[k] and p[k].mob then idx[p[k].mob.index] = true end end
+    for _, k in ipairs(require('vg_util').ALLIANCE_KEYS) do if p[k] and p[k].mob then idx[p[k].mob.index] = true end end
     local best
     for _, m in pairs(windower.ffxi.get_mob_array() or {}) do
         if m.spawn_type == 16 and m.status == 1 and m.hpp and m.hpp > 0 and m.valid_target ~= false and idx[m.target_index]
@@ -54,7 +54,8 @@ local PET_RECALL = { BST = 'Heel', SMN = 'Retreat', PUP = 'Retreat' }
 function combat.tick(player)
     if S.leader == '' or not S.modules.assist then return false end
     local l = h.leader_mob(player)
-    local leader_fighting = l and l.status == 1
+    -- (fighting: engaged - or, with assist.on_claim, pulling / casting on a mob the party has claimed)
+    local leader_fighting = l and (l.status == 1 or (h.leader_target and h.leader_target(player) ~= nil))
 
     -- Self-defense: something is hitting me and the leader isn't fighting.
     if S.assist.defend and not leader_fighting then
@@ -93,7 +94,7 @@ function combat.tick(player)
 
     -- Disengage with the leader (not while farming on my own or defending myself).
     -- (only when the leader is standing idle: if the leader is KO'd, keep fighting)
-    if S.assist.disengage and player.status == 1 and l and l.status == 0 and not S.modules.farm and not state.defending then
+    if S.assist.disengage and player.status == 1 and l and l.status == 0 and not leader_fighting and not S.modules.farm and not state.defending then
         state.leader_idle_since = state.leader_idle_since or clock()
         if clock() - state.leader_idle_since >= 2 and not h.recently('disengage', 4) then
             h.mark('disengage')

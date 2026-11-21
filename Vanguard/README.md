@@ -234,6 +234,9 @@ Settings are now saved safely with several characters running (one character's s
 - **Geomancer.** Casts Dia II first so Geo-Frailty / Malaise work (the guide: the GEO must be on the mob's hate list).
   `//vg set geo.entrust auto` entrusts Indi-Haste (or Indi-Fury) to you. Radial Arcana also when 2+ party members are
   under 40% MP (`geo.party_mp`).
+- **AutoSkillchain while farming.** Farming > Battles > AutoSkillchain: pick "AutoSkillchain" instead of the Weaponskill
+  list, load a preset or fill in your own weapon skills, and save your own chains by name.
+- **Weapon skills at a set MP.** On Job & abilities or in AutoSkillchain: weapon skills only at this MP % and / or MP number.
 - **Weapon skill chain (one character).** On Job & abilities: up to 6 weapon skills used in turn (each at 1000+ TP,
   4 s or more apart, in range), repeating or stopping at the end; a new mob or a 20 s break starts it over. Chains saved
   in the AutoSkillchain addon (its data folder) can be loaded with one click. Saved per job.
@@ -378,6 +381,18 @@ picks unclaimed only, unclaimed or ours, or any.
 
 Give any quick button a hotkey (Ctrl or Alt + a number) from its menu on the Team tab. Press it in the game window you
 play (the leader's, or pick another) and the button's character acts - no need to click the app.
+
+## Unbridled spells and "use these abilities first" (new in 0.95.0 / Vanguard Control 1.92.0)
+
+- **Unbridled spells** (Mighty Guard, Carcharian Verve, Harden Shell, Pyric Bulwark, Thunderbolt, Gates of Hades...): turn the
+  action on (or add one with Add your own > Blue magic) and Vanguard uses **Unbridled Learning** right before it. Each one has a
+  choice: Unbridled Learning, "Learning, else Wisdom" (Wisdom only while Learning is on recast), or Unbridled Wisdom. Main-job
+  BLU only, like the game.
+- **first:** on every ability row of the Job tab: pick job abilities to use on yourself right before it, e.g. Diffusion before
+  Mighty Guard, Burst Affinity before a blue nuke, Composure before a Red Mage buff, Accession or Manifestation before a Scholar
+  spell, Elemental Seal before a debuff. Each is used only when it's ready and not already up, one at a time. If one is on recast:
+  "go without it" (default) or "wait for it". Saved per job and in profiles. Chat: `//vg actpre <id> add Diffusion`,
+  `del <name>`, `clear`, `default`, `mode go|wait`, `ub learning|wisdom|either`.
 
 ## Ability priority (new in 0.23.0 / Vanguard Control 1.12.0)
 

@@ -31,7 +31,7 @@ local function has_item(name, bags)
         local list = all[bag]
         if type(list) == 'table' then
             for _, it in ipairs(list) do
-                local item = type(it) == 'table' and it.id and res.items[it.id]
+                local item = type(it) == 'table' and it.id and require('vg_items').get(it.id)
                 if item and item.en == name then return true end
             end
         end

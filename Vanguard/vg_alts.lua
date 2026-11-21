@@ -16,6 +16,7 @@ Windower's local IPC (no packets). Nothing here acts in a fight: mounting and ea
 ]]
 
 local res = require('resources')
+local items = require('vg_items')
 
 local alts = {}
 local S, state, h          -- settings, runtime state, helpers from Vanguard.lua
@@ -142,10 +143,7 @@ local item_ids = {}
 local function item_by_name(name)
     local key = name:lower()
     if item_ids[key] == nil then
-        item_ids[key] = false
-        for id, it in pairs(res.items) do
-            if type(it) == 'table' and ((it.en or ''):lower() == key or (it.enl or ''):lower() == key) then item_ids[key] = id break end
-        end
+        item_ids[key] = items.id(name) or false
     end
     return item_ids[key] or nil
 end
@@ -173,7 +171,7 @@ function alts.upkeep(player)
     if food ~= '' and not has_buff(player.buffs, BUFF_FOOD) and not h.recently('food', 30) then
         h.mark('food')
         local id = item_by_name(food)
-        if id and in_inventory(id) then return use_item(res.items[id].en, 'food wore off') end
+        if id and in_inventory(id) then return use_item(items.name(id), 'food wore off') end
         if not h.recently('food_missing', 600) then h.mark('food_missing') h.log('No ' .. food .. ' in the inventory for food upkeep') end
     end
     local rr = S.upkeep.reraise or ''
@@ -185,7 +183,7 @@ function alts.upkeep(player)
         end
         if rr:lower() ~= 'auto' then
             local id = item_by_name(rr)
-            if id and in_inventory(id) then return use_item(res.items[id].en, 'Reraise upkeep') end
+            if id and in_inventory(id) then return use_item(items.name(id), 'Reraise upkeep') end
         end
     end
     return false

@@ -17,6 +17,8 @@ Normal game commands only (/ws, /attackoff, /attack). The "stop attacking" order
 on this PC (vg_finish <mob id> <name>).
 ]]
 
+local util = require('vg_util')
+
 local finish = {}
 local S, state, h
 
@@ -134,6 +136,13 @@ function finish.ws(player, t)
     if S.ws.finish_trial_only then
         local ok, tr = pcall(require, 'vg_trials')
         if not (ok and ((tr.assisting and tr.assisting()) or (tr.wants and tr.wants(t.name, f)))) then return nil end
+    end
+    -- another weapon's (his log 2026-10-30: Atonement on a DRK with a scythe): no holding TP, the others keep attacking
+    if not util.ws_fits(f) then
+        if util.ws_unfit_note(f, 'finish') then
+            h.log(f .. " doesn't work with the weapon in your hand: no finishing weapon skill")
+        end
+        return nil
     end
     finish.learn_tick()
     state.finish_seen = { id = t.id, hpp = t.hpp }

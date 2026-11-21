@@ -26,7 +26,8 @@ local function clock() return os.clock() end
 blist.LISTS = { 'start', 'trusts', 'pull', 'battle', 'finish', 'healing', 'ws' }
 -- fields: name and defaults (EasyFarm's defaults: everything open, distance 3 for melee-range things)
 local FIELDS = { { 'n', '' }, { 'on', 1 }, { 'd', 20 }, { 'rc', 0 }, { 'pl', 0 }, { 'ph', 100 }, { 'tl', 0 }, { 'th', 100 },
-                 { 'ml', 0 }, { 'mh', 100 }, { 'tpl', 0 }, { 'tph', 3000 }, { 'st', '' }, { 'sp', 0 }, { 'tn', '' }, { 'lim', 0 } }
+                 { 'ml', 0 }, { 'mh', 100 }, { 'tpl', 0 }, { 'tph', 3000 }, { 'st', '' }, { 'sp', 0 }, { 'tn', '' }, { 'lim', 0 },
+                 { 'mal', 0 }, { 'mah', 0 } }                 -- mal / mah: the MP number, low and high (0 = no limit)
 blist.FIELDS = FIELDS
 
 local function job() local p = windower.ffxi.get_player() return p and p.main_job end
@@ -73,11 +74,8 @@ end
 -- what kind of thing a name is, and how it's used
 local item_ids
 local function item_by_name(n)
-    if not item_ids then
-        item_ids = {}
-        for id, it in pairs(res.items) do if it.en then item_ids[it.en:lower()] = it end end
-    end
-    return item_ids[(n or ''):lower()]
+    local items = require('vg_items')
+    return items.get(items.id(n))
 end
 function blist.kind(name)
     local sp = util.spell(name)
@@ -102,12 +100,21 @@ local function has_status(player, name)
     return id and util.has_buff(player.buffs, id)
 end
 
+-- the action's MP conditions: % and the MP number (a job with no MP has nothing to compare)
+function blist.mp_ok(a, v)
+    if (v.max_mp or 0) <= 0 then return true end
+    if v.mpp < (a.ml or 0) or v.mpp > (a.mh or 100) then return false end
+    if (a.mal or 0) > 0 and v.mp < a.mal then return false end
+    if (a.mah or 0) > 0 and v.mp > a.mah then return false end
+    return true
+end
+
 -- may this action go now? (its own conditions, not the recasts)
 local function ok(a, player, mob)
     if tonumber(a.on) ~= 1 then return false end
     local v = player.vitals
     if v.hpp < a.pl or v.hpp > a.ph then return false end
-    if (v.max_mp or 0) > 0 and (v.mpp < a.ml or v.mpp > a.mh) then return false end
+    if not blist.mp_ok(a, v) then return false end
     if v.tp < a.tpl or v.tp > a.tph then return false end
     if a.st ~= '' then
         local present = has_status(player, a.st)
@@ -150,7 +157,7 @@ local function fire(a, player, mob, why)
         if h.amnesia(player) or not util.ability_ready(r) then return false end
         done = h.use_ja(r, tgt)
     elseif kind == 'ws' then
-        if h.amnesia(player) or player.vitals.tp < 1000 or player.status ~= 1 then return false end
+        if h.amnesia(player) or player.vitals.tp < 1000 or player.status ~= 1 or not util.ws_fits(r.en) then return false end
         done = h.use_ws(r.en)
     elseif kind == 'item' then
         if h.recently('item:' .. r.en, 3) then return false end
@@ -239,9 +246,10 @@ end
 -- the weapon skill list (do_ws asks): the weapon skill to use now, or nil
 function blist.ws(player, t)
     if not S.modules.farm or not blist.any('ws') then return nil end
+    if require('vg_wschain').in_charge(t) then return nil end   -- (AutoSkillchain picked in Battles: its chain instead)
     for _, a in ipairs(blist.get('ws')) do
         local kind, r = blist.kind(a.n)
-        if kind == 'ws' and ok(a, player, t) and player.vitals.tp >= math.max(1000, a.tpl) then return a, r end
+        if kind == 'ws' and util.ws_fits(r.en) and ok(a, player, t) and player.vitals.tp >= math.max(1000, a.tpl) then return a, r end
     end
     return 'hold'
 end

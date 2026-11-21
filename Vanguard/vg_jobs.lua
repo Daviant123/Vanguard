@@ -23,6 +23,9 @@ Action fields
   pet      none (only without a pet) | present (only with a pet)
   no_pld   skip while a Paladin is in the party (Majesty is better than Protect)
   on       roles where this starts enabled (true = all roles)
+  pre      job abilities used on me first, "Diffusion/Chain Affinity" (each only when ready; vg_actions prep)
+  pre_mode go (one that isn't ready is left out) | wait (the action waits for it)
+  ub       Unbridled spells: learning | wisdom | either (Unbridled Learning / Wisdom goes first by itself)
 
 Only actions the character can actually use right now (job, sub job, level,
 spells learned) are shown and executed, so sub-job abilities appear
@@ -67,7 +70,7 @@ jobs.role_labels = {
 -- Shared sub-job style blocks (appear for any job that can use them)
 ------------------------------------------------------------------------
 local common = {
-    A('berserk', 'Berserk', 'Buffs', 'ja', 'Berserk', {buff = 'Berserk', on = {melee = true, pet = true}}),
+    A('berserk', 'Berserk', 'Buffs', 'ja', 'Berserk', {buff = 'Berserk', hpp_above = 50, on = {melee = true, pet = true}}),   -- (defense down: not while hurt)
     A('warcry', 'Warcry', 'Buffs', 'ja', 'Warcry', {buff = 'Warcry', on = {melee = true, tank = true}}),
     A('aggressor', 'Aggressor', 'Buffs', 'ja', 'Aggressor', {buff = 'Aggressor', on = {melee = true}}),
     A('provoke', 'Provoke (hold hate)', 'Defense', 'ja', 'Provoke', {target = '<t>', cooldown = 30, on = {tank = true}}),
@@ -199,7 +202,7 @@ jobs.PLD = {
         A('crusade', 'Crusade', 'Buffs', 'ma', 'Crusade', {buff = 'Enmity Boost', when = 'always', on = {tank = true}}),
         A('phalanx', 'Phalanx', 'Defense', 'ma', 'Phalanx', {buff = 'Phalanx', when = 'always', on = {tank = true}}),
         A('reprisal', 'Reprisal', 'Defense', 'ma', 'Reprisal', {buff = 'Reprisal', shield = true, when = 'combat', on = {tank = true}}),
-        A('enlight2', 'Enlight II', 'Offense', 'ma', 'Enlight II', {buff_any = {'Enlight', 'Enlight II'}, when = 'combat', on = {tank = true}}),
+        A('enlight2', 'Enlight II', 'Offense', 'ma', 'Enlight II', {buff = 'Enlight', when = 'combat', on = {tank = true}}),
         A('protect5', 'Protect V', 'Defense', 'ma', 'Protect V', {buff = 'Protect', when = 'always', on = {tank = true}}),
         A('shell4', 'Shell IV', 'Defense', 'ma', 'Shell IV', {buff = 'Shell', when = 'always', on = {tank = true}}),
         A('flash_pld', 'Flash (enmity)', 'Defense', 'ma', 'Flash', {target = '<t>', cooldown = 20, on = {tank = true}}),
@@ -217,7 +220,7 @@ jobs.DRK = {
     roles = {'melee', 'tank'},
     ws = {'Torcleaver', 'Resolution', 'Insurgency', 'Cross Reaper', 'Catastrophe', 'Entropy', 'Savage Blade'},
     actions = {
-        A('last_resort', 'Last Resort', 'Buffs', 'ja', 'Last Resort', {buff = 'Last Resort', on = {melee = true}}),
+        A('last_resort', 'Last Resort', 'Buffs', 'ja', 'Last Resort', {buff = 'Last Resort', hpp_above = 50, on = {melee = true}}),
         A('arcane_circle', 'Arcane Circle', 'Buffs', 'ja', 'Arcane Circle', {buff = 'Arcane Circle', on = {melee = true}}),
         A('scarlet_delirium', 'Scarlet Delirium', 'Buffs', 'ja', 'Scarlet Delirium', {buff = 'Scarlet Delirium', on = {melee = true}}),
         A('endark2', 'Endark II', 'Buffs', 'ma', 'Endark II', {buff = 'Endark', when = 'combat', on = {melee = true}}),
@@ -225,7 +228,7 @@ jobs.DRK = {
         A('absorb_tp', 'Absorb-TP', 'Debuffs', 'ma', 'Absorb-TP', {target = '<t>', cooldown = 60}),
         A('drain3', 'Drain III when HP < 50%', 'Recovery', 'ma', 'Drain III', {target = '<t>', hpp_below = 50, on = true}),
         A('stun', 'Stun', 'Debuffs', 'ma', 'Stun', {target = '<t>', cooldown = 45}),
-        A('souleater', 'Souleater', 'Offense', 'ja', 'Souleater', {}),
+        A('souleater', 'Souleater', 'Offense', 'ja', 'Souleater', {hpp_above = 60}),
     },
 }
 
@@ -246,7 +249,7 @@ jobs.BRD = {
     ws = {"Rudra's Storm", 'Savage Blade', 'Evisceration', 'Mordant Rime'},
     songs = {
         support = 'Honor March,Valor Minuet V,Valor Minuet IV,Blade Madrigal',
-        support_caster = "Mage's Ballad III,Mage's Ballad II,Sage Etude,Arcane Etude",
+        support_caster = "Mage's Ballad III,Mage's Ballad II,Sage Etude,Logical Etude",   -- (there is no "Arcane Etude")
     },
     debuffs = {support = 'Carnage Elegy', support_caster = 'Carnage Elegy'},
     actions = {
@@ -280,7 +283,7 @@ jobs.SAM = {
     actions = {
         A('sekkanoki', 'Sekkanoki (before WS)', 'Offense', 'ja', 'Sekkanoki', {tp_min = 1000, on = {melee = true}}),
         A('seigan', 'Seigan', 'Defense', 'ja', 'Seigan', {buff = 'Seigan', on = {tank = true}}),
-        A('konzen', 'Konzen-ittai', 'Offense', 'ja', 'Konzen-ittai', {tp_min = 1000}),
+        A('konzen', 'Konzen-ittai', 'Offense', 'ja', 'Konzen-ittai', {target = '<t>', tp_min = 1000}),   -- (on the enemy: BG Wiki)
         A('sengikori', 'Sengikori', 'Offense', 'ja', 'Sengikori', {tp_min = 1000}),
         A('hagakure', 'Hagakure', 'Offense', 'ja', 'Hagakure', {tp_min = 1000}),
         A('meikyo', 'Meikyo Shisui (2-hour)', 'Offense', 'ja', 'Meikyo Shisui', {}),
@@ -312,7 +315,7 @@ jobs.DRG = {
         A('spirit_jump', 'Spirit Jump', 'Offense', 'ja', 'Spirit Jump', {target = '<t>', tp_max = 1000, on = {melee = true}}),
         A('soul_jump', 'Soul Jump', 'Offense', 'ja', 'Soul Jump', {target = '<t>', tp_max = 1000, on = {melee = true}}),
         A('angon', 'Angon (new mob)', 'Debuffs', 'ja', 'Angon', {target = '<t>', once = true}),
-        A('spirit_link', 'Spirit Link when HP is low', 'Recovery', 'ja', 'Spirit Link', {hpp_below = 40, pet = 'present'}),
+        A('spirit_link', 'Spirit Link when the wyvern is low', 'Recovery', 'ja', 'Spirit Link', {pet_hpp_below = 50, hpp_above = 50, pet = 'present'}),   -- (it spends MY HP to heal the wyvern)
     },
 }
 
@@ -323,8 +326,8 @@ jobs.SMN = {
         A('summon_garuda', 'Keep Garuda out', 'Pet', 'ma', 'Garuda', {pet = 'none', when = 'always', on = {support = true}}),
         A('summon_ifrit', 'Keep Ifrit out', 'Pet', 'ma', 'Ifrit', {pet = 'none', when = 'always', on = {pet = true}}),
         A('avatars_favor', "Avatar's Favor", 'Support', 'ja', "Avatar's Favor", {buff = "Avatar's Favor", pet = 'present', when = 'always', on = true}),
-        A('hastega2', 'Hastega II (Garuda)', 'Support', 'ja', 'Hastega II', {buff = 'Haste', pet = 'present', when = 'combat', on = {support = true}}),
-        A('crystal_blessing', 'Crystal Blessing (Shiva)', 'Support', 'ja', 'Crystal Blessing', {pet = 'present', when = 'combat', cooldown = 180}),
+        A('hastega2', 'Hastega II (Garuda)', 'Support', 'ja', 'Hastega II', {buff = 'Haste', pet = 'present', avatar = 'Garuda', when = 'combat', on = {support = true}}),
+        A('crystal_blessing', 'Crystal Blessing (Shiva)', 'Support', 'ja', 'Crystal Blessing', {pet = 'present', avatar = 'Shiva', when = 'combat', cooldown = 180}),
         A('assault', 'Assault (send avatar in)', 'Pet', 'ja', 'Assault', {target = '<bt>', pet = 'present', when = 'combat', once = true, on = {pet = true}}),
         A('apogee', 'Apogee', 'Pet', 'ja', 'Apogee', {pet = 'present', when = 'combat'}),
     },
@@ -340,7 +343,8 @@ jobs.BLU = {
         A('barrier_tusk', 'Barrier Tusk', 'Defense', 'ma', 'Barrier Tusk', {when = 'combat', on = {tank = true}}),
         A('occultation', 'Occultation (blink)', 'Defense', 'ma', 'Occultation', {buff = 'Blink', when = 'combat', on = {tank = true}}),
         A('battery_charge', 'Battery Charge (refresh)', 'Buffs', 'ma', 'Battery Charge', {when = 'always', on = true}),
-        A('mighty_guard', 'Mighty Guard', 'Defense', 'ma', 'Mighty Guard', {when = 'combat'}),
+        A('mighty_guard', 'Mighty Guard (Unbridled)', 'Defense', 'ma', 'Mighty Guard', {when = 'combat', pre = 'Diffusion'}),
+        A('carcharian_verve', 'Carcharian Verve (Unbridled)', 'Buffs', 'ma', 'Carcharian Verve', {when = 'combat'}),
         A('magic_fruit', 'Magic Fruit when HP < 50%', 'Healing', 'ma', 'Magic Fruit', {hpp_below = 50, when = 'always', on = true}),
         A('free_nuke_blu', 'Free nuke (Spectral Floe)', 'Offense', 'ma', 'Spectral Floe', {target = '<bt>', when = 'combat', cooldown = 10, on = {nuker = true}}),
     },
@@ -388,8 +392,8 @@ jobs.PUP = {
         A('fire_maneuver', 'Fire Maneuver', 'Pet', 'ja', 'Fire Maneuver', {buff = 'Fire Maneuver', pet = 'present', when = 'combat', on = {pet = true}}),
         A('wind_maneuver', 'Wind Maneuver', 'Pet', 'ja', 'Wind Maneuver', {buff = 'Wind Maneuver', pet = 'present', when = 'combat', on = {pet = true}}),
         A('light_maneuver', 'Light Maneuver', 'Pet', 'ja', 'Light Maneuver', {buff = 'Light Maneuver', pet = 'present', when = 'combat', on = {pet = true}}),
-        A('repair', 'Repair when automaton is low (needs oil)', 'Pet', 'ja', 'Repair', {pet = 'present', cooldown = 90}),
-        A('cooldown', 'Cooldown (overload relief)', 'Pet', 'ja', 'Cooldown', {pet = 'present', cooldown = 300}),
+        A('repair', 'Repair when automaton is low (needs oil)', 'Pet', 'ja', 'Repair', {pet = 'present', pet_hpp_below = 50, cooldown = 90}),
+        A('cooldown', 'Cooldown (when overloaded)', 'Pet', 'ja', 'Cooldown', {pet = 'present', need_buff = 'Overload', cooldown = 30}),
     },
 }
 
@@ -404,7 +408,7 @@ jobs.DNC = {
         A('healing_waltz', 'Healing Waltz (remove debuff)', 'Healing', 'ja', 'Healing Waltz', {cooldown = 20}),
         A('quickstep', 'Quickstep (lower evasion)', 'Debuffs', 'ja', 'Quickstep', {target = '<t>', cooldown = 25, on = {melee = true}}),
         A('presto', 'Presto (before steps)', 'Offense', 'ja', 'Presto', {cooldown = 30}),
-        A('climactic', 'Climactic Flourish (before WS)', 'Offense', 'ja', 'Climactic Flourish', {tp_min = 1000, target = '<t>', on = {melee = true}}),
+        A('climactic', 'Climactic Flourish (before WS)', 'Offense', 'ja', 'Climactic Flourish', {tp_min = 1000, buff = 'Climactic Flourish', on = {melee = true}}),   -- (on me, needs a finishing move)
         A('reverse_flourish', 'Reverse Flourish', 'Offense', 'ja', 'Reverse Flourish', {tp_max = 1000, cooldown = 30}),
         A('animated_flourish', 'Animated Flourish (pull hate)', 'Defense', 'ja', 'Animated Flourish', {target = '<t>', cooldown = 30, on = {tank = true}}),
     },
@@ -454,9 +458,9 @@ jobs.RUN = {
     ws = {'Dimidiation', 'Resolution', 'Steel Cyclone', 'Shockwave'},
     actions = {
         A('rune', 'Keep a rune up (Tellus)', 'Defense', 'ja', 'Tellus', {buff = 'Tellus', on = {tank = true}}),
-        A('vallation', 'Vallation', 'Defense', 'ja', 'Vallation', {buff = 'Vallation', on = {tank = true}}),
-        A('valiance', 'Valiance (party)', 'Defense', 'ja', 'Valiance', {buff = 'Valiance'}),
-        A('pflug', 'Pflug', 'Defense', 'ja', 'Pflug', {buff = 'Pflug', on = {tank = true}}),
+        A('vallation', 'Vallation', 'Defense', 'ja', 'Vallation', {buff = 'Vallation', need_rune = true, on = {tank = true}}),
+        A('valiance', 'Valiance (party)', 'Defense', 'ja', 'Valiance', {buff = 'Valiance', need_rune = true}),
+        A('pflug', 'Pflug', 'Defense', 'ja', 'Pflug', {buff = 'Pflug', need_rune = true, on = {tank = true}}),
         A('swordplay', 'Swordplay', 'Buffs', 'ja', 'Swordplay', {buff = 'Swordplay', on = {tank = true}}),
         A('battuta', 'Battuta', 'Defense', 'ja', 'Battuta', {buff = 'Battuta', on = {tank = true}}),
         A('foil', 'Foil', 'Defense', 'ma', 'Foil', {when = 'combat', on = {tank = true}}),

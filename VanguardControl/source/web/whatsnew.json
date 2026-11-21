@@ -1,5 +1,42 @@
 [
-  {
+  {"version": "1.96.0", "date": "2026-11-21", "items": [
+  "Healing tab: Alliance - cure the other two parties' members (under their own HP %, after your own party) and raise them.",
+  "Charm sleep: a Scholar (main or support) can tick 'Sleep II + Manifestation' to make it an area sleep, and a Blue Mage gets Sheep Song, Soporific, Yawn and Dream Flower (only when the charmed member is close enough to you).",
+  "A Scholar sub or main uses Dark Arts and Addendum: Black first when that is the only way to cast Sleep on a charmed member.",
+  "Enfeebles tab: Sleep a charmed party member - a charmed party or alliance member is put to sleep. Tick the sleeps to use and put them in order with the arrows (saved per job)."
+]},
+  {"version": "1.95.0", "date": "2026-11-21", "items": [
+  "Team tab: Hold here, Camp off, Retreat and Come now work even when the leader's game is closed - every online character is told directly.",
+  "Retreat turns into 'Stop retreating' while it is on.",
+  "Alliances: a monster claimed by someone in the other parties of your alliance counts as yours - no more engaging and letting go of it over and over.",
+  "With Vanguard switched off, farming never stops an attack you made by hand."
+]},
+  {"version": "1.94.0", "date": "2026-11-15", "items": [
+  "Job tab: a new Assist box - tick 'Attack whatever <character> attacks' and this character fights the same monster, with no farming setup needed.",
+  "Assist options: walk up or stay put, how close to stop, how far away a monster may be, wait a few seconds or until the monster is hurt, switch when the leader switches, join when the leader only pulls or casts.",
+  "A Blue Mage's own cures (Magic Fruit, Plenilune Embrace, Restoral, White Wind...) are part of Cure the party, and its dispels and ailment spells show on the Enfeebles tab.",
+  "Holy Water for your own Doom and Echo Drops for your own Silence are used before anything else."
+]},
+  {"version": "1.93.0", "date": "2026-11-14", "items": [
+  "Smarter curing: the healer now picks each Cure by how much it really heals, learned by itself for each job (Healing tab > Which cures to use > Automatic).",
+  "Curaga goes on the member with the most hurt members within 10 yalms, as soon as enough of them need a cure.",
+  "Trusts are cured after players and only below their own HP setting (Cure trusts below).",
+  "Farming (EasyFarm) starts no new mob while you or a party member is low on HP (Farming > Settings).",
+  "One owner per spell: a Job tab action that is also ticked on the Buffs tab or switched on in an EasyFarm list says who handles it.",
+  "Healing tab: Also cure, outside the party - a list of other players to keep alive.",
+  "Job abilities follow the game's rules: dances wait for their TP, flourishes for a finishing move, blood pacts for their avatar."
+]},
+  {"version": "1.92.0", "date": "2026-11-09", "items": [
+  "Blue Mage Unbridled spells (Mighty Guard, Carcharian Verve, Harden Shell...) work: Unbridled Learning is used first by itself, or Unbridled Wisdom if you pick it.",
+  "Each ability on the Job tab has \"first:\" - pick job abilities to use right before it (Diffusion before Mighty Guard, Burst Affinity, Composure, Accession...). If one is on recast: go without it, or wait for it."
+]},
+  {"version": "1.91.0", "items": [
+  "Farming > Battles has AutoSkillchain: load a preset or make your own weapon skill chain, save it by name, and pick it instead of the Weaponskill list while farming.",
+  "Weapon skills can wait for a set MP, in % or as an MP number: on the Job tab, in AutoSkillchain, and on each Weaponskill list action.",
+  "Fixed: a list action with MP range 0-0 went off at any MP.",
+  "Battles warns with a triangle when a weapon skill can never go because another one above it always goes first, and can move it up with one click."
+]},
+{
     "version": "1.90.0",
     "date": "2026-10-28",
     "items": [

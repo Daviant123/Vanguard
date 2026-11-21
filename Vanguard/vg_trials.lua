@@ -39,7 +39,7 @@ function trials.main_weapon()
     local eq = windower.ffxi.get_items('equipment')
     if type(eq) ~= 'table' or not eq.main or eq.main == 0 then return nil end
     local it = windower.ffxi.get_items(eq.main_bag or 0, eq.main)
-    local r = it and it.id and it.id ~= 0 and res.items[it.id]
+    local r = it and it.id and it.id ~= 0 and require('vg_items').get(it.id)
     return r and r.en or nil
 end
 

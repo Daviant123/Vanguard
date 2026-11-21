@@ -100,6 +100,12 @@ function menu.catalog(player, status_cures)
             elseif t == 'Geomancy' then
                 if name:sub(1, 5) == 'Indi-' then indi[#indi + 1] = name
                 elseif name:sub(1, 4) == 'Geo-' then geo[#geo + 1] = name end
+            elseif t == 'BlueMagic' then
+                -- a Blue Mage's enfeebles (0.99.2): spells that are SET and leave an ailment on the enemy, sleep
+                -- aside (Venom Shell, Sweeping Gouge, Tenebral Crush, Silent Storm, Cruel Joke...)
+                if spell.status and spell.status ~= 2 and spell.status ~= 19 and targets(spell, 'Enemy')
+                    and util.can_cast(spell, player) then debuffs[#debuffs + 1] = name end
+                if not util.can_cast(spell, player) then has[name:lower()] = nil end      -- (not set: not usable)
             elseif spell.status and (t == 'WhiteMagic' or t == 'BlackMagic' or t == 'Ninjutsu') then
                 if targets(spell, 'Enemy') then
                     local fam = family(name):lower()
@@ -143,14 +149,21 @@ function menu.catalog(player, status_cures)
         if has[n:lower()] then curagas[#curagas + 1] = n end
     end
 
+    local vc = require('vg_cure')                      -- a Blue Mage's own cures (set spells only)
+    for _, list in ipairs({ vc.BLU_SINGLE, vc.BLU_SELF }) do
+        for _, n in ipairs(list) do if has[n:lower()] then cures[#cures + 1] = n end end
+    end
+    for _, n in ipairs(vc.BLU_AOE) do if has[n:lower()] then curagas[#curagas + 1] = n end end
+
     cache.data = {
         cures = cures, curagas = curagas,
         party_buffs = party, self_buffs = self_only, debuffs = debuffs,
         songs = songs, indi = indi, geo = geo, cleanse = cleanse,
-        can_cure = any('Cure', 'Cure II', 'Cure III', 'Cure IV', 'Cure V', 'Cure VI'),
+        can_cure = #cures > 0,
         can_curaga = any('Curaga', 'Curaga II', 'Curaga III', 'Curaga IV', 'Curaga V'),
         can_raise = any('Raise', 'Raise II', 'Raise III', 'Arise'),
-        can_dispel = any('Dispel', 'Dispelga'),
+        can_dispel = any('Dispel', 'Dispelga', 'Blank Gaze', 'Geist Wall'),
+        sleeps = require('vg_charm').available(player),
     }
     cache.key, cache.time = key, os.clock()
     return cache.data
@@ -184,11 +197,13 @@ function menu.config(settings)
             curaga_count = settings.heal.curaga_count, priority_at = settings.heal.priority_at,
             priority = util.split(settings.heal.priority, ','), ignore = util.split(settings.heal.ignore, ','),
             wake_sleep = settings.heal.wake_sleep, curaga = settings.heal.curaga, tiers = settings.heal.tiers, curagas = settings.heal.curagas,
+            auto = settings.heal.auto ~= false, trust_at = settings.heal.trust_at, alliance = settings.heal.alliance == true, alliance_at = settings.heal.alliance_at, alliance_raise = settings.heal.alliance_raise == true, watch = util.split(settings.heal.watch or '', ','), learned = require('vg_cure').info(),
         },
         rest = settings.rest, mana = settings.mana, cleanse = settings.cleanse,
         cleanse_skip = util.split(settings.cleanse.skip, ','),
         songs_when = settings.songs.when,
         debuff_retries = settings.debuff.retries,
+        charm = require('vg_charm').info(windower.ffxi.get_player()),
         modules = settings.modules,
         extra = menu.extra(settings),
     }
@@ -215,6 +230,9 @@ function menu.extra(settings)
         song_duration = settings.songs.duration, refresh_before = settings.songs.refresh_before, song_party_fix = settings.songs.party_fix,
         hate_first = settings.geo.hate_first, party_mp = settings.geo.party_mp,
         disengage = settings.assist.disengage, defend = settings.assist.defend, autotarget = settings.assist.autotarget,
+        assist = { range = settings.assist.engage_range, switch = settings.assist.switch ~= false, delay = settings.assist.delay or 0,
+                   below_hp = settings.assist.below_hp or 100, on_claim = settings.assist.on_claim == true,
+                   approach_mode = settings.assist.approach_mode or 'role', approach = settings.assist.approach },
         setups = setups,
         strat = settings.strat,
         farm_targets = settings.farm.targets, farm_ignore = settings.farm.ignore,
@@ -222,6 +240,7 @@ function menu.extra(settings)
         farm_pull = settings.farm.pull_cmd, farm_loop = settings.farm.loop, farm_aggro = settings.farm.aggro_first,
         farm_route = #util.split(settings.farm.route or '', ';'),
         rest_hp_low = settings.rest.hp_low, rest_mp_low = settings.rest.mp_low,
+        ws_tp = settings.ws.tp, ws_mp_low = settings.ws.mp_low, ws_mp_high = settings.ws.mp_high, ws_mp_min = settings.ws.mp_min, ws_mp_max = settings.ws.mp_max, farm_ws_use = settings.farm.ws_use,
         ws_am = settings.ws.am, ws_am_ws = settings.ws.am_ws, ws_finish = settings.ws.finish, ws_finish_at = settings.ws.finish_at, ws_finish_trial_only = settings.ws.finish_trial_only, ws_finish_learned = require('vg_finish').learned_list(), ws_finish_save = settings.ws.finish_save,
         ws_finish_others = settings.ws.finish_others, ws_finish_wait = settings.ws.finish_wait,
         farm_approach = settings.farm.approach, farm_stay = settings.farm.stay, farm_engine = settings.farm.engine, farm_ef_jobs = settings.farm.ef_jobs, farm_approach_wait = settings.farm.approach_wait, farm_rest_hp = settings.farm.rest_hp, farm_rest_hp_low = settings.farm.rest_hp_low, farm_rest_hp_high = settings.farm.rest_hp_high, farm_rest_mp = settings.farm.rest_mp, farm_rest_mp_low = settings.farm.rest_mp_low, farm_rest_mp_high = settings.farm.rest_mp_high, farm_follow = settings.farm.follow, farm_follow_dist = settings.farm.follow_dist, farm_route_n = #require('vg_util').split(settings.farm.route or '', ';'), farm_f_unclaimed = settings.farm.f_unclaimed, farm_f_party = settings.farm.f_party, farm_f_claimed = settings.farm.f_claimed, farm_detect = settings.farm.detect, farm_gcd = settings.farm.gcd, farm_engage = settings.farm.engage, melee_range = settings.assist.melee_range, follow_distance = settings.follow.distance, rest_hp_high = settings.rest.hp_high, rest_mp_high = settings.rest.mp_high, rest_on = settings.modules.rest, farm_respawn = settings.farm.respawn, farm_respawn_learned = require('vg_farm').learned_respawn(), farm_mode = settings.farm.mode, farm_area = settings.farm.area,
@@ -230,6 +249,7 @@ function menu.extra(settings)
         farm_wait_near = settings.farm.wait_near, farm_packs = settings.farm.packs, farm_pack_range = settings.farm.pack_range,
         farm_pack_strict = settings.farm.pack_strict, farm_stop_full = settings.farm.stop_full, farm_stop_kills = settings.farm.stop_kills,
         farm_spots = require('vg_farm').spots(),
+        farm_pull_hp = tonumber(settings.farm.pull_hp) or 50,
         farm_pull_back = settings.farm.pull_back, farm_prefer = settings.farm.prefer_best, farm_keep_chain = settings.farm.keep_chain, farm_stop_mins = settings.farm.stop_mins, farm_strong = settings.farm.strong, farm_preset = settings.farm.preset, farm_th = settings.farm.th, farm_rotate = settings.farm.rotate, farm_rest_idle = settings.farm.rest_idle, farm_check = settings.farm.check, farm_polite = settings.farm.polite, farm_widen = settings.farm.widen, farm_time_alert = settings.farm.time_alert, farm_make_room = settings.farm.make_room, farm_rezone = settings.farm.rezone, pause_on_zone = settings.pause_on_zone, farm_stop_trial = settings.farm.stop_trial, stop_on_job = settings.stop_on_job, farm_stop_level = settings.farm.stop_level, my_level = (windower.ffxi.get_player() or {}).main_job_level, farm_hotkey = settings.farm.hotkey, farm_watch = settings.farm.watch, farm_emergency = settings.farm.emergency, farm_emergency_hp = settings.farm.emergency_hp, trials = require('vg_trials').list(), trial_game = require('vg_trials').game_line(), farm_skip_weak = settings.farm.skip_weak, farm_skip_tough = settings.farm.skip_tough, ws_min_hpp = settings.ws.min_mob_hpp, inv_free = require('vg_farm').inv_free(), farm_skip_strong = settings.farm.skip_strong, sleep_extra = settings.mages.sleep, farm_when_done = settings.farm.when_done, farm_item = settings.farm.item, farm_item_goal = settings.farm.item_goal, inv_items = require('vg_farm').inventory_names(), trusts_list = settings.trusts.list, trusts_size = settings.trusts.party_size,
         triggers = (function()
             local out = {}

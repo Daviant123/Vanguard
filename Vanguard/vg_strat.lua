@@ -112,7 +112,7 @@ function strat.pools(player)
     local p = { white = {}, enhancing = {}, accession = {}, black = {}, enfeebling = {} }
     local seen = {}
     for _, sp in pairs(require('resources').spells) do
-        if sp.en and not seen[sp.en] and (sp.type == 'WhiteMagic' or sp.type == 'BlackMagic') and util.can_cast(sp, player) then
+        if sp.en and not seen[sp.en] and (sp.type == 'WhiteMagic' or sp.type == 'BlackMagic') and util.can_cast(sp, player, { addendum = true }) then
             seen[sp.en] = true
             local item = { n = sp.en, s = SKILL[sp.skill] or 'Other' }
             if sp.type == 'WhiteMagic' then

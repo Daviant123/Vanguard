@@ -20,6 +20,7 @@ is a normal game command (/pcmd add, /join) or ordinary movement.
 
 local party = {}
 local S, state, h
+local util = require('vg_util')
 
 local function clock() return os.clock() end
 
@@ -265,6 +266,18 @@ function party.on_order(player, from, what, rest)
             -- "pull": the farmer brings each mob back here, so wait for it instead of running out to it
             state.camp = { x = tonumber(x), y = tonumber(y), facing = tonumber(f), zone = tonumber(z), pull = pull == 'pull' }
             h.log('Camp set by ' .. from)
+            -- a character that can cure, with Cures off: say so when farming starts (his KO 2026-11-12: CharB on RDM,
+            -- "support" role, Cures off - not one cure all fight). "Farming: " lines ring the app's alarm.
+            local me = windower.ffxi.get_player()
+            if me and not S.modules.heal then
+                for _, n in ipairs({ 'Cure IV', 'Cure III', 'Cure II', 'Cure' }) do
+                    local sp = util.spell(n)
+                    if sp and util.can_cast(sp, me) then
+                        h.log('Farming: my Cures are off - turn Cures on in Vanguard Control if I should heal the party')
+                        break
+                    end
+                end
+            end
         end
     end
 end

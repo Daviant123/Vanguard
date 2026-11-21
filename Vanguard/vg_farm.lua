@@ -30,6 +30,7 @@ Normal game commands only: /targetbnpc, /attack, the pull command, /heal; walkin
 local util = require('vg_util')
 local function BL() return require('vg_blist') end      -- the battle lists (EasyFarm), loaded when first used
 local res = require('resources')
+local items = require('vg_items')
 
 local farm = {}
 local S, state, h
@@ -94,6 +95,7 @@ local function party()
             if m.mob and m.mob.id then ids[m.mob.id] = true end
         end
     end
+    util.alliance_ids(ids)             -- (claims: the alliance's mobs are ours to fight too)
     return out, ids
 end
 
@@ -664,19 +666,36 @@ function farm.fight_tick(player)
     -- stuck in a fight (upgrade 3): engaged, but its HP hasn't moved for 25 s and it's out of reach - let go of it;
     -- and one that someone else claimed while we were on it
     if f and player.status == 1 and t and t.id == f.id then
-        if (t.hpp or 100) < (f.hpp or 100) then f.hpp, f.hurt_t = t.hpp, now() end
+        if (t.hpp or 100) < (f.hpp or 100) then f.hpp, f.hurt_t, f.close_t = t.hpp, now(), nil end
         local _, ids = party()
         local theirs = t.claim_id and t.claim_id ~= 0 and not ids[t.claim_id]
-        if theirs and S.farm.claim ~= 'any' then
+        -- (only while Vanguard is on: with it off he is playing by hand and nothing here may stop his attack)
+        if not S.enabled then
+        elseif theirs and S.farm.claim ~= 'any' then
             windower.send_command('input /attackoff')
             farm.skip(t.id, 180, 'someone else claimed it')
             state.farm_fight, state.farm_fight_info = nil, nil
             return
         elseif now() - f.hurt_t > 25 and util.dist(t) > 6 then
-            windower.send_command('input /attackoff')
-            farm.skip(t.id, 120, 'no damage in 25 s and out of reach')
-            state.farm_fight, state.farm_fight_info = nil, nil
-            return
+            -- one that is already on the party (claimed by us, a trust or a party member) is never let go: walking away
+            -- from it leaves it hitting the party while the next one is picked (his KO 2026-11-12: Colibri after
+            -- Colibri dropped "out of reach" while they fought his trusts). Close in on it first (state.farm_close_in,
+            -- also with Approach off; not with Do not move on - then it stays on it a little longer, saying so once).
+            local ours = t.claim_id and t.claim_id ~= 0 and ids[t.claim_id]
+            f.close_t = f.close_t or (ours and now())
+            -- (25 s more of closing in and still nothing - on a ledge, can't get there: let go after all)
+            if ours and now() - f.close_t <= 25 then
+                if state.farm_close_in ~= t.id then
+                    state.farm_close_in = t.id
+                    h.log(S.farm.stay and ('%s is fighting the party out of reach and Do not move is on: waiting for it'):format(t.name)
+                        or ('%s is fighting the party out of reach: closing in'):format(t.name))
+                end
+            else
+                windower.send_command('input /attackoff')
+                farm.skip(t.id, 120, 'no damage in 25 s and out of reach')
+                state.farm_fight, state.farm_fight_info = nil, nil
+                return
+            end
         end
     end
     if f and player.status == 1 then
@@ -889,16 +908,13 @@ local item_ids                                   -- lower-case name -> id (built
 local function item_id(name)
     if not name or name == '' then return nil end
     if not item_ids then
-        item_ids = {}
-        for id, it in pairs(res.items) do
-            if type(it) == 'table' and it.en then item_ids[it.en:lower()] = id end
-        end
+        item_ids = true
     end
-    return item_ids[name:lower()]
+    return items.id(name)
 end
 farm.item_id = item_id
 
-local function item_name(id) local it = res.items[id] return it and it.en or ('item ' .. tostring(id)) end
+local function item_name(id) return items.name(id) or ('item ' .. tostring(id)) end
 
 -- kills over time (upgrade 5): a timestamp per kill this run, shown as kills per 5 minutes over the last hour
 function farm.kill_watch()
@@ -1049,7 +1065,7 @@ end
 function farm.inventory_names()
     local seen, out = {}, {}
     for id in pairs(inv_counts()) do
-        local it = res.items[id]
+        local it = items.get(id)
         if it and it.en and not seen[it.en] then seen[it.en] = true out[#out + 1] = it.en end
     end
     table.sort(out)

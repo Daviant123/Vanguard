@@ -31,7 +31,10 @@ link.SECTIONS = SECTIONS
 
 -- Ability fields the app may change.
 link.OPT_KEYS = { hpp_below = 'number', mpp_below = 'number', mpp_above = 'number', tp_min = 'number',
-                  tp_max = 'number', party_below = 'number', cooldown = 'number', when = 'string', pet_hpp_below = 'number' }
+                  tp_max = 'number', party_below = 'number', cooldown = 'number', when = 'string', pet_hpp_below = 'number',
+                  pre = 'string', pre_mode = 'string', ub = 'string' }
+-- the allowed words of the other text settings ("use these first": vg_actions)
+local CHOICES = { pre_mode = { go = true, wait = true }, ub = { learning = true, wisdom = true, either = true } }
 local WHEN = { always = true, combat = true, engaged = true, idle = true }
 
 local function copy(v)
@@ -111,12 +114,52 @@ function link.actopt(pr, id, key, value)
         local n = tonumber(value)
         if not n then h.log('Not a number: ' .. tostring(value)) return false end
         pr.opts[id][key] = n
+    elseif key == 'pre' then
+        pr.opts[id][key] = value
+    elseif CHOICES[key] then
+        if not CHOICES[key][value] then h.log(key .. ': not one of the choices: ' .. tostring(value)) return false end
+        pr.opts[id][key] = value
     else
         if not WHEN[value] then h.log('when: always | combat | engaged | idle') return false end
         pr.opts[id][key] = value
     end
     if next(pr.opts[id]) == nil then pr.opts[id] = nil end
     return true
+end
+
+-- "Use these abilities first": //vg actpre <ability id> add <job ability> | del <job ability> | clear | default
+--   | mode go|wait | ub learning|wisdom|either     (base = the job's recommended list for that action)
+function link.actpre(pr, id, sub, value, base)
+    sub = (sub or ''):lower()
+    if not pr or not id or id == '' then
+        h.log('Usage: //vg actpre <ability id> add|del <job ability> | clear | default | mode go|wait | ub learning|wisdom|either')
+        return false
+    end
+    if sub == 'mode' then return link.actopt(pr, id, 'pre_mode', value) end
+    if sub == 'ub' then return link.actopt(pr, id, 'ub', value) end
+    if sub == 'default' then return link.actopt(pr, id, 'pre', 'default') end
+    if sub == 'clear' then return link.actopt(pr, id, 'pre', 'none') end
+    local cur = pr.opts and pr.opts[id] and pr.opts[id].pre
+    if cur == nil then cur = base or '' end
+    local list = {}
+    for _, n in ipairs(util.split(tostring(cur), '/')) do
+        if n ~= '' and n:lower() ~= 'none' then list[#list + 1] = n end
+    end
+    if sub == 'add' then
+        local ja = util.ability(value or '')
+        if not ja then h.log('Not a job ability: ' .. tostring(value)) return false end
+        for _, n in ipairs(list) do if n:lower() == ja.en:lower() then return true end end
+        if #list >= 4 then h.log('Up to 4 abilities first') return false end
+        list[#list + 1] = ja.en
+    elseif sub == 'del' then
+        local out = {}
+        for _, n in ipairs(list) do if n:lower() ~= tostring(value):lower() then out[#out + 1] = n end end
+        list = out
+    else
+        h.log('Usage: //vg actpre <ability id> add|del <job ability> | clear | default | mode go|wait | ub learning|wisdom|either')
+        return false
+    end
+    return link.actopt(pr, id, 'pre', #list > 0 and table.concat(list, '/') or 'none')
 end
 
 -- Profile string part: o=id:key~val:key~val+id2:...   ('+' and ':' because commas are split by the config library)

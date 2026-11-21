@@ -11,6 +11,7 @@ character can use and carries out a button press.
 
 local util = require('vg_util')
 local res = require('resources')
+local items = require('vg_items')
 
 local quick = {}
 local S, state, h
@@ -28,6 +29,11 @@ function quick.known(player)
         if sp.en and sp.type ~= 'Trust' and not seen[sp.en] and util.can_cast(sp, player) then
             seen[sp.en] = true out.spells[#out.spells + 1] = sp.en
             if sp.type == 'BlueMagic' then out.blue[#out.blue + 1] = sp.en end      -- the set blue spells (pull menu)
+        elseif sp.en and util.unbridled(sp) and not seen[sp.en] and util.can_cast(sp, player, { unbridled = true }) then
+            -- learned Unbridled spells: the app's "Add your own" Blue magic list (Unbridled Learning goes first by itself)
+            seen[sp.en] = true
+            out.unbridled = out.unbridled or {}
+            out.unbridled[#out.unbridled + 1] = sp.en
         end
     end
     local ab = windower.ffxi.get_abilities() or {}
@@ -51,7 +57,7 @@ function quick.known(player)
     seen = {}
     out.food, out.reraise, out.mounts = {}, {}, {}
     for _, it in ipairs(type(inv) == 'table' and inv or {}) do
-        local item = type(it) == 'table' and it.id and res.items[it.id]
+        local item = type(it) == 'table' and it.id and items.get(it.id)
         if item and item.category == 'Usable' and not seen[item.en] then
             seen[item.en] = true
             out.items[#out.items + 1] = item.en
@@ -108,7 +114,7 @@ function quick.act(player, kind, target, name)
         cmd = ('input /ws "%s" %s'):format(ws.en, tgt == '<me>' and '<t>' or tgt)
     elseif kind == 'item' then
         local found
-        for _, it in pairs(res.items) do if it.en and name and it.en:lower() == name:lower() then found = it.en break end end
+        found = items.name(items.id(name))
         if not found then return nil, 'unknown item' end
         cmd = ('input /item "%s" %s'):format(found, tgt)
     elseif kind == 'attack' then

@@ -136,6 +136,8 @@ table.board td { vertical-align: top; }
 .lim { display: inline-flex; align-items: center; gap: 3px; font-size: 11px; color: var(--muted); }
 .lim input { width: 52px; padding: 2px 4px; font: inherit; font-size: 12px; color: var(--text); background: var(--bg); border: 1px solid var(--line); border-radius: 4px; }
 .lim input.changed, .lim select.changed { border-color: var(--accent); }
+.lim.first { flex-wrap: wrap; } .lim.first.changed { color: var(--accent); }
+.btag.pre { color: var(--text); } .btag.pre button { padding: 0 3px; font-size: 10px; line-height: 1; }
 .lim select { padding: 2px 4px; font-size: 11px; }
 table.grid input[type=number] { width: 70px; height: auto; }
 .strat { display: grid; grid-template-columns: 130px 1fr; gap: 6px 12px; align-items: start; padding: 8px 0; border-bottom: 1px solid var(--line); }
@@ -302,7 +304,7 @@ function tabsFor(p) {
   if (m.can_cure || m.can_raise || arr(m.cleanse).length) t.push({id: "heal", label: "Healing & MP"});
   else t.push({id: "heal", label: "Recovery"});
   if (arr(m.party_buffs).length || arr(m.self_buffs).length) t.push({id: "buffs", label: "Buffs", n: arr(cfg.buffs).length});
-  if (arr(m.debuffs).length || m.can_dispel) t.push({id: "debuffs", label: "Enfeebles", n: arr(cfg.debuffs).length});
+  if (arr(m.debuffs).length || m.can_dispel || arr(m.sleeps).length) t.push({id: "debuffs", label: "Enfeebles", n: arr(cfg.debuffs).length});
   if (arr(m.songs).length) t.push({id: "songs", label: "Songs", n: arr(cfg.songs).length});
   if (arr(m.indi).length || arr(m.geo).length) t.push({id: "geo", label: "Geomancy"});
   if ((cfg.strat_info || {}).max > 0) t.push({id: "strat", label: "Stratagems"});
@@ -311,6 +313,46 @@ function tabsFor(p) {
   t.push({id: "app", label: "App & updates"});
   t.push({id: "news", label: "What's new", n: newsUnseen() ? "new" : 0});
   return t;
+}
+
+// His request 2026-10-30: weapon skills only at a certain MP. Both in % and as the MP number (0 = no limit).
+const wsNum = (cmd, val, min, max, title) => `<input type="number" style="width:62px" min="${min}" max="${max}" value="${esc(val)}" title="${esc(title)}" onchange="send('${cmd} ' + (this.value || 0))">`;
+function wsMpFields(x) {
+  return `<label class="field" title="Every weapon skill waits until MP is in this range (the finishing weapon skill and party skillchains don't wait). A job with no MP ignores it.">Weapon skills only at MP %
+      <span>${wsNum("set ws.mp_low", x.ws_mp_low ?? 0, 0, 100, "From this MP %")} to ${wsNum("set ws.mp_high", x.ws_mp_high ?? 100, 0, 100, "Up to this MP %")}</span></label>
+    <label class="field" title="The same as an MP number. 0 = no limit.">...and MP number
+      <span>${wsNum("set ws.mp_min", x.ws_mp_min ?? 0, 0, 9999, "At least this much MP (0 = no limit)")} to ${wsNum("set ws.mp_max", x.ws_mp_max ?? 0, 0, 9999, "At most this much MP (0 = no limit)")}</span></label>`;
+}
+
+// His request 2026-11-15: "build a way that allows me to just assist and actually attack whatever the follow/assist
+// character is. i should be able to tick it on/off" - without the EasyFarm part.
+function assistBox(s, p) {
+  const x = (p.config || {}).extra || {}, a = x.assist, mods = s.modules || {}, who = s.leader || "";
+  if (!a) return "";                                  // (an older addon: nothing to show)
+  const on = !!mods.assist;
+  if (!who) return `<div class="box"><h3>Assist</h3><div class="hint">Pick a character under "Follow / assist" above first: this one then attacks whatever that character attacks.</div></div>`;
+  const num = (v, l) => ({v: String(v), l});
+  return `<div class="box"><h3>Assist ${esc(who)}</h3>
+    <div class="checks">
+      ${chk(`Attack whatever ${who} attacks`, on, "assist on", "assist off", "Targets the same monster with /assist and attacks it. Off: this character never starts a fight by itself.")}
+      ${chk(`Follow ${who}`, !!mods.follow, "follow on", "follow off", "Stay close to that character between fights.")}
+    </div>
+    ${on ? `<div class="row" style="flex-wrap:wrap;gap:6px 14px;align-items:flex-end;margin-top:6px">
+      <label class="field" title="Melee jobs walk into reach of the monster; casters and ranged jobs engage from where they stand. By role follows the Role picked above.">Walk up to the mob ${sel("set assist.approach_mode ", [{v: "role", l: "By role (" + (a.approach ? "yes" : "no") + ")"}, {v: "on", l: "Always"}, {v: "off", l: "Never (stay where I am)"}], a.approach_mode || "role")}</label>
+      <label class="field" title="How close to the monster this character stops.">Stop at ${sel("set assist.melee_range ", [2, 2.5, 3, 3.5, 4, 5, 6, 8].map(v => num(v, v + " yalms")), String(x.melee_range ?? 3))}</label>
+      <label class="field" title="A monster further away than this is left alone (the game allows /attack up to about 25 yalms).">Only mobs within ${sel("set assist.engage_range ", [10, 15, 20, 25, 30, 40, 50].map(v => num(v, v + " yalms")), String(a.range ?? 25))}</label>
+      <label class="field" title="Gives ${esc(who)} time to get the monster's attention first.">Start ${sel("set assist.delay ", [num(0, "at once")].concat([1, 2, 3, 4, 5, 8, 10].map(v => num(v, v + " s after " + who))), String(a.delay ?? 0))}</label>
+      <label class="field" title="Join in only once the monster is at or under this HP.">When the mob's HP is ${sel("set assist.below_hp ", [num(100, "anything")].concat([95, 90, 80, 70, 60, 50].map(v => num(v, v + "% or under"))), String(a.below_hp ?? 100))}</label>
+    </div>
+    <div class="checks" style="margin-top:6px">
+      ${chk(`Switch when ${who} switches to another mob`, a.switch !== false, "set assist.switch true", "set assist.switch false", "Off: finish the monster this character is on first.")}
+      ${chk(`Also when ${who} pulls or casts without drawing a weapon`, !!a.on_claim, "set assist.on_claim true", "set assist.on_claim false", "Attack the monster that character has targeted as soon as your party has claimed it, even if that character is not engaged (a ranged or spell pull, a mage).")}
+      ${chk(`Stop when ${who} stops`, x.disengage !== false, "set assist.disengage true", "set assist.disengage false", "Put the weapon away 2 s after that character does.")}
+      ${chk("Fight back when attacked", x.defend !== false, "set assist.defend true", "set assist.defend false", "A monster hitting this character while nobody is fighting: attack it.")}
+      ${chk("After a kill, take the next mob that is attacking the party", x.autotarget !== false, "set assist.autotarget true", "set assist.autotarget false")}
+    </div>
+    <div class="hint" style="margin-top:4px">Works on its own, without the Farming tab: weapon skills, abilities and cures above are used as usual once it is fighting. Not used while this character is farming (then it picks its own mobs).</div>` : ""}
+  </div>`;
 }
 
 function jobTab(c, p) {
@@ -322,7 +364,8 @@ function jobTab(c, p) {
     <div class="row" style="align-items:flex-end">
       <label class="field">Role ${sel("role ", arr(p.roles).map(r => ({v: r.id, l: r.label})), p.role)}</label>
       <label class="field">Weapon skill ${sel("ws ", [{v: "", l: "None"}].concat(arr(p.ws_list).map(w => ({v: w, l: w}))), p.ws)}
-        ${efInCharge(p).ws ? `<span class="hint" style="color:var(--tp)" title="Farming > Battles > Weaponskill has weapon skills: those are used while it farms">⚑ while farming: the Weaponskill list</span>` : ""}</label>
+        ${efInCharge(p).asc ? `<span class="hint" style="color:var(--tp)" title="Farming > Battles > AutoSkillchain is picked: its chain is used while it farms">⚑ while farming: AutoSkillchain</span>` : efInCharge(p).ws ? `<span class="hint" style="color:var(--tp)" title="Farming > Battles > Weaponskill has weapon skills: those are used while it farms">⚑ while farming: the Weaponskill list</span>` : ""}</label>
+      ${wsMpFields(((p.config || {}).extra) || {})}
       <label class="field" title="Mythic / Empyrean / Relic weapons: without the Aftermath picked here (or with under 8 s left), TP is saved to 1000 / 2000 / 3000 and the Aftermath weapon skill used; with it up, the weapon skill above">Keep Aftermath ${sel("set ws.am ", [{v: "0", l: "Off"}, {v: "1", l: "Lv.1 (1000 TP)"}, {v: "2", l: "Lv.2 (2000 TP)"}, {v: "3", l: "Lv.3 (3000 TP)"}], String((p.config || {}).extra ? ((p.config.extra.ws_am) || 0) : 0))}</label>
       ${((p.config || {}).extra || {}).ws_am > 0 ? `<label class="field">Aftermath weapon skill ${sel("set ws.am_ws ", [{v: "", l: "the one above"}].concat(arr(p.ws_list).map(w => ({v: w, l: w}))), ((p.config || {}).extra || {}).ws_am_ws || "")}</label>` : ""}
       ${(() => {
@@ -341,11 +384,12 @@ function jobTab(c, p) {
       })()}
       <label class="field">Follow / assist ${sel("leader ", [{v: "", l: "Nobody (I lead)"}].concat(others.map(n => ({v: n, l: n}))), s.leader || "", "none")}</label>
     </div>
+    ${assistBox(s, p)}
     ${finishBox(p)}
     ${acts.length ? `<div class="box"><h3>Abilities, in priority order: the top one is tried first <button style="float:right;font-size:11px" onclick="send('actmove reset')">Reset order</button></h3>
       ${acts.map((a, i) => `<div class="act"><span class="hint" style="width:20px;text-align:right">${i + 1}</span>
         <span style="display:inline-flex;gap:2px"><button title="Move up" ${i ? "" : "disabled"} onclick="send('actmove ${esc(a.id)} up')">▲</button><button title="Move down" ${i < acts.length - 1 ? "" : "disabled"} onclick="send('actmove ${esc(a.id)} down')">▼</button><button title="Move to the top" ${i ? "" : "disabled"} onclick="send('actmove ${esc(a.id)} top')">⤒</button></span>
-        ${chk(a.label, a.on, `action ${a.id} on`, `action ${a.id} off`)}<span class="btag">${esc(a.group)}</span>${limits(a)}${a.custom ? ` <button title="Remove it" onclick="send('custom del ${esc(a.id)}')">×</button>` : ""}</div>`).join("")}
+        ${chk(a.label, a.on, `action ${a.id} on`, `action ${a.id} off`)}<span class="btag">${esc(a.group)}</span>${a.owned ? ` <span class="hint" title="The same spell is switched on there, so that feature uses it and this one stands back.">handled by ${esc(a.owned)}</span>` : ""}${limits(a)}${a.custom ? ` <button title="Remove it" onclick="send('custom del ${esc(a.id)}')">×</button>` : ""}${firstUse(a, p)}</div>`).join("")}
       ${customAdd(p)}</div>`
       : `<div class="empty">Waiting for ${esc(selected)}'s job info…</div>`}
     ${jobExtras(p)}
@@ -367,6 +411,25 @@ function limits(a) {
     return `<span class="lim">${LIMIT_LABEL[l.k] || l.k}<input type="number" class="${changed}" value="${esc(l.v)}" min="0"
       data-cmd="actopt ${esc(a.id)} ${l.k} " title="Recommended: ${esc(l.d)}${unit}">${unit}</span>`;
   }).join("");
+}
+
+// "Use these abilities first" (his request 2026-11-09: Mighty Guard with Diffusion; Composure, Chain Affinity... before
+// a spell). Each is used on me right before the action, only when ready; an Unbridled spell uses Unbridled Learning first.
+const jsq = s => esc(String(s).replace(/\\/g, "\\\\").replace(/'/g, "\\'"));
+const UB_OPTS = [["learning", "Unbridled Learning"], ["either", "Learning, else Wisdom"], ["wisdom", "Unbridled Wisdom"]];
+function firstUse(a, p) {
+  if (a.pre === undefined || a.pre === null) return "";   // (rolls; an empty list arrives as {} from the addon)
+  const pre = arr(a.pre), k = (p.config || {}).known || {};
+  const own = String(a.label || "");          // (not the ability itself: Berserk before Berserk)
+  const add = arr(k.abilities).filter(n => !pre.includes(n) && !/^Unbridled /.test(n) && own !== n && !own.startsWith(n + " (")).sort();
+  const changed = JSON.stringify(pre) !== JSON.stringify(arr(a.pre_d));
+  const chips = pre.map(n => `<span class="btag pre">${esc(n)} <button title="Don't use ${esc(n)} first" onclick="send('actpre ${jsq(a.id)} del ${jsq(n)}')">×</button></span>`).join("");
+  return `<span class="lim first ${changed ? "changed" : ""}" title="Used on me right before it, each only when it's ready${arr(a.pre_d).length ? ". Recommended: " + esc(arr(a.pre_d).join(", ")) : ""}">first:
+    ${a.ub ? `<select data-cmd="actpre ${esc(a.id)} ub " title="Unbridled spells need Unbridled Learning or Wisdom up: it is used first by itself">${UB_OPTS.map(([v, t]) => opt(v, t, a.ub)).join("")}</select>${pre.length ? " +" : ""}` : ""}
+    ${chips}
+    ${pre.length < 4 && add.length ? `<select data-preadd="${esc(a.id)}"><option value="">${pre.length || a.ub ? "+" : "+ ability first…"}</option>${add.map(n => opt(n, n, "")).join("")}</select>` : ""}
+    ${pre.length ? `<select data-cmd="actpre ${esc(a.id)} mode " title="When one of them is on recast">${opt("go", "not ready: go without it", a.pre_mode)}${opt("wait", "not ready: wait for it", a.pre_mode)}</select>` : ""}
+    ${changed ? `<button title="Back to the recommended" onclick="send('actpre ${jsq(a.id)} default')">↺</button>` : ""}</span>`;
 }
 
 // ---------- profiles (files kept by the app) ----------
@@ -463,6 +526,16 @@ function leaderName() {
   return best && chars[best] ? best : selected;
 }
 function lead(cmd) { const l = leaderName(); if (l) post(l, cmd); }
+// Movement orders (his report 2026-11-21: "these buttons dont seem to work" - Daviant's game had gone offline, and
+// every order went to him to pass on). Now the leader gets it if online, and every other online character is also
+// told directly (//vg obey ...), so Hold / Come / Retreat / Camp off work with the leader's game closed too.
+function move(cmd) {
+  const L = leaderName(), on = n => chars[n] && chars[n].online;
+  const others = Object.keys(chars).filter(n => n !== L && on(n));
+  if (cmd.trim() === "camp" && !on(L)) { alert(`${L} is offline: Camp here uses ${L}'s position, so it can't be set now.`); return; }
+  if (on(L)) post(L, cmd.trim());
+  if (cmd.trim() !== "camp") others.forEach(n => post(n, "obey " + cmd.trim()));
+}
 function teamTab(c, p) {
   const L = leaderName(), ls = (chars[L] || {}).snapshot || {}, x = (p.config || {}).extra || {}, alts = x.alts || {};
   const anyHold = Object.values(chars).some(ch => (ch.snapshot || {}).hold);
@@ -489,9 +562,9 @@ function teamTab(c, p) {
         ${chk("Accept party invites by themselves (everyone)", x.accept, "__all party accept on", "__all party accept off")}
       </div>
       <div class="box"><h3>Movement</h3><div class="btns">
-        <button class="${anyHold ? "on" : ""}" onclick="lead('${anyHold ? "come" : "hold"}')">${anyHold ? "Come (stop holding)" : "Hold here"}</button>
-        <button class="${anyCamp ? "on" : ""}" onclick="lead('camp ${anyCamp ? "off" : ""}')">${anyCamp ? "Camp off" : "Camp here"}</button>
-        <button class="stop ${anyRetreat ? "on" : ""}" onclick="lead('retreat')">Retreat</button></div>
+        <button class="${anyHold ? "on" : ""}" onclick="move('${anyHold ? "come" : "hold"}')">${anyHold ? "Come (stop holding)" : "Hold here"}</button>
+        <button class="${anyCamp ? "on" : ""}" onclick="move('camp ${anyCamp ? "off" : ""}')">${anyCamp ? "Camp off" : "Camp here"}</button>
+        <button class="stop ${anyRetreat ? "on" : ""}" onclick="move('${anyRetreat ? "come" : "retreat"}')" title="${anyRetreat ? "Retreating: click to follow again" : "Stop fighting and come back to the leader"}">${anyRetreat ? "Stop retreating" : "Retreat"}</button></div>
         <div class="row" style="margin-top:6px"><label class="field">Formation (everyone) ${sel("__all formation ", [{v: "spread", l: "Spread behind the leader"}, {v: "line", l: "Single file"}, {v: "off", l: "Plain follow"}], x.formation || "spread")}</label></div>
       </div>
       <div class="box"><h3>Gear (GearSwap)</h3><div class="btns">
@@ -993,7 +1066,7 @@ document.addEventListener("change", e => { if (e.target && e.target.id === "logn
 let custKind = "ja", custTgt = "me", custName = "";
 function customAdd(p) {
   const k = (p.config || {}).known || {};
-  const blue = arr(k.blue), lists = {ja: arr(k.abilities).slice().sort(), blu: blue.slice().sort(), ma: arr(k.spells).filter(n => !blue.includes(n)).sort()};
+  const blue = arr(k.blue).concat(arr(k.unbridled)), lists = {ja: arr(k.abilities).slice().sort(), blu: blue.slice().sort(), ma: arr(k.spells).filter(n => !blue.includes(n)).sort()};
   const names = lists[custKind] || [];
   if (!names.includes(custName)) custName = names[0] || "";
   const kinds = [{v: "ja", l: "Job ability"}].concat(blue.length ? [{v: "blu", l: "Blue magic"}] : []).concat([{v: "ma", l: "Magic"}]);
@@ -1004,7 +1077,7 @@ function customAdd(p) {
     <label class="field">Which <select id="custname">${opt2(names.map(n => ({v: n, l: n})), custName)}</select></label>
     <label class="field">On <select id="custtgt">${opt2([{v: "me", l: "me"}, {v: "mob", l: "my target (the mob)"}, {v: "leader", l: "the leader"}], custTgt)}</select></label>
     <button class="go" ${custName ? "" : "disabled"} onclick="send('custom add ${custKind === "ja" ? "ja" : "ma"} ' + custTgt + ' ' + custName)">+ Add</button>
-    <span class="hint">It joins the list above (on, with "every" and "when" to set). A buff on me isn't used again while it's up.</span></div>`;
+    <span class="hint">It joins the list above (on, with "every" and "when" to set). A buff on me isn't used again while it's up. "first:" picks abilities to use right before it (Diffusion, Composure...); Unbridled spells use Unbridled Learning first by themselves.</span></div>`;
 }
 
 function problemsBox() {
@@ -1142,8 +1215,9 @@ function healTab(p) {
     ${m.can_cure ? `<div class="box"><h3>When to cure</h3><div class="sliders">
       ${slider("Cure members below", "heal.cure_at", h.cure_at, 30, 95, 5)}
       ${slider("Cure priority members below", "heal.priority_at", h.priority_at, 30, 95, 5)}
-      ${m.can_curaga ? slider("Curaga when members are below", "heal.curaga_at", h.curaga_at, 30, 95, 5) : ""}
-      ${m.can_curaga ? slider("…and at least this many are hurt", "heal.curaga_count", h.curaga_count, 2, 6, 1, "") : ""}
+      ${h.trust_at !== undefined ? slider("Cure trusts below", "heal.trust_at", h.trust_at, 20, 95, 5) : ""}
+      ${m.can_curaga && h.auto === false ? slider("Curaga when members are below", "heal.curaga_at", h.curaga_at, 30, 95, 5) : ""}
+      ${m.can_curaga ? slider(h.auto === false ? "…and at least this many are hurt" : "Curaga when this many hurt members stand together", "heal.curaga_count", h.curaga_count, 2, 6, 1, "") : ""}
     </div></div>` : ""}
     ${m.can_cure ? cureTiers(h.tiers, m, h) : ""}
     ${recoveryBox(p)}
@@ -1154,6 +1228,17 @@ function healTab(p) {
         <td><input type="checkbox" ${prio.includes(lc(n)) ? "checked" : ""} data-on="menu priority ${esc(n)} on" data-off="menu priority ${esc(n)} off"></td></tr>`).join("")}
       </tbody></table>` : `<div class="empty">Not in a party.</div>`}
     </div>` : ""}
+    ${(m.can_cure || m.can_raise) && h.alliance !== undefined ? `<div class="box"><h3>Alliance</h3>
+      <div class="checks">
+        ${m.can_cure ? chk("Cure alliance members (the other two parties)", h.alliance, "set heal.alliance true", "set heal.alliance false", "Single cures on members of the other parties in your alliance, by their real HP. Your own party comes first at about the same HP. Curaga only reaches your own party.") : ""}
+        ${m.can_raise ? chk("Raise alliance members", h.alliance_raise, "set heal.alliance_raise true", "set heal.alliance_raise false", "Raise KO'd members of the other parties too (after your own party), within 20 yalms.") : ""}
+      </div>
+      ${m.can_cure && h.alliance ? `<div class="sliders">${slider("Cure alliance members under", "heal.alliance_at", h.alliance_at ?? 60, 10, 95, 5)}</div>` : ""}
+    </div>` : ""}
+    ${m.can_cure && h.watch !== undefined ? `<div class="box"><h3>Also cure, outside the party</h3>
+      <div class="checks">${arr(h.watch).map(n => `<span class="btag">${esc(n)} <button title="Stop curing them" onclick="send('watch remove ${esc(n)}')">×</button></span>`).join(" ") || `<span class="hint">Nobody.</span>`}
+      <input type="text" placeholder="character name" style="width:140px" onchange="if (/^[A-Za-z]+$/.test(this.value)) send('watch add ' + this.value); this.value = ''"></div>
+      <div class="hint">Cured by their HP % when they are in range (Curaga only reaches the party).</div></div>` : ""}
     ${arr(m.cleanse).length ? `<div class="box"><h3>Remove these effects</h3><div class="checks">
       ${arr(m.cleanse).map(st => chk(cap(st), !skip.includes(lc(st)), `menu cleanse on ${st}`, `menu cleanse off ${st}`)).join("")}
     </div></div>` : ""}
@@ -1167,11 +1252,24 @@ function parseTiers(str) {
 }
 const HP_STEPS = [50, 70, 100, 150, 170, 200, 250, 300, 350, 400, 450, 500, 550, 600, 650, 700, 800, 900, 1000, 1100, 1200, 1300, 1500, 1800, 2000, 2500];
 function cureTiers(str, m, h) {
+  const autoChk = h.auto === undefined ? "" : `<div class="checks" style="margin-bottom:6px">${chk("Automatic: pick the cure by how much each one really heals (learned by itself, per job)", h.auto, "set heal.auto true", "set heal.auto false")}</div>`;
+  if (h.auto && h.learned) {
+    const can = new Set([...(arr(m.cures).length ? arr(m.cures) : CURES), ...arr(m.curagas)].map(lc));
+    const rows = arr(h.learned.tiers).filter(x => can.has(lc(x.n)));
+    const cmd = n => /^Curaga/.test(n) ? "curagatier" : "curetier";
+    return `<div class="box"><h3>Which cures to use</h3>${autoChk}
+      <table class="grid"><thead><tr><th>Cure</th><th>Use it (on ${esc(h.learned.job || "this job")})</th><th>Heals about</th></tr></thead><tbody>
+      ${rows.map(x => `<tr><td>${esc(x.n)}</td><td><input type="checkbox" ${x.off ? "" : "checked"} data-on="${cmd(x.n)} ${esc(x.n)} on" data-off="${cmd(x.n)} ${esc(x.n)} off"></td>
+        <td>${x.hp} HP <span class="hint">${x.learned ? "(seen in game)" : "(starting guess)"}</span></td></tr>`).join("")}
+      </tbody></table>
+      <div class="hint" style="margin-top:4px">The smallest ticked cure that covers the missing HP is cast. Curaga goes on the member with the most hurt members within 10 yalms. The numbers correct themselves as cures land.</div>
+    </div>`;
+  }
   const t = parseTiers(str), cures = arr(m.cures).length ? arr(m.cures) : CURES;
   const curagas = arr(m.curagas), on = new Set(String(h.curagas || "").split(",").map(x => lc(x.trim())));
   const hpSel = c => { const v = t[c] || 0; const steps = HP_STEPS.includes(v) || !v ? HP_STEPS : [...HP_STEPS, v].sort((a, b) => a - b);
     return `<select data-cmd="curetier ${esc(c)} " ${v ? "" : "disabled"}>${steps.map(n => opt(String(n), n + " HP", String(v))).join("")}</select>`; };
-  return `<div class="box"><h3>Which cures to use</h3>
+  return `<div class="box"><h3>Which cures to use</h3>${autoChk}
     <table class="grid"><thead><tr><th>Cure</th><th>Use it</th><th>When this much HP is missing</th></tr></thead><tbody>
     ${cures.map(c => `<tr><td>${esc(c)}</td><td><input type="checkbox" ${t[c] ? "checked" : ""} data-on="curetier ${esc(c)} on" data-off="curetier ${esc(c)} off"></td>
       <td>${hpSel(c)}</td></tr>`).join("")}
@@ -1211,7 +1309,7 @@ function recoveryBox(p) {
 function efInCharge(p) {
   const cfg = p.config || {}, x = cfg.extra || {}, mods = cfg.modules || {}, bl = cfg.blists || {};
   const on = !!mods.farm && x.farm_engine !== "vanguard";
-  return {on, ws: on && arr(bl.ws).length > 0, trusts: on && arr(bl.trusts).length > 0, pull: on && arr(bl.pull).length > 0};
+  return {on, asc: on && x.farm_ws_use === "chain" && arr((cfg.wschain || {}).list).length > 0, ws: on && arr(bl.ws).length > 0, trusts: on && arr(bl.trusts).length > 0, pull: on && arr(bl.pull).length > 0};
 }
 const efNote = text => `<div class="hint" style="margin-top:4px;color:var(--tp)">⚑ ${text}</div>`;
 
@@ -1268,7 +1366,30 @@ function debuffsTab(p) {
       ${arr(m.debuffs).map(sp => chk(sp, on.includes(lc(sp)), `menu debuff on ${sp}`, `menu debuff off ${sp}`)).join("")}
     </div></div>
     <div class="row"><label class="field">If resisted, retry ${sel("set debuff.retries ", [0,1,2,3].map(n => ({v: String(n), l: n === 0 ? "Never" : n + (n === 1 ? " time" : " times")})), String(cfg.debuff_retries ?? 1))}</label></div>` : ""}
-    <div class="hint">Sleep spells are left out on purpose so the battle target is never put to sleep.</div>
+    ${charmBox(cfg.charm)}
+    <div class="hint">Sleep spells are left out of the list above on purpose so the battle target is never put to sleep.</div>
+  </div>`;
+}
+
+// His request 2026-11-21: "auto sleep charmed people in the party ... let me choose which sleep and if that job has
+// multiple sleeps i should be able to select multiple and prioritize multiple". Saved per job.
+function charmBox(c) {
+  if (!c || !arr(c.available).length) return "";
+  const cur = arr(c.order), rest = arr(c.available).filter(s => !cur.includes(s));
+  const setCmd = list => "charmsleep " + (list.length ? "set " + list.join(",") : "none");
+  const move = (i, j) => { const l = cur.slice(); [l[i], l[j]] = [l[j], l[i]]; return setCmd(l); };
+  const AREA = ["Sleepga", "Sleepga II", "Horde Lullaby", "Horde Lullaby II"], NEAR_ME = {"Sheep Song": 6, "Soporific": 6, "Yawn": 10, "Dream Flower": 10};
+  const tag = s => / \+ Manifestation$/.test(s) ? ` <span class="btag" title="Scholar: Dark Arts and Manifestation first, so the sleep hits everything around the target (more MP and recast; uses a stratagem)">area, Scholar</span>`
+    : NEAR_ME[s] ? ` <span class="btag" title="Blue Magic: works around YOU - the charmed member has to be within ${NEAR_ME[s]}' of you${s === "Yawn" ? ", facing you (a gaze)" : ""}. The monster nearby sleeps too.">area around me, ${NEAR_ME[s]}'</span>`
+    : AREA.includes(s) ? ` <span class="btag" title="Puts everything around the charmed member to sleep too, the monster included">area</span>` : "";
+  return `<div class="box"><h3>Sleep a charmed party member</h3>
+    <div class="checks">${chk("Put a charmed party or alliance member to sleep", c.on, "charmsleep on", "charmsleep off", "A charmed player fights for the monster. Asleep, they can't hurt anyone until the charm wears off; a cure wakes them (Healing tab: Wake sleeping members).")}</div>
+    <div class="hint" style="margin:4px 0">Ticked sleeps are tried from the top: the first one that is ready is cast. For ${esc(c.job || "this job")} only.${c.picked ? "" : " (Not picked yet: all of them, in the recommended order.)"}</div>
+    ${cur.map((s, i) => `<div class="act"><span class="hint" style="width:20px;text-align:right">${i + 1}</span>
+      <span style="display:inline-flex;gap:2px"><button title="Move up" ${i ? "" : "disabled"} onclick="send('${esc(move(i, i - 1))}')">▲</button><button title="Move down" ${i < cur.length - 1 ? "" : "disabled"} onclick="send('${esc(move(i, i + 1))}')">▼</button></span>
+      ${chk(s, true, setCmd(cur), setCmd(cur.filter(x => x !== s)))}${tag(s)}</div>`).join("")}
+    ${rest.length ? `<div class="checks" style="margin-top:6px">${rest.map(s => chk(s, false, setCmd(cur.concat([s])), setCmd(cur)) + tag(s)).join("")}</div>` : ""}
+    ${c.picked ? `<button style="font-size:11px;margin-top:6px" onclick="send('charmsleep reset')">Recommended order</button>` : ""}
   </div>`;
 }
 
@@ -1744,6 +1865,58 @@ function efKindOf(name, known) {
   return "item";
 }
 
+// AutoSkillchain in Battles (his request 2026-10-30): a preset or his own chain, used while farming if he picks it.
+function efSaveChain() {
+  const e = document.getElementById("efChainName");
+  if (e && e.value.trim()) { send("wschain save " + e.value.trim()); e.value = ""; }
+}
+function efChain(p, x) {
+  const wc = (p.config || {}).wschain || {}, cur = arr(wc.list), wl = arr(p.ws_list), presets = arr(wc.presets);
+  const label = c => {
+    const missing = arr(c.ws).filter(w => !wl.includes(w));
+    return `${c.mine ? "★ " : ""}${c.name}: ${arr(c.ws).join(" > ")}${c.rep ? " (repeat)" : ""}${missing.length ? " - can't use yet: " + missing.join(", ") : ""}`;
+  };
+  const opts = [{v: "none", l: "—"}].concat(wl.concat(cur.filter(w => !wl.includes(w))).map(w => ({v: w, l: w})));
+  const slots = Array.from({length: Math.min(6, cur.length + 1)}, (_, i) =>
+    `<div class="ef-row"><label class="ef-lab">${i + 1}${cur.length && wc.step === i + 1 ? " ▸" : ""}</label>${sel(`wschain slot ${i + 1} `, opts, cur[i] || "none")}</div>`).join("");
+  const mine = presets.filter(c => c.mine);
+  const on = x.farm_ws_use === "chain";
+  return `<div class="ef-ipane">
+    ${efGroup("While farming, use", `<div class="ef-row"><label class="ef-lab">Weapon skills</label>${sel("set farm.ws_use ", [{v: "list", l: "the Weaponskill list"}, {v: "chain", l: "AutoSkillchain (this chain)"}], on ? "chain" : "list")}</div>
+      ${on && !cur.length ? `<div class="ef-hint">Pick a preset or fill in the weapon skills below. Until then the Weaponskill list is used.</div>` : ""}`)}
+    ${efGroup("Preset", `<div class="ef-row"><label class="ef-lab">${esc(wc.weapon || "Chains")}</label>${presets.length
+        ? `<div style="flex:1;min-width:0;max-width:100%">${sel("wschain load ", [{v: "", l: "- pick a chain -"}].concat(presets.map(c => ({v: c.name, l: label(c)}))), "").replace("<select", '<select style="width:100%"')}</div>`
+        : `<span class="ef-ro">none saved for this job and weapon: make your own below</span>`}</div>`)}
+    ${efGroup("Your chain, in order", `${slots}
+      <div class="ef-row"><label class="ef-lab"></label>${cur.length ? chk("Repeat", wc.rep !== false, "wschain repeat on", "wschain repeat off") : ""}
+        ${cur.length ? `<button onclick="send('wschain clear')">Clear</button>` : ""}</div>
+      ${cur.length ? `<div class="ef-row"><label class="ef-lab">Save as</label><input id="efChainName" style="flex:1" maxlength="30" placeholder="a name for this chain"><button onclick="efSaveChain()">Save</button></div>` : ""}
+      ${mine.length ? `<div class="ef-row"><label class="ef-lab">Forget</label>${sel("wschain forget ", [{v: "", l: "- one of yours -"}].concat(mine.map(c => ({v: c.name, l: c.name}))), "")}</div>` : ""}`)}
+    ${efGroup("When", efSlider("TP at", "set ws.tp ", x.ws_tp ?? 1000, 1000, 3000, 50)
+      + efRange("MP %", "set ws.mp_low ", "set ws.mp_high ", x.ws_mp_low ?? 0, x.ws_mp_high ?? 100, 0, 100, 1, "%")
+      + efRange("MP number", "set ws.mp_min ", "set ws.mp_max ", x.ws_mp_min ?? 0, x.ws_mp_max ?? 0, 0, 3000, 10)
+      + `<div class="ef-hint">At least 4 s between weapon skills. A new mob, or 20 s without the next one, starts the chain over. MP number 0 = no limit on that side. The MP limit counts for all weapon skills on this character.</div>`)}
+  </div>`;
+}
+
+// A weapon skill that can never go: all weapon skills share the same TP, and the list is tried from the top, so one above
+// it that is allowed whenever this one is always goes first (his report 2026-10-30: Entropy at MP 0-22% under Cross Reaper
+// with no MP range: 355 Cross Reapers, no Entropy). The index of the one that blocks it, or -1.
+function efBlockedBy(list, i, known) {
+  const a = list[i];
+  if (!a || a.on != 1 || efKindOf(a.n, known) !== "ws") return -1;
+  const wide = (lo, hi, lo2, hi2) => (+lo || 0) <= (+lo2 || 0) && +hi >= +hi2;
+  const num = (b, f) => +b[f] || 0;
+  return list.findIndex((b, j) => j < i && b.on == 1 && b.n !== a.n && efKindOf(b.n, known) === "ws" && !+b.rc && !+b.lim
+    && wide(b.ml, b.mh, a.ml, a.mh) && wide(b.tpl, b.tph, a.tpl, a.tph) && wide(b.pl, b.ph, a.pl, a.ph) && wide(b.tl, b.th, a.tl, a.th)
+    && num(b, "mal") <= num(a, "mal") && (!num(b, "mah") || (num(a, "mah") && num(b, "mah") >= num(a, "mah")))
+    && (!b.st || (b.st === a.st && +b.sp === +a.sp)) && (!b.tn || b.tn === a.tn) && (!+b.d || (+a.d && +b.d >= +a.d)));
+}
+function efMoveAbove(list, i, j) {
+  for (let n = i; n > j; n--) send(`blist move ${list} ${n + 1} up`);
+  efSelect(list, j);
+}
+
 function efBattles(p, x, known, tgtNames) {
   const all = (p.config || {}).blists || {};
   if (efSel.i === -3) { efSel.i = arr(all[efSel.list]).length - 1; }
@@ -1756,8 +1929,8 @@ function efBattles(p, x, known, tgtNames) {
     const acts = arr(all[k]);
     return `<div class="ef-node ${efSel.list === k && efSel.i < 0 ? "sel" : ""}" onclick="efSelect('${k}', -1)">${acts.length ? "▾" : "▸"} ${l}</div>
       ${acts.map((b, i) => `<div class="ef-leaf ${efSel.list === k && efSel.i === i ? "sel" : ""}" onclick="if(event.target.tagName!=='INPUT')efSelect('${k}', ${i})">
-        <input type="checkbox" ${b.on == 1 ? "checked" : ""} data-on="blist set ${k} ${i + 1} on 1" data-off="blist set ${k} ${i + 1} on 0"> ${esc(b.n)}</div>`).join("")}`;
-  }).join("");
+        <input type="checkbox" ${b.on == 1 ? "checked" : ""} data-on="blist set ${k} ${i + 1} on 1" data-off="blist set ${k} ${i + 1} on 0"> ${esc(b.n)}${efBlockedBy(acts, i, known) >= 0 ? ` <span style="color:#c60" title="Never used: the weapon skill above it always goes first">⚠</span>` : ""}</div>`).join("")}`;
+  }).join("") + `<div class="ef-node ${efSel.list === "asc" ? "sel" : ""}" onclick="efSelect('asc', -1)">⛓ AutoSkillchain${x.farm_ws_use === "chain" ? " (on)" : ""}</div>`;
   // the details: EasyFarm's inner tabs
   const tabs = ["Command", "Action", "MP", "TP", "Status", "Player", "Target", "Misc"];
   let det = "";
@@ -1774,7 +1947,9 @@ function efBattles(p, x, known, tgtNames) {
       Action: a ? efSlider("Distance", set("d"), a.d, 0, 25, 1, a.d ? "" : " (any)") +
         `<div class="ef-row"><label class="ef-lab">Max Use</label>${sel(set("lim"), [{v: 0, l: "0 (no limit)"}].concat([1, 2, 3, 4, 5, 10].map(v => ({v, l: v + " per mob"}))), a.lim)}</div>
          <div class="ef-row"><label class="ef-lab">Recast</label>${sel(set("rc"), [{v: 0, l: "0 (the game's own)"}].concat([3, 5, 8, 10, 15, 20, 30, 45, 60, 90, 120, 180, 300, 600].map(v => ({v, l: v + " s"}))), a.rc)}</div>` : "",
-      MP: a ? `<div class="ef-row"><label class="ef-lab">MP Cost</label><span class="ef-ro">from the game</span></div>` + efRange("MP Range", set("ml"), set("mh"), a.ml, a.mh, 0, 100, 1, "%") : "",
+      MP: a ? `<div class="ef-row"><label class="ef-lab">MP Cost</label><span class="ef-ro">from the game</span></div>` + efRange("MP Range", set("ml"), set("mh"), a.ml, a.mh, 0, 100, 1, "%")
+        + efRange("MP number", set("mal"), set("mah"), a.mal || 0, a.mah || 0, 0, 3000, 10)
+        + `<div class="ef-hint">Used only when MP is in these ranges. MP number 0 = no limit on that side.</div>` : "",
       TP: a ? `<div class="ef-row"><label class="ef-lab">TP Cost</label><span class="ef-ro">${kind === "ws" ? "1000+" : "from the game"}</span></div>` + efRange("TP Range", set("tpl"), set("tph"), a.tpl, a.tph, 0, 3000, 100) : "",
       Status: a ? `<div class="ef-row"><label class="ef-lab">On Status</label>${sel(set("st"), [{v: "", l: "(none)"}].concat(BL_STATUS.concat(a.st && !BL_STATUS.includes(a.st) ? [a.st] : []).map(v => ({v, l: v}))), a.st)}
           ${a.st ? sel(set("sp"), [{v: 0, l: "when NOT on me"}, {v: 1, l: "when on me"}], a.sp) : ""}</div>` : "",
@@ -1788,7 +1963,9 @@ function efBattles(p, x, known, tgtNames) {
     };
     const shown = a ? tabs : ["Command"];
     if (!shown.includes(efDet)) efDet = "Command";
-    det = `<div class="ef-itabs">${shown.map(t => `<span class="${t === efDet ? "on" : ""}" onclick="efDetTab('${t}')">${t}</span>`).join("")}</div>
+    const blocked = a ? efBlockedBy(list, efSel.i, known) : -1;
+    det = `${blocked >= 0 ? `<div class="ef-hint" style="color:#c60">⚠ ${esc(a.n)} will never be used: ${esc(list[blocked].n)} is above it and can go whenever this can, and it spends the TP first.
+        <button onclick="efMoveAbove('${efSel.list}', ${efSel.i}, ${blocked})">Move ${esc(a.n)} above it</button></div>` : ""}<div class="ef-itabs">${shown.map(t => `<span class="${t === efDet ? "on" : ""}" onclick="efDetTab('${t}')">${t}</span>`).join("")}</div>
       <div class="ef-ipane">${pane[efDet] || ""}</div>`;
   } else {
     det = `<div class="ef-hint" style="padding:10px">${{start: "Start: used once when a fight with a new mob begins.", trusts: "Trusts: called while not fighting, until the party has the Trust Party Size (Settings).",
@@ -1796,6 +1973,7 @@ function efBattles(p, x, known, tgtNames) {
       finish: "End: used once after the mob dies.", healing: "Healing: out of a fight, on yourself.", ws: "Weaponskill: when it has any, they replace the normal weapon skill while farming."}[efSel.list] || ""}
       <br><br>Click <b>Add</b> to add an action, or click an action on the left to change it.</div>`;
   }
+  if (efSel.list === "asc") return `<div class="ef-battles"><div class="ef-tree">${tree}</div><div class="ef-det">${efChain(p, x)}</div></div>`;
   return `<div class="ef-battles"><div class="ef-tree">${tree}</div><div class="ef-det">${det}</div></div>
     ${efBtns([["Add", "efAdd()"], ["Delete", "efDelete()", efSel.i < 0], ["Clear", "efClear()", !list.length]])}`;
 }
@@ -1874,6 +2052,7 @@ function efSettings(x) {
     </div>
     ${efGroup("Misc Settings", `
       ${efSlider("Detection Distance", "set farm.detect ", (x.farm_detect || 17), 1, 50, 1)}
+      ${x.farm_pull_hp !== undefined ? efSlider("No new mob while anyone is under HP % (0 = off)", "set farm.pull_hp ", x.farm_pull_hp, 0, 90, 5) : ""}
       ${efSlider("Height Threshold", "set farm.height ", x.farm_height ?? 5, 1, 20)}
       ${efSlider("Melee Distance", "set assist.melee_range ", x.melee_range ?? 3, 1, 10, 0.5)}
       ${efSlider("Wander Distance", "set farm.range ", x.farm_range ?? 17, 1, 100, 1)}
@@ -2381,6 +2560,7 @@ document.addEventListener("change", e => {
     return;
   }
   if (el.dataset.on !== undefined) { send(el.checked ? el.dataset.on : el.dataset.off); el.closest(".chk")?.classList.toggle("off", !el.checked); return; }
+  if (el.dataset.preadd !== undefined) { if (el.value) send(`actpre ${el.dataset.preadd} add ${el.value}`); return; }
   if (el.dataset.cmd !== undefined) { send(el.dataset.cmd + (el.value || el.dataset.empty || "")); el.blur(); }
 });
 var sliding = false;   // (var: render may run before this line)

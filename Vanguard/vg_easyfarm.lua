@@ -23,6 +23,7 @@ Every state whose Check is true runs, in that order, each pass.
 ]]
 local util = require('vg_util')
 local res = require('resources')
+local wschain = require('vg_wschain')
 
 local ef = {}
 local S, state, h
@@ -85,6 +86,7 @@ local function party_ids()
             if mob and mob.id then ids[mob.id] = true end
         end
     end
+    util.alliance_ids(ids)             -- (claims: a mob of the alliance is ours too; list stays my party)
     return ids, list
 end
 
@@ -205,6 +207,7 @@ function ef.buffing_ok(list, a, player, ids)
     -- a spell this character can't cast (not learned, not this job): EasyFarm's EnsureCast fails on it; here it
     -- doesn't count as usable at all (his report 2026-10-21: a trust that never went out held up every pull)
     if (kind == 'ma' or kind == 'trust') and r and util.can_cast and not util.can_cast(r, player) then return false end
+    if kind == 'ws' and not util.ws_fits(r.en) then return false end -- (the same for a weapon skill this weapon can't use)
     if kind == 'trust' then
         local fail = (state.ef_trust_fail or {})[r.en]
         if fail and fail > clock() then return false end
@@ -214,7 +217,8 @@ function ef.buffing_ok(list, a, player, ids)
     end
     if kind == 'ws' and v.tp < 1000 then return false end
     if kind == 'ja' and r and (r.tp_cost or 0) > v.tp then return false end
-    if (v.max_mp or 0) > 0 and not in_range(a.ml, a.mh, v.mpp) then return false end
+    -- (no "not set" for MP: its default is 0-100, so 0-0 really means at 0 MP; it used to fire at any MP)
+    if not BL.mp_ok(a, v) then return false end
     if not in_range(a.tpl, a.tph, v.tp) then return false end
     local m = meta(list, a)
     if (a.lim or 0) ~= 0 and m.uses >= a.lim then return false end
@@ -289,6 +293,18 @@ local function use(list, a, target, player)
         windower.send_command('input /ra <t>') sent = true
     end
     local m = meta(list, a)
+    -- Not sent (0.99.2): since 0.99.1 a spell waits half a second for the character to stand still, and that pass
+    -- still counted as a use, started the action's recast and paused for the whole cast time - a pull limited to 1 use
+    -- was "used" without ever being cast. Now a short pause and another try; only after 8 tries in a row does it count
+    -- as used, so a spell the game keeps refusing can't hold everything up.
+    if not sent then
+        m.fails = (m.fails or 0) + 1
+        if m.fails < 8 then
+            state.ef_wait = clock() + 0.35
+            return false
+        end
+    end
+    m.fails = 0
     m.uses = m.uses + 1
     m.last = clock() + (a.rc or 0)
     -- TimeWaiter.Pause(GlobalCooldown) after each action (+ the cast itself: MonitorCast)
@@ -309,6 +325,14 @@ local function use_targeted(list, a, target, player, me)
     return 'used'
 end
 -- Executor.UseBuffingActions: the first one that passes, this pass
+-- AutoSkillchain picked in Battles (farm.ws_use): its next weapon skill, through the job's weapon skill path (do_ws), so
+-- the finisher, Aftermath and party skillchains keep their turn. A skillchain has a time window: ahead of the Battle list.
+local function chain_turn(player, t)
+    if not wschain.due(player, t) or not h.do_ws(player) then return false end
+    state.ef_wait = clock() + C.gcd + 0.1
+    return true
+end
+
 local function use_buffing(list, actions, player, ids)
     for _, a in ipairs(actions) do
         if ef.buffing_ok(list, a, player, ids) then use(list, a, nil, player) return true end
@@ -321,6 +345,30 @@ end
 ------------------------------------------------------------------------
 local M = { target = nil, fighting = false, zone = nil, route_i = 1, route = nil }
 local function target_ok(ids) return M.target and ef.mob_filter(M.target, ids) end
+
+-- No NEW mob while I or a party player (not a trust, not someone KO'd) is under farm.pull_hp (50 %; 0 = off).
+-- His wipes of 2026-11-14 (BLU + NIN + WAR on Apex Toads, no healer): in the last minute he used White Wind five
+-- times and still pulled two more toads, the last one 9 s before the KO. A mob already on us is always fought.
+local function hold_pull(player, ids)
+    local floor = num(S.farm.pull_hp, 50)
+    if floor <= 0 or any_aggro(ids) then return nil end
+    local why
+    local hpp = (player.vitals or {}).hpp or 100
+    if hpp < floor then why = ('my HP is %d%%'):format(hpp) end
+    if not why then
+        local p = windower.ffxi.get_party() or {}
+        for _, k in ipairs({ 'p1', 'p2', 'p3', 'p4', 'p5' }) do
+            local m = p[k]
+            if m and m.name and m.mob and not m.mob.is_npc and (m.hpp or 0) > 0 and m.hpp < floor and dist(m.mob) < 30 then
+                why = ('%s is at %d%% HP'):format(m.name, m.hpp)
+                break
+            end
+        end
+    end
+    if why and not h.recently('ef:hold', 30) then h.mark('ef:hold') h.log(('[EasyFarm] Not pulling: %s (pulls again at %d%%)'):format(why, floor)) end
+    return why
+end
+ef.hold_pull = hold_pull
 local function list_of(name) return BL.get(name) end
 local function any_enabled(name)
     for _, a in ipairs(list_of(name)) do if tonumber(a.on) == 1 then return true end end
@@ -444,6 +492,10 @@ local STATES = {
           if cur and (party_claim(cur, ids) or fighting(cur) or player.status == 1) then return false end
           if h.recently('ef:scan', 1) then return false end            -- UnitArrayCheckRate 1 s
           h.mark('ef:scan')
+          -- between fights: the Finish list first (End clears this; 6 s at most, and never with a mob on us)
+          if M.end_pending then
+              if any_aggro(ids) or clock() - M.end_pending > 6 then M.end_pending, M.end_used = nil, nil else return false end
+          end
           local best, bd
           for _, m in pairs(windower.ffxi.get_mob_array() or {}) do
               if type(m) == 'table' and m.is_npc and m.spawn_type == 16 and ef.mob_filter(m, ids) then
@@ -453,6 +505,18 @@ local STATES = {
           end
           if cur and best and best.id ~= cur.id and bd >= dist(cur) - 1 then return false end   -- (not worth switching)
           if best and (not cur or best.id ~= cur.id) then
+              -- a new mob: EasyFarm's End state resets each action's Usages and runs the Finish list after a fight, but
+              -- here a new target is picked at once, so End never ran - a pull with a use limit (Fire, limit 2) stayed
+              -- used up for the rest of the run (his KO 2026-11-12: no pull after 23:02, then mobs hit from 7-10 yalms)
+              for _, m in pairs(state.ef_meta or {}) do m.uses = 0 end
+              -- (0.99.2) the fight just ended: the next mob is not picked on this pass. First the Finish list gets
+              -- its turn with no target (before, the new mob was already picked and, with no pull list, Battle
+              -- actions went out on it ahead of the Finish list). A mob that is on us is picked at once.
+              if M.target and not cur and any_enabled('finish') and not any_aggro(ids) then
+                  M.end_pending = clock()
+                  M.target = nil
+                  return false
+              end
               M.target = best
               h.log(('[EasyFarm] Now targeting %s : %d (%.1f yalms)'):format(best.name, best.id, bd))
           elseif not best then
@@ -491,18 +555,21 @@ local STATES = {
       end },
     { name = 'Start', pri = 5,
       check = function(player, ids)
+          if M.end_pending then return false end
           if Rest.check(player, ids) then return false end
           if not target_ok(ids) then return false end
+          if hold_pull(player, ids) then return false end
           return not fighting(windower.ffxi.get_mob_by_id(M.target.id))
       end,
       enter = function() reset_nav() end,
       run = function(player, ids) use_buffing('start', list_of('start'), player, ids) end },
     { name = 'Pull', pri = 4,
       check = function(player, ids, plist)
-          if M.fighting then return false end
+          if M.fighting or M.end_pending then return false end
           if Rest.check(player, ids) then return false end
           if Trusts.check(player, ids, plist) then return false end
           if not target_ok(ids) then return false end
+          if not fighting(windower.ffxi.get_mob_by_id(M.target.id)) and hold_pull(player, ids) then return false end
           return any_enabled('pull')
       end,
       enter = function() reset_nav() end,
@@ -530,6 +597,7 @@ local STATES = {
       end,
       run = function(player, ids, plist, me)
           local t = windower.ffxi.get_mob_by_id(M.target.id)
+          if player.status == 1 and chain_turn(player, t) then return end
           for _, a in ipairs(list_of('battle')) do
               if ef.targeted_ok('battle', a, player, ids, t) then use_targeted('battle', a, t, player, me) return end
           end
@@ -537,14 +605,31 @@ local STATES = {
     { name = 'End', pri = 3,
       check = function(player, ids)
           if Rest.check(player, ids) then return false end
-          return not target_ok(ids)
+          return M.end_pending or not target_ok(ids)
       end,
-      enter = function(player)
+      enter = function(player, ids)
           reset_nav()
-          if player.status == 1 then windower.send_command('input /attack off') end
+          if player.status == 1 and not target_ok(ids) then windower.send_command('input /attack off') end
       end,
       run = function(player, ids)
-          use_buffing('finish', list_of('finish'), player, ids)
+          -- (every Finish action that is ready gets its turn, one per pass, before the next mob is picked)
+          -- (each one once per fight: an item or an ability with no recast must not repeat until the time is up)
+          if M.end_pending then
+              M.end_used = M.end_used or {}
+              local used = false
+              for i, a in ipairs(list_of('finish')) do
+                  if not M.end_used[i] and ef.buffing_ok('finish', a, player, ids) then
+                      M.end_used[i] = true
+                      use('finish', a, nil, player)
+                      used = true
+                      break
+                  end
+              end
+              if not used then M.end_pending, M.end_used = nil, nil end
+          else
+              M.end_used = nil
+              use_buffing('finish', list_of('finish'), player, ids)
+          end
           for k, m in pairs(state.ef_meta or {}) do m.uses = 0 end          -- action.Usages = 0
       end },
     { name = 'Rest', pri = 2, check = function(...) return Rest.check(...) end, run = function(p) Rest.run(p) end,
@@ -558,6 +643,8 @@ local STATES = {
       run = function(player, ids, plist, me)
           if player.status ~= 1 then return end
           local t = windower.ffxi.get_mob_by_id(M.target.id)
+          if wschain.in_charge(t) then chain_turn(player, t) return end
+          if not wschain.mp_ok(player) then return end                -- (Weapon skill MP limit: for every weapon skill)
           for _, a in ipairs(list_of('ws')) do
               if ef.targeted_ok('ws', a, player, ids, t) then use_targeted('ws', a, t, player, me) return end
           end
@@ -609,6 +696,7 @@ local STATES = {
           if not target_ok(ids) then return false end
           local t = windower.ffxi.get_mob_by_id(M.target.id)
           if fighting(t) then return true end
+          if hold_pull(player, ids) then return false end
           local usable = false
           for _, a in ipairs(list_of('pull')) do if ef.buffing_ok('pull', a, player, ids) then usable = true break end end
           if not usable then return true end
@@ -622,10 +710,19 @@ local STATES = {
           if M.approach_for ~= t.id then M.approach_for, M.approach_at = t.id, clock() end
           local waiting = C.approach_wait > 0 and clock() - M.approach_at < C.approach_wait
           -- (goto_pos stops once within Melee Distance; before, nothing stopped him there and he ran past the mob)
-          if C.approach and not waiting then goto_pos(me, t, C.melee) else reset_nav() end
+          -- (a mob on the party that stayed out of reach: closed in on even with Approach off - vg_farm's stuck check)
+          local close_in = state.farm_close_in == t.id and fighting(t)
+          if (C.approach and not waiting) or close_in then goto_pos(me, t, C.melee) else reset_nav() end
           face(me, t)
           local targeted = set_target(t)
-          if C.engage and targeted and player.status ~= 1 and dist(t) < 25 and not h.recently('ef:attack', 2) then
+          -- Approach off: only a mob that is coming (fighting) or already in reach is engaged; /attack on one standing
+          -- 7-25 yalms away did nothing but start the 25 s "out of reach" clock (his KO 2026-11-12)
+          local reachable = C.approach or fighting(t) or dist(t) <= C.melee + 2
+          if not reachable and M.wait_note ~= t.id then
+              M.wait_note = t.id
+              h.log(('[EasyFarm] %s is %.0f yalms away, no pull ready and Approach is off: waiting for a pull'):format(t.name, dist(t)))
+          end
+          if C.engage and targeted and reachable and player.status ~= 1 and dist(t) < 25 and not h.recently('ef:attack', 2) then
               h.mark('ef:attack')
               if dist(t) <= C.melee + 0.5 or not C.approach then reset_nav() end
               windower.send_command('input /attack <t>')

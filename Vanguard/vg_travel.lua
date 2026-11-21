@@ -51,7 +51,7 @@ local ITEMS = { [SNEAK] = 'Silent Oil', [INVIS] = 'Prism Powder' }
 local SPELLS = { [SNEAK] = 'Sneak', [INVIS] = 'Invisible' }
 
 local function item_id(name)
-    for id, it in pairs(res.items) do if type(it) == 'table' and it.en == name then return id end end
+    return require('vg_items').id(name)
 end
 local ids = {}
 local function in_inventory(name)
