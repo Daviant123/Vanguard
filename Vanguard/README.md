@@ -12,10 +12,11 @@ Vanguard is free and always will be: no paid features, subscriptions, keys, ads 
 
 ### [⬇ Download Vanguard (zip)](https://github.com/Daviant123/Vanguard/raw/main/Vanguard.zip)
 
-1. Unzip it anywhere (your Desktop is fine) and double-click **Vanguard Control.exe** (the gold shield). That's all:
-   there's no installer. Windows may warn about an unknown app the first time: **More info** > **Run anyway**.
-2. The app finds your Windower folder (or asks you to pick it), puts the Vanguard addon into
-   `Windower\addons\Vanguard` and sets it to load when the game starts.
+1. Unzip it straight into your Windower folder (the one with `Windower.exe`). It adds `addons\Vanguard` (the
+   addon) and `VanguardControl` (the app). There's no installer.
+2. Double-click `VanguardControl\Vanguard Control.exe` (the gold shield). Windows may warn about an unknown app the
+   first time: **More info** > **Run anyway**. The app sets Vanguard to load when the game starts. (Unzipped
+   somewhere else? Fine too: the app finds your Windower folder, or asks you to pick it, and puts the addon there.)
 3. Start the game (or, if it's already running, type `//lua load vanguard` once in each game window). Your characters
    appear in the app: click the one you play, **Set up party**, **Start all**.
 
