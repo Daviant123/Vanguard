@@ -149,6 +149,20 @@ function util.has_buff(buff_list, id)
     return false
 end
 
+-- Unable to act at all (CurePlease audit 1.1): nothing - spell, ability, weapon skill or item - can be used, so
+-- nothing is sent (the game would refuse it and the anti-spam waits would delay the right action once it wears off).
+-- Buff ids checked against res/buffs.lua: 2 / 19 sleep, 7 petrification, 10 stun, 14 / 17 charm, 28 terror.
+-- (Silence 6 / mute 29 only stop spells: that's the 'silenced' check in Vanguard.lua.) Returns the state's name.
+util.INCAPACITATED = { [2] = 'asleep', [19] = 'asleep', [7] = 'petrified', [10] = 'stunned', [14] = 'charmed',
+                       [17] = 'charmed', [28] = 'terrorized' }
+function util.incapacitated(buff_list)
+    if not buff_list then return nil end
+    for _, b in pairs(buff_list) do
+        if util.INCAPACITATED[b] then return util.INCAPACITATED[b] end
+    end
+    return nil
+end
+
 -- Songs that come with an instrument instead of a scroll (they aren't in the learned-spell list): available
 -- while that instrument is in the inventory or a wardrobe (Singer does the same for Marsyas).
 util.INSTRUMENT_SONGS = { ['honor march'] = { 21398 },                          -- Marsyas
@@ -440,5 +454,45 @@ util.burst_elements = {
     Detonation    = {'Wind'},
     Impaction     = {'Lightning'},
 }
+
+------------------------------------------------------------------------
+-- Monster TP moves that buff the monster (1.2.0, Silmaril audit 2.4): move name -> the buff it gives, and whether
+-- Dispel can take it off. Looked up by NAME in res.monster_abilities (the same move has several ids, one per mob
+-- family), never by a fixed number. Invincible and Perfect Dodge (the mob's two-hour abilities) can't be dispelled
+-- (bg-wiki), so a dispeller doesn't waste MP on them; for anything not known here we keep dispelling as before.
+------------------------------------------------------------------------
+util.MOB_BUFF_MOVES = {
+    ['Invincible']       = { buff = 'Invincible',    dispel = false },
+    ['Perfect Dodge']    = { buff = 'Perfect Dodge', dispel = false },
+    ['Granite Skin']     = { buff = 'Stoneskin',     dispel = true },
+    ['Metallic Body']    = { buff = 'Stoneskin',     dispel = true },
+    ['Mighty Guard']     = { buff = 'Mighty Guard',  dispel = true },
+    ['Dark Thorn']       = { buff = 'Dread Spikes',  dispel = true },
+    ['Animating Wail']   = { buff = 'Haste',         dispel = true },
+    ['Fortifying Wail']  = { buff = 'Protect',       dispel = true },
+    ['Rhino Guard']      = { buff = 'Evasion Boost', dispel = true },
+    ['Scissor Guard']    = { buff = 'Defense Boost', dispel = true },
+    ['Infernal Bulwark'] = { buff = 'Infernal Bulwark', dispel = true },   -- (several defence buffs; name kept)
+}
+-- buffs Dispel can't remove, by name (a "gains the effect of X" message names the buff itself)
+util.UNDISPELLABLE = { ['invincible'] = true, ['perfect dodge'] = true }
+
+local mob_move_ids
+-- The buff a monster TP move (res.monster_abilities id) gives: { move = name, buff = name, dispel = bool } or nil.
+function util.mob_move_buff(ability_id)
+    if not mob_move_ids then
+        mob_move_ids = {}
+        for id, ab in pairs(res.monster_abilities or {}) do
+            local e = ab.en and util.MOB_BUFF_MOVES[ab.en]
+            if e then mob_move_ids[ab.id or id] = { move = ab.en, buff = e.buff, dispel = e.dispel } end
+        end
+    end
+    return ability_id and mob_move_ids[ability_id]
+end
+
+-- Can Dispel take this buff (a name) off a mob? Unknown buffs: yes (keep dispelling when unsure).
+function util.dispellable(buff_name)
+    return not (buff_name and util.UNDISPELLABLE[buff_name:lower()])
+end
 
 return util

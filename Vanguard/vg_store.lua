@@ -44,7 +44,7 @@ memory gets text keys "13", "14" next to the number keys, and config can't sort 
 No Vanguard setting is a list: everything saved is text, numbers or true/false. So tidy turns a list back into
 its text (joined with ',', as config split it), and drops number keys anywhere else. Done after every load,
 reload and before every save. ]]
-local TEXT = { 'charm_sleeps', 'profiles', 'menus', 'priorities', 'customs', 'blists', 'wschains', 'wschains_mine', 'trials',
+local TEXT = { 'charm_sleeps', 'profiles', 'menus', 'priorities', 'customs', 'blists', 'wschains', 'wschains_mine', 'scf_rules', 'trials',
     'triggers', 'farmspots', 'cure_learn', 'cure_off' }
 
 local function as_text(v)

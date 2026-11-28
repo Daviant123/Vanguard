@@ -182,6 +182,8 @@ local function can_work(cmd, player, bt)
     local c = ' ' .. cmd:lower() .. ' '
     local ws = c:find(' act ws ', 1, true) or c:find('/ws ', 1, true) or c:find('/weaponskill ', 1, true)
     if ws and player.status ~= 1 then return false end
+    -- a reactive skillchain follow-up (vg_scfollow) is waiting for its moment: it owns the TP, the rule waits
+    if ws and require('vg_scfollow').owns_tp(player, windower.ffxi.get_mob_by_target('t')) then return false end
     -- a finishing weapon skill is set (vg_finish): it owns the TP - a reaction firing the same weapon skill (or any,
     -- when TP is saved for the finisher) would spend it before the mob is low enough to die from it
     local fin = settings_ref and settings_ref.ws and settings_ref.ws.finish or ''

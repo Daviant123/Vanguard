@@ -134,7 +134,14 @@ jobs.WHM = {
     roles = {'healer'},
     ws = {'Black Halo', 'Hexa Strike', 'Realmrazer', 'Judgment'},
     actions = {
-        A('afflatus_solace', 'Afflatus Solace', 'Buffs', 'ja', 'Afflatus Solace', {buff = 'Afflatus Solace', when = 'always', on = {healer = true}}),
+        -- Afflatus stance (1.3.0, CurePlease audit 2.2): Solace and Misery replace each other in the game, so only the
+        -- one picked on the Job tab (whm.afflatus: solace | misery, default solace = as before) is ever used; the other
+        -- one is "owned" by that choice (Vanguard.lua action_owner) and left alone. afflatus = which choice it belongs to.
+        A('afflatus_solace', 'Afflatus Solace', 'Buffs', 'ja', 'Afflatus Solace', {buff = 'Afflatus Solace', when = 'always', afflatus = 'solace', on = {healer = true}}),
+        A('afflatus_misery', 'Afflatus Misery', 'Buffs', 'ja', 'Afflatus Misery', {buff = 'Afflatus Misery', when = 'always', afflatus = 'misery', on = {healer = true}}),
+        -- Divine Caress (1.3.0, audit 2.1): only right before a -na spell is cast on someone (do_status in Vanguard.lua
+        -- owns it; reactive = never used from the action list). Off by default: tick it on the Job tab.
+        A('divine_caress', 'Divine Caress (right before a -na spell)', 'Healing', 'ja', 'Divine Caress', {when = 'always', reactive = true}),
         A('divine_seal', 'Divine Seal when party is low', 'Healing', 'ja', 'Divine Seal', {party_below = 40, when = 'always', on = {healer = true}}),
         A('benediction', 'Benediction when party is critical (2-hour)', 'Healing', 'ja', 'Benediction', {party_below = 20, when = 'always'}),
         A('regen_leader', 'Regen IV on leader', 'Support', 'ma', 'Regen IV', {target = '{leader}', when = 'combat', on = {healer = true}}),
@@ -379,6 +386,11 @@ jobs.COR = {
         A('auto_ra_cor', 'Ranged attack loop', 'Offense', 'ra', 'Ranged', {target = '<t>', cooldown = 0, on = {ranged = true}}),
         A('triple_shot', 'Triple Shot', 'Buffs', 'ja', 'Triple Shot', {buff = 'Triple Shot', on = {ranged = true}}),
         A('crooked_cards', 'Crooked Cards (before first roll)', 'Support', 'ja', 'Crooked Cards', {when = 'combat'}),
+        -- Quick Draw (1.2.0, Silmaril audit 2.1): after a party member's enfeeble lands on the battle target, the Shot of
+        -- its element (Dia -> Light Shot, Bio / Blind -> Dark Shot ...; which elements: cor.quickdraw). reactive = not run
+        -- by the action engine's list: vg_support.quick_draw uses it when vg_support.qd_on_action saw the spell land.
+        -- Off by default (it spends cards and draws hate): switch it on on the Job tab or //vg action quick_draw on.
+        A('quick_draw', 'Quick Draw after an enfeeble lands (Light / Dark Shot)', 'Debuffs', 'ja', 'Light Shot', {target = '<bt>', when = 'combat', reactive = true}),
     },
 }
 

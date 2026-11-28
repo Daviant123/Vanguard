@@ -1,6 +1,6 @@
 _addon.name = 'Vanguard'
 _addon.author = 'Daviant'
-_addon.version = '0.99.8'
+_addon.version = '1.3.0'
 _addon.commands = {'vanguard', 'vg'}
 
 --[[
@@ -45,12 +45,15 @@ local safety = require('vg_safety')
 local store = require('vg_store')
 local mages = require('vg_mages')
 local charm = require('vg_charm')    -- sleep a charmed party member
+local sortie = require('vg_sortie')  -- Sortie: sector, boss procs and timers, the run
 local support = require('vg_support')
 local update = require('vg_update')
 local link = require('vg_link')
 local strat = require('vg_strat')
 local bard = require('vg_bard')
 local wschain = require('vg_wschain')
+local scfollow = require('vg_scfollow')   -- reactive skillchains + learned skillchain window (1.2.0, audit 1.2 / 3.2)
+local planner = require('vg_plan')        -- team planner assignments from Vanguard Control 2.0.0 (audit 3.1)
 local blist = require('vg_blist')
 local easyfarm = require('vg_easyfarm')
 local bufftime = require('vg_bufftime')
@@ -96,16 +99,32 @@ local defaults = {
     pause_on_zone = true,   -- stop the bot on a zone change (his request 2026-10-17: "when it changes zones i want you to stop the bot")
     stop_on_job = true,     -- ...and when the job or sub job changes (same request)
     -- formation: spread (fan behind the leader), line (single file) or off (plain follow)
-    follow = { distance = 2.5, max_distance = 40, formation = 'spread', trail = true },
+    -- move_tick (Silmaril audit 1.1): seconds between movement / steering passes (following, formation, trail, closing
+    -- in on the mob), between the 0.25 s decision passes. 0 (the default, as before 1.2.0; or as much as tick) =
+    -- movement only with the decisions. 0.1 = steering 10 times a second (try it: //vg set follow.move_tick 0.1)
+    follow = { distance = 2.5, max_distance = 40, formation = 'spread', trail = true, move_tick = 0 },
     party = { accept = true },          -- accept party invites from the leader / other Vanguard characters
     -- disengage: stop when the leader stops; defend: fight back when attacked while the leader is idle
     assist = { engage = true, approach = true, melee_range = 3.0, engage_range = 25, disengage = true, defend = true,
                autotarget = true,
+               -- resync (1.2.0): the game shows us fighting but the server says we're not (2 s+): /attack <t> again
+               resync = false,
                -- the Job tab's "Assist" box (0.99.3): switch = follow the leader's target changes; delay = seconds
                -- to wait after the leader starts on a mob; below_hp = only once the mob is at or under this HP %;
                -- on_claim = also when the leader isn't engaged but has a claimed mob targeted (pulls, a mage leader);
                -- approach_mode = role (melee roles walk up, casters don't) | on | off
-               switch = true, delay = 0, below_hp = 100, on_claim = false, approach_mode = 'role' },
+               switch = true, delay = 0, below_hp = 100, on_claim = false, approach_mode = 'role',
+               -- seek (1.2.0, Silmaril audit 2.6; vg_combat): an idle melee alt takes the nearest mob within
+               -- seek_range (yalms) that the party claimed / that attacks the party, up to max_mobs mobs fought by the
+               -- party; seek_unclaimed = also fresh unclaimed mobs. Never while farming, holding or retreating.
+               seek = false, seek_range = 15, max_mobs = 2, seek_unclaimed = false,
+               -- on_engage (1.2.0, audit 2.7; vg_combat): used once per new mob right after this character engages:
+               -- a command ('input /ra <t>'), or a spell / ability name. Farming with a pull: farm.pull_cmd wins.
+               on_engage = '',
+               -- hate_spell (1.3.0, CurePlease audit 2.8; vg_support): once per new battle target, when the leader
+               -- engages it, this spell on <bt> so a healer standing back is on the mob's hate list ('' = off);
+               -- hate_on = a member name: the spell goes on that member instead (a buff, CurePlease's party mode)
+               hate_spell = '', hate_on = '' },
     -- priority = names healed first at a higher threshold (tanks). wake_sleep = cure sleeping members.
     -- tiers: HP missing before each Cure tier is used (0 = never use it), like CurePlease's cure thresholds
     heal = { cure_at = 75, curaga_at = 70, curaga_count = 3, range = 20,
@@ -119,19 +138,35 @@ local defaults = {
              watch = '',                  -- people outside the party to cure too (HealBot "watch", CurePlease has it): //vg watch
              -- alliance (his request 2026-11-21: "the curebot needs alliance options"): cure the other two parties'
              -- members under alliance_at (after my own party at the same HP; Curaga never reaches them), raise them
-             alliance = false, alliance_at = 60, alliance_raise = false },
+             alliance = false, alliance_at = 60, alliance_raise = false,
+             -- 1.3.0 (CurePlease audit 2.4 / 2.5 / 3.2, vg_cure): priority_cover = how much of a priority member's
+             -- missing HP his cure must cover (0.85 = like everyone, as before; 1.0+ = bigger cures for the tank);
+             -- curaga_on = a member tried first as the Curaga centre ('' = off: the centre reaching the most);
+             -- predict = predictive healing (off): a member whose HP keeps falling over predict_window seconds moves
+             -- up the order and may get one tier more, by the HP% he loses in predict_lead seconds (at most predict_cap)
+             priority_cover = 0.85, curaga_on = '',
+             predict = false, predict_lead = 2, predict_cap = 20, predict_window = 3 },
     cure_learn = {},                      -- vg_cure: per job, "Cure IV=912;Cure V=1180" (what each healed in the game)
     charm = { on = false },               -- vg_charm: sleep a charmed party member (Enfeebles tab)
     charm_sleeps = {},                    -- vg_charm: per job, the sleeps to use in order, "Sleep II,Repose" ('-' = none)
     cure_off = {},                        -- vg_cure: per job, the Cure / Curaga tiers never to use, "Cure VI,Curaga"
 
     -- Statuses NOT to remove (comma list of status names).
-    cleanse = { skip = '', items = true },   -- items: Echo Drops / Holy Water / Remedy on myself (CurePlease, Silmaril)
+    cleanse = { skip = '', items = true },
+    -- temp_mp (1.3.0, audit 2.9): under this MP% use a temporary MP item (Lucid Ether, Dusty Ether, Megalixir ...) from
+    -- the Temporary Items bag or the inventory (0 = off)
+    items = { temp_mp = 0 },   -- items: Echo Drops / Holy Water / Remedy on myself (CurePlease, Silmaril)
     -- Rest (/heal) when idle and low; stand back up when recovered.
     rest = { hp_low = 40, hp_high = 95, mp_low = 25, mp_high = 95 },
     -- Sublimation upkeep and Convert.
     -- reserve: below this MP% only cures / Raise / status removal are cast (0 = off) - MP saved for healing
-    mana = { sublimation = true, sublimation_mpp = 70, convert_mpp = 15, reserve = 0, devotion_mpp = 0 },   -- devotion: WHM, 0 = off
+    -- 1.3.0 (CurePlease audit 2.3 / 2.7): devotion_to = only this member gets Devotion ('' = the first member under
+    -- devotion_mpp, as before); devotion_engaged = Devotion only while the party fights; sub_skip_refresh = don't start
+    -- charging Sublimation while my own Refresh is up, unless my MP is under sublimation_mpp (off = as before)
+    mana = { sublimation = true, sublimation_mpp = 70, convert_mpp = 15, reserve = 0, devotion_mpp = 0,   -- devotion: WHM, 0 = off
+             devotion_to = '', devotion_engaged = false, sub_skip_refresh = false },
+    -- White Mage (1.3.0, audit 2.2): afflatus = the stance kept up, solace | misery (one at a time; solace = as before)
+    whm = { afflatus = 'solace' },
     -- Summon trusts (spell names) until the party has party_size members.
     trusts = { list = '', party_size = 5 },
     -- Farming: target names (partial match), ignore list, claim filter (unclaimed|party|any),
@@ -180,6 +215,10 @@ local defaults = {
            finish = '', finish_at = 0, learned = '', finish_trial_only = true, finish_save = true, finish_others = true, finish_wait = false },
     -- Ordered chain steps "Character:Weapon Skill". Each character only fires its own steps.
     sc = { steps = '', open_tp = 1000, window_min = 3, window_max = 8 },
+    -- reactive skillchains (vg_scfollow, 1.2.0): on = the module (//vg scf on|off); tune_sc = sc.steps' window_max is
+    -- also capped by the learned skillchain window; learned = what was learned (written by Vanguard)
+    scf = { on = false, tune_sc = false, learned = '' },
+    scf_rules = {},          -- per job: "who|trigger|ws|delay;..." (//vg scf add), up to 4
     -- "Element:Spell|Fallback|Fallback" pairs.
     burst = {
         spells = 'Fire:Fire V|Fire IV|Fire III,Ice:Blizzard V|Blizzard IV|Blizzard III,' ..
@@ -196,14 +235,23 @@ local defaults = {
     -- entrust = 'Indi-Spell>Member'. full_circle_range = recall luopan when target is this far from it.
     -- entrust = 'auto' for Indi-Haste/Fury on the leader; hate_first = Dia before a Geo debuff;
     -- party_mp = Radial Arcana when 2+ members are under this MP%
-    geo = { indi = '', geo = '', geo_target = 'bt', entrust = '', full_circle_range = 15, hate_first = true, party_mp = 40 },
+    -- indi_engaged (1.3.0, audit 2.6): my own Indi only while the party fights (off = always, as before)
+    geo = { indi = '', geo = '', geo_target = 'bt', entrust = '', full_circle_range = 15, hate_first = true, party_mp = 40,
+            indi_engaged = false },
     debuff = { list = 'Dia II', retries = 1 },
+    -- Enfeebler mode (vg_mages, 1.2.0, Silmaril audit 1.3; off by default): keep up to count mobs enfeebled. mobs =
+    -- names it may take ('' = any mob fighting the party); pull = also unclaimed mobs within range (yalms) to fill the
+    -- count; spells = in order ('' = debuff.list); stay = never walk (like DO NOT MOVE); wait_hp = no enfeebling while
+    -- a party member is under this HP%. //vg enfeebler on|off|count N|mobs <list>|pull on|off|stay on|off
+    enfeebler = { on = false, count = 1, mobs = '', pull = false, range = 20, spells = '', stay = false, wait_hp = 50 },
     triggers = { t1 = '' },
     bridge = { enabled = true, host = '127.0.0.1', port = 47000, interval = 1 },
     -- Playing alts (vg_alts): alerts on the leader's screen, mount sync, food & Reraise upkeep.
     -- Kept outside "modules" so presets don't switch them off.
     alts = { alerts = true, mount = true, upkeep = true, hud = true, stealth = true, restsync = true },
-    hud = { x = 20, y = 320 },            -- alt overview box on the leader's screen
+    -- alt overview box on the leader's screen; tp = the party TP / battle target HP box (1.2.0, Silmaril audit 2.8,
+    -- off by default) at tp_x / tp_y
+    hud = { x = 20, y = 320, tp = false, tp_x = 20, tp_y = 220 },
     keys = false,                         -- //vg keys on: Ctrl+F1..F6 hotkeys for alt orders
     setups = {},                          -- //vg setup save|load <name>: named team setups
     share = { emergency = 35 },           -- other healers still cure a member below this HP%
@@ -219,7 +267,26 @@ local defaults = {
     -- Corsair: risk = highest bust chance % to Double-Up into (0 = never bust), range = roll reach in yalms
     -- //vg update: GitHub page (owner/name) and folder that hold the newest Vanguard
     updater = { repo = 'Daviant123/Vanguard', path = 'Vanguard', branch = 'main', check = true },   -- //vg update (see take_old_update_section)
-    cor = { risk = 0, snake_eye = true, fold = true, range = 8, crooked = '' },   -- crooked: Crooked Cards before this roll
+    -- crooked: Crooked Cards before this roll; quickdraw: the Shot after a party enfeeble of these elements lands on
+    -- the battle target (1.2.0, Silmaril audit 2.1): 'light,dark' (Dia / Bio, Blind), 'all', or '' = none
+    cor = { risk = 0, snake_eye = true, fold = true, range = 8, crooked = '', quickdraw = 'light,dark' },
+    -- Ranger: hover_step = with Hover Shot up, a half-second side step after each ranged attack / ranged weapon skill
+    -- (1.2.0, Silmaril audit 2.2; vg_support)
+    -- (off by default: //vg set rng.hover_step true)
+    rng = { hover_step = false },
+    -- Reaction timing (1.3.0, CurePlease audit 1.2-1.4):
+    -- ja.settle: seconds still kept busy after the game confirms (or refuses) a job ability Vanguard sent, instead of
+    --   the fixed 1.5 s (still the fallback when no answer comes; pet commands / blood pacts always keep 1.5 s).
+    --   1.5 = as before 1.3.0.
+    ja = { settle = 0.3 },
+    -- cast.tail: seconds added after a spell's cast time before the next action may go (cut short when the game says
+    --   the cast finished). 3 = as before 1.3.0. cast.log_gap: also write every measured after-cast gap to the app's log
+    --   (the numbers are always kept: //vg stats).
+    cast = { tail = 3, log_gap = false },
+    -- wake.on: an extra decision pass right when something important happens (a party member's HP falls under the
+    --   cure line, our own action ends or the busy wait runs out) instead of up to 0.25 s later; at most one extra pass
+    --   every wake.gap seconds.
+    wake = { on = true, gap = 0.05 },
     -- Scholar stratagems, main or sub SCH (vg_strat): which spells get which stratagem, reserve, Arts upkeep
     strat = { enabled = true, arts = 'auto', reserve = 1, jp_gift = false,
               perpetuance = 'Regen V,Regen IV,Regen III,Adloquium,Embrava,Haste,Haste II,Refresh,Refresh II,Refresh III,Phalanx,Phalanx II,Flurry,Flurry II,Aquaveil',
@@ -231,7 +298,15 @@ local defaults = {
               focalization = '', equanimity = '' },
     mages = { aoe_na = true, bar = '', bar_status = '', pld = false, saboteur = true, stymie = true,
               sleep = false, sleep_skip = '', accession = true, perpetuance = true, immanence = true,
-              chain = 'liquefaction', chain_every = 40 },
+              chain = 'liquefaction', chain_every = 40,
+              -- Sortie round 2026-11-25: chain_steps 2-5, chain_healer (healer role makes chains too), helix_close / helix_tier
+              -- (Helix as the last step, I or II), finish_hp (magic killing blow at this HP %, 0 off), elements
+              -- ("Name:element,..." weak element by target), storm_auto + klimaform (Storm of that element, Klimaform)
+              chain_steps = 2, chain_healer = false, helix_close = false, helix_tier = 1, finish_hp = 0, elements = '',
+              storm_auto = false, klimaform = true,
+              -- vg_sortie: sortie_auto (the Scholar changes with the sector; set by //vg sortie), sortie_procs (Degei /
+              -- Aita: a quick nuke of the element their last TP move made them weak to)
+              sortie_auto = false, sortie_procs = true },
 }
 
 -- The update settings are called "updater", not "update": Windower's config library calls its own table method
@@ -323,6 +398,9 @@ local state = {
     songs = {},           -- [song name] = os.clock() last sung
     debuffs = {},         -- [mob id] = {[spell name] = {tries=n, landed=bool}}
     dispel_until = 0,
+    mob_buff = nil,       -- {id = mob id, name = buff, move = TP move, at = t}: the last buff the battle target gained
+    srv_status = nil,     -- our status as the server last sent it (0x037: 0 idle, 1 fighting), and since when
+    srv_status_at = nil,
     resting = false,
     entrust = nil,        -- {spell, target, expires}
     farm_pulled = {},     -- [mob id] = true
@@ -332,6 +410,7 @@ local state = {
     action_once = {},     -- [action id] = mob id
     profile = nil,        -- {job, role, ws, toggles}
     profile_sent = 0,
+    unseen = {},          -- [lower name] = {name, untl}: "can't see" members (3.1, see cant_see)
 }
 
 local function now() return os.clock() end
@@ -345,6 +424,14 @@ end
 -- Action helpers
 ------------------------------------------------------------------------
 local function busy() return now() < state.busy_until end
+
+-- An extra decision pass (CurePlease audit 1.3): asks the prerender loop for a pass at time `at` (now when nil) instead
+-- of the next 0.25 s one. Only ever set here, from event handlers; the pass itself always runs in prerender, never
+-- inside a packet / action handler. The earliest request wins.
+local function wake(at)
+    at = at or now()
+    if not state.wake or at < state.wake then state.wake = at end
+end
 
 local function stop_running()
     if state.running then
@@ -370,8 +457,23 @@ local function healing_spell(spell)
     return false
 end
 
+-- "Can't see the target" (1.3.0, CurePlease audit 3.1): the game refused our spell with "Unable to see X" / "You
+-- cannot see X" (action messages 5, 217, 219: a member behind a wall or up a ledge). That member is left out of
+-- cures, raises, -na spells and buffs for UNSEEN_SECS, so the next member is tried instead of the same refused cast
+-- again and again. One owner: state.unseen is written only by cant_see (the 'action message' handler) and read by
+-- unseen(); it expires by itself. Distance stays out_of_reach's job; mobs are never marked here (a pull that can't
+-- see its mob is vg_farm's give-up list).
+local UNSEEN_SECS = 3
+local CANT_SEE_MSGS = { [5] = true, [217] = true, [219] = true }
+local function unseen(name)
+    local u = name and state.unseen[name:lower()]
+    return u ~= nil and now() < u.untl
+end
+
 local STAND_BEFORE_CAST = 0.5       -- seconds standing still before a spell is sent
 local function cast(spell, target, why)
+    -- (a name the game just said it can't see: not sent until UNSEEN_SECS have passed - "<t>", "<me>"... always go)
+    if type(target) == 'string' and target:sub(1, 1) ~= '<' and unseen(target) then return false end
     local reserve = tonumber(settings.mana.reserve) or 0
     if reserve > 0 and (spell.mp_cost or 0) > 0 and not healing_spell(spell) then
         local p = windower.ffxi.get_player()
@@ -396,9 +498,11 @@ local function cast(spell, target, why)
     if strat.before_cast(spell, target, why) then return true end      -- a stratagem first; the spell follows
     stop_running()
     windower.send_command(('input /ma "%s" %s'):format(spell.en, target))
+    state.last_ja = nil                    -- (a refusal message from now on is this spell's, not an ability's)
+    state.last_ma = { key = 'ma:' .. spell.en .. ':' .. target, at = now() }     -- (until the cast begins: a refusal gives the wait back, ma_refused)
     -- stand still until the game says the cast began (then for its cast time) - 1.5 s if it never does (refused)
     state.casting_until = math.max(state.casting_until or 0, now() + 1.5)
-    state.busy_until = now() + (spell.cast_time or 2) + 3
+    state.busy_until = now() + (spell.cast_time or 2) + (tonumber(settings.cast.tail) or 3)   -- (cast.tail, audit 1.4)
     state.no_move_until = now() + (spell.cast_time or 2) + 1     -- casting: can't walk, not "stuck"
     mark('ma:' .. spell.en .. ':' .. target)
     if why then log(('%s -> %s (%s)'):format(spell.en, target, why)) end
@@ -407,8 +511,14 @@ end
 
 local function use_ja(ja, target)
     -- pet commands and blood pacts are /pet in the game's own data (Fight, Assault, Deploy, maneuvers, Hastega II...)
-    windower.send_command(('input %s "%s" %s'):format(ja.prefix == '/pet' and '/pet' or '/ja', ja.en, target))
+    local pet = ja.prefix == '/pet'
+    windower.send_command(('input %s "%s" %s'):format(pet and '/pet' or '/ja', ja.en, target))
     state.busy_until = now() + 1.5
+    -- confirm-and-chain (CurePlease audit 1.2): remembered so the game's answer (our category 6 action, or its refusal
+    -- message) can end the 1.5 s wait early - see ja_answered. Pet commands and blood pacts aren't tracked: their
+    -- answer comes from the pet (and a pact's own lock is the game's), so they keep the full 1.5 s.
+    state.last_ja = (not pet) and { id = ja.id, en = ja.en, at = now() } or nil
+    state.last_ma = nil                    -- (a refusal from now on is this ability's, not the last spell's)
     mark('ja:' .. ja.en .. ':' .. target)
     return true
 end
@@ -422,9 +532,16 @@ local function ws_fits(ws_name)
     return false
 end
 
-local function use_ws(ws_name)
+-- owner: 'scf' when the reactive skillchain follow-up (vg_scfollow) sends it. Any other sender (do_ws, battle lists,
+-- EasyFarm's Weaponskill list, the finisher) holds while a follow-up owns the TP (one owner per action).
+local function use_ws(ws_name, owner)
+    if owner ~= 'scf' then
+        local p = windower.ffxi.get_player()
+        if p and scfollow.owns_tp(p, windower.ffxi.get_mob_by_target('t')) then return false end
+    end
     if not ws_fits(ws_name) then return false end
     windower.send_command(('input /ws "%s" <t>'):format(ws_name))
+    state.last_ja = nil                    -- (a refusal from now on is the weapon skill's)
     state.busy_until = now() + 2
     state.no_move_until = now() + 4          -- the weapon skill's animation: not "stuck" (vg_safety)
     mark('ws:' .. ws_name)
@@ -457,6 +574,10 @@ end
 
 local function can_act(player)
     if player.status ~= 0 and player.status ~= 1 then return false end   -- dead, resting, event
+    -- asleep / petrified / stunned / charmed / terrorized (CurePlease audit 1.1): nothing can be used, so nothing is
+    -- sent. One gate for every module that asks can_act (cures, songs, Geo, abilities, EasyFarm's gaps); the alt's
+    -- "disabled" alert (vg_alts) still goes to the leader.
+    if util.incapacitated(player.buffs) then return false end
     return not busy()
 end
 
@@ -524,27 +645,50 @@ end
 -- 2026-10-27: "does vanguard know, if the bard is singing songs or casting is happening, not to move the character").
 local function casting() return now() < (state.casting_until or 0) end
 
+-- Who started the running now going on (Silmaril audit 1.1, one owner per action): 'move' = the movement step
+-- (do_movement: follow, formation, trail, camp, closing in, unstick), 'other' = anything else (farming walks, travel,
+-- Corsair roll walk, EasyFarm...). The fast movement passes between decision passes only steer or stop running that
+-- the movement step started; anything else's walking is left to the 0.25 s decision pass, as before.
+local in_move, fast_pass = false, false
+
 local function run_toward(me, mob)
     -- DO NOT MOVE (his request 2026-10-19: "a DO NOT MOVE button ... that overrides all the other movements"): every
     -- walk Vanguard makes - farming, back to camp, follow, closing in, formation, travel - comes through here
-    if settings.farm.stay then stop_running() return false end
+    -- (the enfeebler's "stay put", enfeebler.stay, is the same: it casts from where it stands)
+    if settings.farm.stay or (settings.enfeebler.on and settings.enfeebler.stay) then stop_running() return false end
     if casting() then stop_running() return false end                 -- (a spell / song in progress: stand still)
     local dx, dy = mob.x - me.x, mob.y - me.y
     local len = math.sqrt(dx * dx + dy * dy)
     if len < 0.01 then return end
-    windower.ffxi.run(dx / len, dy / len)
+    local ux, uy = dx / len, dy / len
+    state.run_by = in_move and 'move' or 'other'
+    -- fast passes: the same way as already running (under ~2 degrees off) is not sent again - at least once a decision
+    -- pass (tick) it still is, as before, so a run the game dropped is picked up again
+    local rd = state.run_dir
+    if fast_pass and state.running and rd and rd[1] * ux + rd[2] * uy > 0.9994 and now() - (state.run_sent or 0) < settings.tick then
+        return true
+    end
+    windower.ffxi.run(ux, uy)
     state.running = true
-    state.run_dir = { dx / len, dy / len }
+    state.run_dir = { ux, uy }
+    state.run_sent = now()
     return true
 end
 
 local function face(me, mob)
-    windower.ffxi.turn(-(math.atan2 or math.atan)(mob.y - me.y, mob.x - me.x))
+    local a = -(math.atan2 or math.atan)(mob.y - me.y, mob.x - me.x)
+    -- fast passes: already facing it (within ~3 degrees): no turn sent
+    if fast_pass and me.facing then
+        local d = (a - me.facing + math.pi) % (2 * math.pi) - math.pi
+        if math.abs(d) < 0.05 then return end
+    end
+    windower.ffxi.turn(a)
 end
 
 local function do_movement(player)
     local me = windower.ffxi.get_mob_by_target('me')
     if not me then return end
+    if support.hover_tick() then return end          -- a Ranger's Hover Shot side step (vg_support): it owns the walk
     -- bringing a mob back to camp comes first (abilities wait until it's there)
     state.farm_bringing = nil
     if player.status == 1 and settings.modules.farm and settings.farm.pull_back and not state.hold then
@@ -553,7 +697,7 @@ local function do_movement(player)
     end
     if busy() then stop_running() return end
     if state.hold then stop_running() return end
-    if safety.unstick() then return end
+    if safety.unstick() then state.run_by = 'move' return end
 
     -- Engaged melee: close to melee range on our target.
     -- farming decides by its own "Then: walk up to it / let it come to me" - the role's "close in" (melee roles have
@@ -618,6 +762,44 @@ local function do_movement(player)
     end
     if settings.modules.farm and player.status == 0 and state.route_moving then return end
     stop_running()
+end
+
+-- The movement step as the decision pass runs it: remembers that it ran and whether it left us running, so the fast
+-- passes know they may carry on steering (see fast_move_ok in the prerender handler).
+local function run_movement(player)
+    in_move = true
+    do_movement(player)
+    in_move = false
+    state.move_ran = true
+    state.move_wanted = state.running and state.run_by == 'move'
+end
+
+-- Seconds between movement passes (follow.move_tick), or nil when they are off (0, or not faster than the decisions).
+local function move_interval()
+    local mt = tonumber(settings.follow.move_tick) or 0
+    if mt <= 0 then return nil end
+    if mt < 0.05 then mt = 0.05 end
+    if mt >= (tonumber(settings.tick) or 0.25) then return nil end
+    return mt
+end
+
+-- A fast movement pass (Silmaril audit 1.1: steering 10 times a second, decisions 4 times a second). Light work only:
+-- my own mob, the leader's, the movement step. No get_player (the decision pass's player, with today's status), no
+-- casting, no abilities, no stuck check (safety.watch stays on the decision pass, its 2 s timing unchanged).
+-- Who wins: the decision pass. A fast pass runs only when the last decision pass ran the movement step and left either
+-- the movement step's own running, or no running it wanted (if a later step in that pass stopped the movement step's
+-- run - a cast, a roll walk - the fast passes keep out of it until the next decision pass).
+local function move_step()
+    local p = state.tick_player
+    if p then party.send_pos(p) end                      -- (the leader's position for the trail: 0.1 s while it moves)
+    if not state.fast_move_ok or not p or not settings.enabled or state.away or state.resting then return end
+    if state.running and state.run_by ~= 'move' then return end      -- someone else is walking us: not ours to steer
+    local me = windower.ffxi.get_mob_by_target('me')
+    if not me or (me.status ~= 0 and me.status ~= 1) then return end
+    local view = setmetatable({ status = me.status }, { __index = p })
+    in_move, fast_pass = true, true
+    do_movement(view)
+    in_move, fast_pass = false, false
 end
 
 ------------------------------------------------------------------------
@@ -742,7 +924,7 @@ local function do_heal(player)
     local in_party, lowest = {}, 100
     for _, m in ipairs(party_members(settings.heal.range)) do
         in_party[m.name:lower()] = true
-        if not ignore[m.name:lower()] then
+        if not ignore[m.name:lower()] and not unseen(m.name) then          -- (can't see: the others first, 3.1)
             members[#members + 1] = m
             if (m.hpp or 0) > 0 and m.hpp < lowest then lowest = m.hpp end
         end
@@ -750,7 +932,7 @@ local function do_heal(player)
     -- the alliance's other two parties (heal.alliance): their real HP is in the party list; never in a Curaga
     if settings.heal.alliance then
         for _, m in ipairs(alliance_members(settings.heal.range)) do
-            if not ignore[m.name:lower()] and not in_party[m.name:lower()] then
+            if not ignore[m.name:lower()] and not in_party[m.name:lower()] and not unseen(m.name) then
                 in_party[m.name:lower()] = true
                 members[#members + 1] = { name = m.name, hpp = m.hpp, hp = (m.hp and m.hp > 0) and m.hp or (m.hpp or 0) * 15,
                                           mob = m.mob, outsider = true, alliance = true }
@@ -760,7 +942,7 @@ local function do_heal(player)
     -- people outside the party on the watch list: cured by their HP% (their HP isn't known: counted as 1500 at full,
     -- HealBot's guess). Curaga never counts them - it only reaches the party.
     for _, n in ipairs(util.split(settings.heal.watch or '', ',')) do
-        if not in_party[n:lower()] then
+        if not in_party[n:lower()] and not unseen(n) then
             local mob = windower.ffxi.get_mob_by_name(n)
             if mob and not mob.is_npc and mob.valid_target ~= false and (mob.hpp or 0) > 0 and util.dist(mob) <= settings.heal.range then
                 members[#members + 1] = { name = mob.name, hpp = mob.hpp, hp = mob.hpp * 15, mob = mob, outsider = true }
@@ -786,10 +968,18 @@ local function do_heal(player)
 
     local priority = {}
     for _, n in ipairs(util.split(settings.heal.priority, ',')) do priority[n:lower()] = true end
+    -- covered by someone else: another healer's cure is on its way (vg_share), or the app's team planner gave this
+    -- member to another healer (vg_plan: only a fresh plan, never under share.emergency HP - then anyone cures)
+    local function being_cured(m) return planner.cure_elsewhere(m, player) or share.being_cured(m) end
 
     -- AUTO (the default): vg_cure decides - learned potencies per job, triage, Curaga by who stands near whom
     if settings.heal.auto ~= false then
-        local plan = cure.plan(members, player, priority, share.being_cured)
+        -- (the planner's split only picks the single-cure target: everyone hurt still counts towards a Curaga)
+        -- (predictive healing, 3.2: every pass adds a sample to the HP history; the party updates below add the rest)
+        if settings.heal.predict then
+            for _, m in ipairs(members) do cure.observe(cure.hkey(m), m.hpp, now()) end
+        end
+        local plan = cure.plan(members, player, priority, share.being_cured, function(m) return planner.cure_elsewhere(m, player) end)
         if not plan then return false end
         local who = plan.target.name
         if recently('ma:' .. plan.spell.en .. ':' .. who, 3) or out_of_reach(plan.spell, who) then return false end
@@ -810,7 +1000,7 @@ local function do_heal(player)
             if m.alliance then threshold = math.min(threshold, tonumber(settings.heal.alliance_at) or 60) end
             -- Priority members sort ahead of everyone else.
             local score = is_prio and (m.hpp - 100) or m.hpp
-            if m.hpp < threshold and score < worst_hpp and not share.being_cured(m) then
+            if m.hpp < threshold and score < worst_hpp and not being_cured(m) then
                 worst, worst_hpp = m, score
             end
         end
@@ -844,7 +1034,7 @@ local function do_raise(player)
         for _, m in ipairs(alliance_members(20)) do list[#list + 1] = m end
     end
     for _, m in ipairs(list) do
-        if m.hpp == 0 and m.name ~= player.name then
+        if m.hpp == 0 and m.name ~= player.name and not unseen(m.name) then
             local t = state.raised[m.name]
             if not t or now() - t > 60 then
                 for _, name in ipairs(raise_tiers) do
@@ -859,6 +1049,27 @@ local function do_raise(player)
     return false
 end
 
+-- Divine Caress (1.3.0, CurePlease audit 2.1): used right before a -na spell goes on someone, and only then (CurePlease
+-- fires it whenever it's ready, debuff or not). Who owns it: do_status alone - the WHM action "divine_caress" is
+-- reactive (never used from the action list), its Job-tab tick only says whether this may use it (off by default).
+-- Returns true when Divine Caress was sent (the -na follows on the next pass, with the Caress up).
+local DIVINE_CARESS = 453
+local function caress_first(player, spell_name, target)
+    if player.main_job ~= 'WHM' or not settings.modules.actions or not state.profile then return false end
+    if not spell_name:find('na$') then return false end                   -- (Poisona ... Cursna, Esuna; not Erase)
+    if util.has_buff(player.buffs, DIVINE_CARESS) or amnesia(player) then return false end
+    local action
+    for _, a in ipairs(jobs.WHM.actions) do if a.id == 'divine_caress' then action = a end end
+    if not action or not engine.enabled(action, state.profile) then return false end
+    local ja = util.ability('Divine Caress')
+    if not ja or not util.ability_ready(ja) or recently('ja:Divine Caress:<me>', 5) then return false end
+    -- only when the -na itself can go right now (else Caress would wait up unused)
+    local spell = util.spell(spell_name)
+    if not spell or not util.spell_ready(spell, player) or recently('ma:' .. spell.en .. ':' .. target, 4) then return false end
+    log(('Divine Caress before %s on %s'):format(spell.en, target))
+    return use_ja(ja, '<me>')
+end
+
 local URGENT = { doom = true, petrification = true }
 do_status = function(player, urgent)
     if not settings.modules.cleanse or silenced(player) then return false end
@@ -867,7 +1078,7 @@ do_status = function(player, urgent)
     for _, n in ipairs(util.split(settings.cleanse.skip, ',')) do skip[n:lower()] = true end
     local members, wanted = {}, {}
     for _, m in ipairs(party_members(settings.heal.range)) do
-        if not ignore[m.name:lower()] then members[#members + 1] = m end
+        if not ignore[m.name:lower()] and not unseen(m.name) then members[#members + 1] = m end
     end
     for _, entry in ipairs(status_ids) do
         if not skip[entry[3]:lower()] then wanted[#wanted + 1] = entry end
@@ -885,6 +1096,7 @@ do_status = function(player, urgent)
                 -- the MP is needed for cures (his CharB 2026-11-21: 21 Erases, 10 on Zurii, MP at 1-9 %)
                 if entry[2] == 'Erase' and m.name ~= player.name and ((player.vitals or {}).mpp or 100) < 40 then esuna_ok = false end
                 if esuna_ok and not skip[entry[3]:lower()] and util.has_buff(bl, entry[1]) then
+                    if caress_first(player, entry[2], m.name) then return true end
                     if try_cast(entry[2], m.name, entry[3], player) then return true end
                 end
               end
@@ -901,15 +1113,39 @@ local AILMENT_ITEMS = {
     { 'curse', { 'Holy Water', 'Hallowed Water' } }, { 'paralysis', { 'Remedy' } }, { 'poison', { 'Remedy', 'Antidote' } },
     { 'blindness', { 'Remedy', 'Eye Drops' } }, { 'disease', { 'Remedy' } }, { 'plague', { 'Remedy' } },
 }
-local item_ids
+-- In the inventory or the Temporary Items bag (bag 3, CurePlease audit 2.9): Abyssea / Sortie temporaries (Dusty /
+-- Lucid items, Megalixir) live there and /item uses them from it.
 local function have_item(name)
-    if not item_ids then
-        item_ids = true
-    end
     local id = items.id(name)
     if not id then return false end
-    for _, it in ipairs(windower.ffxi.get_items('inventory') or {}) do
-        if type(it) == 'table' and it.id == id and (it.count or 1) > 0 then return true end
+    for _, bag in ipairs({ 'inventory', 'temporary' }) do
+        local list = windower.ffxi.get_items(bag)
+        for _, it in ipairs(type(list) == 'table' and list or {}) do
+            if type(it) == 'table' and it.id == id and (it.count or 1) > 0 then return true end
+        end
+    end
+    return false
+end
+-- Temporary MP items (audit 2.9, CurePlease F51), weakest first, the ones that also restore HP after, Megalixir last.
+-- items.temp_mp = under this MP% (0 = off). Owner: this is the only item use for MP (Sublimation / Convert / Devotion
+-- in do_mana are spells and abilities). It runs right after do_mana in the 'abilities2' group, so when one of those
+-- is ready it goes first, MP is back up and this stays quiet.
+local TEMP_MP_ITEMS = { 'Dusty Ether', 'Lucid Ether I', 'Lucid Ether II', 'Lucid Ether III', 'Dusty Elixir',
+                        'Lucid Elixir I', 'Lucid Elixir II', 'Megalixir' }
+local function do_temp_mp(player)
+    local at = tonumber((settings.items or {}).temp_mp) or 0
+    if at <= 0 then return false end
+    if player.status ~= 0 and player.status ~= 1 then return false end
+    local v = player.vitals or {}
+    if (v.max_mp or 0) <= 0 or (v.mpp or 100) >= at or recently('temp_mp', 10) then return false end
+    for _, item in ipairs(TEMP_MP_ITEMS) do
+        if have_item(item) then
+            mark('temp_mp')
+            windower.send_command(('input /item "%s" <me>'):format(item))
+            state.busy_until = now() + 2
+            log(('MP %d%%: %s'):format(v.mpp or 0, item))
+            return true
+        end
     end
     return false
 end
@@ -1028,7 +1264,7 @@ local function do_buffs(player)
 
         local target_name = (who:lower() == 'me') and player.name or who
         local m = members[target_name:lower()]
-        if m then
+        if m and not unseen(m.name) then
             local bl = buffs_of(m, player)
             local action = is_ja and util.ability(what) or util.spell(what)
             if action and bl then
@@ -1053,7 +1289,8 @@ local function do_buffs(player)
                             return use_ja(action, tgt)
                         end
                     elseif not silenced(player) and util.spell_ready(action, player)
-                        and not recently('ma:' .. action.en .. ':' .. tgt, 6) and not buff_backoff(action.en, target_name) then
+                        and not recently('ma:' .. action.en .. ':' .. tgt, 6) and not buff_backoff(action.en, target_name)
+                        and engine.tools_ok(action.en, player, log) then   -- (Utsusemi: only with ninja tools)
                         local ok = cast(action, tgt, 'buff')
                         if ok and state.casting_until and now() < state.casting_until and recently('ma:' .. action.en .. ':' .. tgt, 0.1) then
                             buff_sent(action.en, target_name)
@@ -1099,7 +1336,8 @@ local function do_skillchain(player)
     local me = player.name:lower()
 
     -- Expire an unfinished chain.
-    if state.sc.step > 0 and (now() - state.sc.time > settings.sc.window_max or state.sc.target ~= t.id) then
+    local wmin, wmax = scfollow.sc_window()       -- (1.2.0: never under 2 s / over 10 s; scf.tune_sc: the learned window)
+    if state.sc.step > 0 and (now() - state.sc.time > wmax or state.sc.target ~= t.id) then
         state.sc = { target = 0, step = 0, time = 0 }
     end
 
@@ -1116,10 +1354,28 @@ local function do_skillchain(player)
         return use_ws(step.ws)
     end
     local elapsed = now() - state.sc.time
-    if elapsed >= settings.sc.window_min and elapsed <= settings.sc.window_max then
+    if elapsed >= wmin and elapsed <= wmax then
         return use_ws(step.ws)
     end
     return false
+end
+
+-- Aftermath upkeep (ws.am, his request 2026-10-19): the level wanted and its weapon skill when Aftermath is below it
+-- (or under 8 s left), else nil. do_ws saves TP for it; vg_scfollow lets it win over a follow-up.
+-- fits: do_ws passes ws_fits (says once why a weapon skill doesn't fit the weapon); others the quiet util.ws_fits.
+local function am_need(player, fits)
+    local am = tonumber(settings.ws.am) or 0
+    local am_ws = settings.ws.am_ws ~= '' and settings.ws.am_ws or settings.ws.name
+    if am <= 0 or not am_ws or am_ws == '' or not (fits or util.ws_fits)(am_ws) then return nil end
+    local have, id = 0, nil
+    if util.has_buff(player.buffs, 273) then have, id = 3, 273               -- relic Aftermath
+    elseif util.has_buff(player.buffs, 272) then have, id = 3, 272
+    elseif util.has_buff(player.buffs, 271) then have, id = 2, 271
+    elseif util.has_buff(player.buffs, 270) then have, id = 1, 270 end
+    local left = id and bard.buff_left(id)
+    if have >= am and left and left < 8 then have = 0 end
+    if have < am then return am, am_ws end
+    return nil
 end
 
 local function do_ws(player)
@@ -1127,6 +1383,10 @@ local function do_ws(player)
     local chain_farm = settings.modules.farm and wschain.mode_on()
     if not (settings.modules.ws or chain_farm) or player.status ~= 1 or amnesia(player) then return false end
     local t = windower.ffxi.get_mob_by_target('t')
+    -- a reactive skillchain follow-up (vg_scfollow) is waiting for its moment on this mob: it owns the TP until it's used
+    -- or its window runs out - ahead of the finisher, Aftermath, battle lists, wschain and the normal weapon skill
+    -- (sc.steps still wins: a character listed there never follows rules)
+    if scfollow.owns_tp(player, t) then return false end
     local fin = finish.ws(player, t)                                  -- the finishing weapon skill comes first
     if fin == 'used' then return true elseif fin == 'block' then return false end
     if not wschain.mp_ok(player) then return false end                -- Weapon skill MP limit (his request 2026-10-30)
@@ -1139,21 +1399,12 @@ local function do_ws(player)
     end
     -- Aftermath (his request 2026-10-19): keep Lv.1 / 2 / 3 up - without it (or with under 8 s left by the game's timer)
     -- TP is saved to 1000 / 2000 / 3000 and the Aftermath weapon skill used; with it up, the normal weapon skill
-    local am = tonumber(settings.ws.am) or 0
-    local am_ws = settings.ws.am_ws ~= '' and settings.ws.am_ws or settings.ws.name
-    if am > 0 and ws_fits(am_ws) then                                 -- (another weapon's: no saving TP for it, the chain goes on)
-        local have, id = 0, nil
-        if util.has_buff(player.buffs, 273) then have, id = 3, 273               -- relic Aftermath
-        elseif util.has_buff(player.buffs, 272) then have, id = 3, 272
-        elseif util.has_buff(player.buffs, 271) then have, id = 2, 271
-        elseif util.has_buff(player.buffs, 270) then have, id = 1, 270 end
-        local left = id and bard.buff_left(id)
-        if have >= am and left and left < 8 then have = 0 end
-        if have < am then
-            if player.vitals.tp < am * 1000 or recently('ws:' .. am_ws, 3) or not ws_in_range(t) then return false end
-            log(('%s at %d TP for Aftermath Lv.%d'):format(am_ws, player.vitals.tp, am))
-            return use_ws(am_ws)
-        end
+    -- (another weapon's Aftermath weapon skill: no saving TP for it, the chain goes on - am_need checks the weapon)
+    local am, am_ws = am_need(player, ws_fits)
+    if am then
+        if player.vitals.tp < am * 1000 or recently('ws:' .. am_ws, 3) or not ws_in_range(t) then return false end
+        log(('%s at %d TP for Aftermath Lv.%d'):format(am_ws, player.vitals.tp, am))
+        return use_ws(am_ws)
     end
     -- farming with a Weaponskill battle list (EasyFarm): its weapon skills instead
     local ba, br = blist.ws(player, t)
@@ -1192,7 +1443,7 @@ local function do_burst(player)
     if not settings.modules.burst or not state.burst or silenced(player) then return false end
     if now() > state.burst.expires then state.burst = nil return false end
     local map = burst_map()
-    for _, element in ipairs(state.burst.elements) do
+    for _, element in ipairs(mages.burst_order(state.burst.elements, battle_target())) do
         for _, name in ipairs(map[element:lower()] or {}) do
             if try_cast(name, '<bt>', 'burst ' .. state.burst.chain, player) then
                 state.burst = nil
@@ -1271,8 +1522,9 @@ local function do_geo(player)
     -- (it used to wait for the old one to wear off, minutes; 2026-10-19 GEO round)
     local indi_on = state.indi_on or {}
     local mine = util.has_buff(player.buffs, 612) and indi_on.me
-    if settings.geo.indi ~= '' and (not util.has_buff(player.buffs, 612)
-        or (mine and mine:lower() ~= settings.geo.indi:lower())) then
+    -- (geo.indi_engaged: only while the party fights; an Indi already up is left to wear off by itself)
+    if settings.geo.indi ~= '' and (not settings.geo.indi_engaged or party_engaged(player))
+        and (not util.has_buff(player.buffs, 612) or (mine and mine:lower() ~= settings.geo.indi:lower())) then
         if try_cast(settings.geo.indi, '<me>', mine and ('indi: ' .. mine .. ' -> ' .. settings.geo.indi) or 'indi', player) then return true end
     end
     -- Geo: keep a luopan out.
@@ -1292,6 +1544,7 @@ end
 
 local function do_debuff(player)
     if not settings.modules.debuff or silenced(player) then return false end
+    if settings.enfeebler.on then return false end        -- (Enfeebler mode owns enfeebling: mages.enfeebler)
     local bt = battle_target()
     if not bt or util.dist(bt) > 21 then return false end
     state.debuffs[bt.id] = state.debuffs[bt.id] or {}
@@ -1322,6 +1575,25 @@ local function blu_dispel(player)
     if d <= 12 and on_me and try_cast('Blank Gaze', '<bt>', 'mob buffed', player) then return true end
     if d <= 5 and try_cast('Geist Wall', '<bt>', 'mob buffed', player) then return true end
     return false
+end
+-- Desync recovery (1.2.0, Silmaril audit 2.5; read only, no packets sent). The game window shows us fighting
+-- (status 1) but the server's own character update (0x037, read in 'incoming chunk') has said idle for 2 s or more:
+-- swings never come. Send /attack <t> once (then not again for 10 s) when the target is alive and in reach.
+-- Who owns what: engaging / switching / disengaging stay with combat.tick, assist and the farmer (they pick the
+-- target and run first); this never picks a target, only repeats the fight the game already shows. Off by default
+-- (assist.resync).
+local function desync_check(player)
+    if not settings.assist.resync or player.status ~= 1 then state.engaged_since = nil return false end
+    state.engaged_since = state.engaged_since or now()
+    if state.retreat or state.srv_status ~= 0 or not state.srv_status_at then return false end
+    if now() - state.engaged_since < 2 or now() - state.srv_status_at < 2 or recently('resync', 10) then return false end
+    local t = windower.ffxi.get_mob_by_target('t')
+    if not t or not t.is_npc or (t.hpp or 0) <= 0 or t.valid_target == false then return false end
+    if util.dist(t) > settings.assist.melee_range + 3 then return false end
+    mark('resync')
+    log(('Out of step with the server (it says I am not fighting %s): /attack again'):format(t.name or 'the mob'))
+    windower.send_command('input /attack <t>')
+    return true
 end
 local function do_dispel(player)
     if not settings.modules.dispel or now() > state.dispel_until or silenced(player) then return false end
@@ -1392,18 +1664,31 @@ local function do_mana(player)
         if sub and util.ability_ready(sub) and not recently('ja:Sublimation:<me>', 10) then
             local active = util.has_buff(player.buffs, util.buff_id('Sublimation: Activated'))
             local complete = util.has_buff(player.buffs, util.buff_id('Sublimation: Complete'))
-            if (not active and not complete) or (complete and v.mpp < settings.mana.sublimation_mpp) then
+            -- mana.sub_skip_refresh (audit 2.7, like CurePlease): no new charge while my own Refresh is up (buff 43 or
+            -- 541), unless my MP is already under sublimation_mpp - the charge eats HP for MP Refresh already gives
+            local start = not active and not complete
+            if start and settings.mana.sub_skip_refresh and v.mpp >= settings.mana.sublimation_mpp
+                and (util.has_buff(player.buffs, 43) or util.has_buff(player.buffs, 541)) then
+                start = false
+            end
+            if start or (complete and v.mpp < settings.mana.sublimation_mpp) then
                 return use_ja(sub, '<me>')
             end
         end
     end
     -- Devotion (White Mage; CurePlease / Silmaril): MP to a party member who runs low, while my HP is healthy
     local dv = tonumber(settings.mana.devotion_mpp) or 0
-    if dv > 0 and player.main_job == 'WHM' and v.hpp >= 70 then
+    -- (1.3.0, audit 2.3: mana.devotion_to = only that member; mana.devotion_engaged = only while the party fights)
+    -- (an empty entry reads back from settings.xml as an empty table, see vg_store: text only, else '' = anyone)
+    local dv_raw = settings.mana.devotion_to
+    local dv_to = type(dv_raw) == 'string' and util.trim(dv_raw):lower() or ''
+    if dv > 0 and player.main_job == 'WHM' and v.hpp >= 70
+        and (not settings.mana.devotion_engaged or party_engaged(player)) then
         local ja = util.ability('Devotion')
         if ja and util.ability_ready(ja) and not recently('ja:Devotion', 10) then
             for _, m in ipairs(party_members(10)) do
-                if m.name ~= player.name and (m.hpp or 0) > 0 and (m.mpp or 100) < dv and (m.mp or 0) + 1 > 0 then
+                if m.name ~= player.name and (dv_to == '' or m.name:lower() == dv_to)
+                    and (m.hpp or 0) > 0 and (m.mpp or 100) < dv and (m.mp or 0) + 1 > 0 then
                     mark('ja:Devotion')
                     log(('Devotion: %s at %d%% MP'):format(m.name, m.mpp))
                     return use_ja(ja, m.name)
@@ -1473,6 +1758,13 @@ end
 -- Who else already does this action (vg_actions' engine.owner): the Buffs tab keeps the same spell up on the same target
 -- (it also has the "recast before it wears off" timers), or one of EasyFarm's lists has it switched on while it farms.
 local function action_owner(a)
+    -- Afflatus Solace / Misery (1.3.0, audit 2.2): the Job tab's choice (whm.afflatus) wins; the stance not picked is
+    -- never used, so the two never replace each other back and forth
+    if a.afflatus then
+        local pick = util.trim(tostring((settings.whm or {}).afflatus or 'solace')):lower()
+        if pick ~= 'misery' then pick = 'solace' end
+        if a.afflatus ~= pick then return 'the Afflatus choice' end
+    end
     if a.kind ~= 'ma' and a.kind ~= 'ja' then return nil end
     local name = tostring(a.name):lower()
     if settings.modules.buffs and (a.target == '<me>' or a.target == '{leader}') then
@@ -1687,7 +1979,8 @@ party.init(settings, state, {
     party_engaged = party_engaged, leader_mob = leader_mob, face = face,
 })
 hud.init(settings, state, { log = log })
-combat.init(settings, state, { log = log, recently = recently, mark = mark, leader_mob = leader_mob, leader_target = leader_target })
+combat.init(settings, state, { log = log, recently = recently, mark = mark, leader_mob = leader_mob, leader_target = leader_target,
+    face = face, try_cast = try_cast, farm_has_pull = function() return farm.has_pull() end })
 share.init(settings, state, { log = log })
 safety.init(settings, state, { log = log, recently = recently, mark = mark, stop_running = stop_running })
 team.init(settings, state, {
@@ -1701,6 +1994,7 @@ travel.init(settings, state, {
 update.init(settings, log, function() store.save(settings) end)
 cure.init(settings, state, {})
 charm.init(settings, state, { log = log, recently = recently, mark = mark, cast = cast, silenced = silenced, use_ja = use_ja })
+sortie.init(settings, state, { log = log, recently = recently, mark = mark, silenced = silenced, battle_target = battle_target })
 local function ja_ready(name)
     local ja = util.ability(name)
     if not ja or not util.ability_ready(ja) then return nil end
@@ -1719,6 +2013,15 @@ farm.init(settings, state, { log = log, run_toward = run_toward, stop_running = 
 finish.init(settings, state, { log = log, use_ws = use_ws, ws_in_range = ws_in_range, recently = recently, mark = mark,
     save = function() store.save(settings) end })
 wschain.init(settings, state, { log = log, recently = recently, mark = mark })
+scfollow.init(settings, state, { log = log, recently = recently, mark = mark, use_ws = use_ws, amnesia = amnesia,
+    save = function() store.save(settings) end, am_need = am_need,
+    -- sc.steps owns the TP of every character listed in it (while the sc module is on): no rules for them
+    in_sc_steps = function(player)
+        if not settings.modules.sc then return false end
+        local me = player.name:lower()
+        for _, s in ipairs(sc_steps()) do if s.who == me then return true end end
+        return false
+    end })
 bufftime.init(settings, state, { save = function() store.save(settings) end })
 easyfarm.init(settings, state, { stop_running = function() return stop_running() end,
     run_toward = function(...) return run_toward(...) end, face = function(...) return face(...) end,
@@ -1779,12 +2082,15 @@ support.init(settings, state, {
     log = log, recently = recently, mark = mark, cast = cast, use_ja = use_ja, try_cast = try_cast, silenced = silenced,
     amnesia = amnesia, party_members = party_members, buffs_of = buffs_of, battle_target = battle_target,
     party_engaged = party_engaged, leader_mob = leader_mob, run_toward = run_toward, stop_running = stop_running,
+    casting = casting, face = face,
 })
 mages.init(settings, state, {
     log = log, recently = recently, mark = mark, cast = cast, use_ja = use_ja, silenced = silenced,
     amnesia = amnesia, party_members = party_members, buffs_of = buffs_of, battle_target = battle_target,
     party_engaged = party_engaged, leader_mob = leader_mob,
 })
+planner.init(settings, state, { party_members = party_members, casting = casting, send = bridge.send, silenced = silenced,
+    enf_candidates = function(p) return mages.enfeebler_candidates(p) end })
 alts.init(settings, state, {
     log = log, bridge_log = function(m) bridge.log(m) end, recently = recently, mark = mark,
     try_cast = try_cast, party_engaged = party_engaged,
@@ -1792,7 +2098,8 @@ alts.init(settings, state, {
 
 local function tick()
     local player = windower.ffxi.get_player()
-    if not player then return end
+    if not player then state.tick_player = nil return end
+    state.tick_player = player
     -- am I moving? (my own position, pass to pass: also when he walks the character himself)
     do
         local me = windower.ffxi.get_mob_by_target('me')
@@ -1816,6 +2123,7 @@ local function tick()
     -- a rest that ended without us (hit by a mob, moved): stop thinking we're resting
     if state.resting and player.status ~= 33 and not recently('rest', 3) and not recently('farm:rest', 3) then state.resting = false end
     stats.tick(player)
+    sortie.tick(player)
     -- what the cures were seen to heal (vg_cure): written to the settings file at most once a minute
     if state.cure_learn_dirty and not recently('cure_learn_save', 60) then
         mark('cure_learn_save')
@@ -1833,6 +2141,7 @@ local function tick()
     party.send_pos(player)
     hud.send(player)
     hud.draw()
+    hud.draw_tp()
     travel.broadcast(player)
     if not settings.enabled then return end
     -- the Job tab's "Walk up to the mob" (assist.approach_mode): always / never, or back to what the role says
@@ -1876,7 +2185,7 @@ local function tick()
     end
     if player.status ~= 0 and player.status ~= 1 then stop_running() return end
     if not ef_gap then                                              -- (EasyFarm moves this character)
-        do_movement(player)
+        run_movement(player)
         support.roll_walk_tick(player)
     end
     safety.watch(player)
@@ -1895,6 +2204,8 @@ local function tick()
     end
     if not ef_gap and travel.tick(player) then return end
     if not ef_gap and combat.tick(player) then return end           -- (assist / self-defense: EasyFarm targets)
+    if desync_check(player) then return end                          -- (only re-sends a fight we're already in)
+    if not ef_gap and combat.on_engage(player) then return end      -- (once per new mob; a farm pull wins)
 
     if settings.modules.triggers and triggers.run(settings, player, state) then
         state.busy_until = now() + 1.5
@@ -1943,12 +2254,16 @@ local function tick()
         cures = function() return do_heal(player) end,
         ailments = function() return do_status(player) or do_items(player) end,
         songs = function() return bard_first() or do_songs(player) or support.pianissimo(player) end,
-        fighting = function() return blist_tick(player) or strat.arts(player) or mages.crowd(player) or do_assist(player) or farm_pull(player) end,
-        abilities = function() return support.double_up(ctx, engine) or mages.bar(player) or engine.run(ctx, pr, pre_ws_filter) end,
-        ws = function() return do_skillchain(player) or do_ws(player) end,
-        bursts = function() return do_burst(player) or mages.sch(player) end,
-        abilities2 = function() return engine.run(ctx, pr, normal_filter) or do_mana(player) end,
-        enfeebles = function() return do_dispel(player) or do_debuff(player) end,
+        -- (support.hate_spell first: once per new mob, the healer's hate spell; 1.3.0 audit 2.8)
+        fighting = function() return support.hate_spell(player) or blist_tick(player) or strat.arts(player) or mages.crowd(player) or do_assist(player) or farm_pull(player) end,
+        abilities = function() return support.double_up(ctx, engine) or support.quick_draw(player, pr) or mages.bar(player) or engine.run(ctx, pr, pre_ws_filter) end,
+        -- weapon skill owners in order: sc.steps (do_skillchain), then a reactive follow-up (vg_scfollow), then do_ws
+        ws = function() return do_skillchain(player) or scfollow.tick(player) or do_ws(player) end,
+        bursts = function() return sortie.proc(player) or do_burst(player) or mages.finisher(player) or mages.storm(player) or mages.sch(player) end,
+        -- (do_temp_mp after do_mana: the free MP - Sublimation: Complete, Convert, Devotion - before a scarce item)
+        abilities2 = function() return engine.run(ctx, pr, normal_filter) or do_mana(player) or do_temp_mp(player) end,
+        -- enfeebling owners: the enfeebler (mages.enfeebler, when enfeebler.on) else do_debuff - never both
+        enfeebles = function() return do_dispel(player) or mages.enfeebler(player) or do_debuff(player) end,
         geo = function() return support.radial(player) or do_geo(player) end,
         buffs = function() return do_buffs(player) end,
     }
@@ -1960,11 +2275,30 @@ local function tick()
     local _ = alts.upkeep(player) or do_rest(player) or do_trusts(player) or farm_tick(player)
 end
 
+local guarded_move = crash.guard('movement', move_step)
 windower.register_event('prerender', function()
     local t = now()
-    if t - state.last_tick < settings.tick then return end
+    if state.hover then support.hover_tick() end     -- (Hover Shot step: stopped on time, not up to a tick late)
+    -- an extra pass asked for by an event (wake, 1.3): due, and at least wake.gap after the last pass
+    local woken = settings.wake.on and state.wake and t >= state.wake and t - state.last_tick >= (tonumber(settings.wake.gap) or 0.05)
+    if t - state.last_tick < settings.tick and not woken then
+        -- between decision passes: movement / steering only, every follow.move_tick (0.1 s)
+        local mt = move_interval()
+        if mt and t - (state.last_move or 0) >= mt - 0.005 then   -- (a frame's rounding: not a whole frame late)
+            state.last_move = t
+            guarded_move()
+            in_move, fast_pass = false, false              -- (even if that pass failed half-way)
+        end
+        return
+    end
     state.last_tick = t
+    state.last_move = t
+    state.move_ran = false
+    if state.wake and t >= state.wake then state.wake = nil end        -- (this pass answers it)
     crash.guard('main loop', tick)()
+    -- the fast movement passes may carry on what this pass's movement step did (see move_step)
+    in_move, fast_pass = false, false
+    state.fast_move_ok = state.move_ran and ((state.running and state.run_by == 'move') or (not state.running and not state.move_wanted))
     if state.profile and t - state.profile_sent > 15 then crash.guard('sending the setup to the app', send_profile)() end
     -- talking to the app: a problem here is reported once a minute (crash report), not every second in chat
     crash.guard('talking to Vanguard Control', bridge.poll)(settings, state)
@@ -1984,11 +2318,40 @@ windower.register_event('incoming chunk', function(id, data)
         stats.on_message(actor, target, msg, p1, p2)
         return
     end
+    -- 0x037 "character update": our status as the SERVER sees it (byte 0x30, addons/libs/packets/fields.lua), for
+    -- the desync check (desync_check). Read only - nothing is sent.
+    if id == 0x037 then
+        local p = windower.ffxi.get_player()
+        if p and data:unpack('I', 0x24 + 1) == p.id then
+            local st = data:byte(0x30 + 1)
+            if st ~= state.srv_status then state.srv_status, state.srv_status_at = st, now() end
+        end
+        return
+    end
     if id == 0x063 then bard.on_buff_packet(data) return end   -- our buffs with their end times (songs already up)
     if id == 0x0DC then                               -- party invite: inviter's name at 0x0C
         local player = windower.ffxi.get_player()
         local from = data:sub(0x0C + 1, 0x0C + 16):gsub('%z.*$', '')
         if player then party.on_invite(player, from) end
+        return
+    end
+    -- 0x0DD party member update (HP% at 0x1D) / 0x0DF character update (HP% at 0x16), addons/libs/packets/fields.lua:
+    -- a member's HP fell under the cure line -> an extra decision pass right away (1.3). Read only, nothing is sent,
+    -- and the pass runs in prerender, not here.
+    if id == 0x0DD or id == 0x0DF then
+        local pid = data:unpack('I', 0x04 + 1)
+        local hpp = data:byte((id == 0x0DD and 0x1D or 0x16) + 1)
+        if pid and hpp then
+            state.hp_seen = state.hp_seen or {}
+            local before = state.hp_seen[pid]
+            state.hp_seen[pid] = hpp
+            if settings.heal.predict then cure.observe(pid, hpp, now()) end   -- (3.2: HP history, read only)
+            if settings.enabled and settings.modules.heal and before and hpp > 0 and hpp < before then
+                local line = tonumber(settings.heal.cure_at) or 75
+                if settings.heal.priority ~= '' then line = math.max(line, tonumber(settings.heal.priority_at) or 0) end
+                if before >= line and hpp < line then wake(now()) end
+            end
+        end
         return
     end
     if id ~= 0x076 then return end
@@ -2007,15 +2370,85 @@ windower.register_event('incoming chunk', function(id, data)
     end
 end)
 
+-- The game answered the job ability Vanguard sent last (use_ja): our category 6 action for it arrived, or a refusal
+-- message. One owner of the busy lock after a JA: this shortens it to ja.settle (it never lengthens it, and leaves a
+-- longer lock set by something else alone); with no answer the 1.5 s from use_ja stands. The queued follow-up
+-- (strat.run_queue - the spell waiting for its stratagem -, Divine Seal's Curaga, Accession's Cure...) then goes on the
+-- woken pass.
+local JA_REFUSED = { [71] = true, [87] = true, [88] = true, [94] = true, [155] = true, [428] = true, [661] = true,
+                     [665] = true, [78] = true, [198] = true, [328] = true }
+local function ja_answered(id)
+    local lj = state.last_ja
+    if not lj then return false end
+    if now() - lj.at > 3 or (id and id ~= lj.id) then
+        if now() - lj.at > 3 then state.last_ja = nil end
+        return false
+    end
+    state.last_ja = nil
+    local settle = tonumber(settings.ja.settle) or 1.5
+    if settle < 0 then settle = 0 end
+    local t = now() + settle
+    if t < state.busy_until and state.busy_until <= now() + 1.5 + 0.001 then state.busy_until = t end
+    wake(state.busy_until)
+    return true
+end
+
 local landed_msgs = S{2, 236, 237, 252, 264, 268, 271}
 local resist_msgs = S{85, 284, 653, 654, 655, 656}
 local buffed_msgs = S{230, 266, 280, 319}
+local mob_buff_msgs = { [186] = true, [194] = true }      -- a TP move: "<mob> uses X. <mob> gains the effect of Y"
+local no_effect_msgs = { [75] = true, [156] = true, [189] = true, [283] = true, [323] = true }
 local song_gone_msgs = { [64] = true, [204] = true, [206] = true, [350] = true, [531] = true }
 local ko_msgs = { [6] = true, [20] = true, [97] = true, [113] = true, [406] = true, [605] = true, [646] = true }
+
+-- Our spell was refused because we can't see the member (3.1, see unseen): mark them for UNSEEN_SECS, release the
+-- cast's wait (the spell never started) so the next member is tried on the next pass, and say so once per 10 s (chat,
+-- the app's log; the app's party board shows it from the snapshot, vg_bridge.unseen). Party members, alliance,
+-- watch-list players and trusts only.
+-- Our spell was refused before it began ("You must wait longer", "Unable to cast spells at this time", out of range,
+-- "X cannot cast Y"...): the cast() wait (cast time + cast.tail) was for a spell that never started. Give it back
+-- (1 s) and forget that it was just sent, so the next pass tries again - a spell sent right after a job ability (ja.settle 0.3 s) that the game still
+-- refused used to lock the healer for ~5.5 s. Once per 4 s only, so a refusal that keeps coming (silence, amnesia
+-- the game knows about and we don't) keeps the full wait after the first retry. Owner: this only shortens the lock
+-- cast() set; ja_answered owns the lock after a job ability (cast() clears last_ja, so a message goes to one of them).
+local MA_REFUSED = { [17] = true, [18] = true, [47] = true, [48] = true, [49] = true, [94] = true, [313] = true }
+local function ma_refused(me)
+    local lm = state.last_ma
+    if not lm or now() - lm.at > 3 then return end
+    state.last_ma = nil
+    if recently('ma_refused', 4) then return end
+    mark('ma_refused')
+    state.attempts[lm.key] = nil           -- (the "just sent it" mark would hold the same spell back 3-6 s more)
+    state.casting_until = 0
+    if state.busy_until > now() + 1 then state.busy_until = now() + 1 end
+    wake(state.busy_until)
+end
+
+local function cant_see(target_id, me)
+    local mb = target_id ~= me.id and windower.ffxi.get_mob_by_id(target_id)
+    if not mb or not mb.name or (mb.is_npc and mb.spawn_type ~= 14) then return end
+    local key = mb.name:lower()
+    state.unseen[key] = { name = mb.name, untl = now() + UNSEEN_SECS }
+    -- the other healers: my "I'm curing him" claim (or my Curaga's) is taken back, and the planner's split doesn't
+    -- leave him to me while I can't see him (share.release / share.unseen, plan.cure_elsewhere)
+    share.release(me, mb.name)
+    share.unseen(me, mb.name, UNSEEN_SECS)
+    state.casting_until = 0
+    if state.busy_until > now() + 0.5 then state.busy_until = now() + 0.5 end
+    wake(state.busy_until)
+    if not recently('unseen:' .. key, 10) then
+        mark('unseen:' .. key)
+        log(("can't see %s (a wall or a ledge?): the others first for %d s"):format(mb.name, UNSEEN_SECS))
+    end
+end
 
 windower.register_event('action message', function(actor_id, target_id, actor_index, target_index, message_id, p1, p2)
     stats.on_message(actor_id, target_id, message_id, p1, p2)
     local me = windower.ffxi.get_player()
+    -- "Unable to use job ability" / "You must wait longer" / too far...: the ability we just sent isn't coming (1.2)
+    if me and actor_id == me.id and JA_REFUSED[message_id] then ja_answered(nil) end
+    if me and actor_id == me.id and MA_REFUSED[message_id] then ma_refused(me) end
+    if me and actor_id == me.id and CANT_SEE_MSGS[message_id] then cant_see(target_id, me) end
     -- one of our songs wore off us / was dispelled (vg_bard keeps its song slots like Singer)
     if me and target_id == me.id and song_gone_msgs[message_id] then bard.on_lost(p1) end
     -- a debuff of ours wore off a mob (Elegy, Dia, Slow...): cast it again. Once landed it used to count as done for
@@ -2042,13 +2475,34 @@ windower.register_event('action message', function(actor_id, target_id, actor_in
     farm.on_message(actor_id, target_id, message_id)
 end)
 
+-- After-cast gap (1.4, measuring): our next action after a finished cast was accepted by the game - how long after?
+local function note_next_action(what)
+    local cd = state.cast_done
+    if not cd then return end
+    state.cast_done = nil
+    local gap = now() - cd.at
+    if gap > 10 then return end                                  -- (not back to back: nothing to learn)
+    stats.note_gap(gap)
+    if settings.cast.log_gap then bridge.log(('gap %.2fs %s>%s'):format(gap, cd.en, what and what.en or '?')) end
+end
+
 windower.register_event('action', function(act)
     local player = windower.ffxi.get_player()
     if not player then return end
     local first = act.targets and act.targets[1]
     local first_action = first and first.actions and first.actions[1]
     mages.on_action(act, player, res)
+    -- Sortie: Degei / Aita's TP moves, and a proc element landing on them (anyone's spell)
+    if act.category == 11 then
+        local am, ab = windower.ffxi.get_mob_by_id(act.actor_id), res.monster_abilities[act.param]
+        if am and ab then sortie.on_move(am.name, ab.en) end
+    elseif act.category == 4 and first then
+        sortie.on_hit(first.id, res.spells[act.param])
+    end
     support.note_hate(act, player)
+    -- COR Quick Draw after a party enfeeble lands (2.1) and the Ranger's Hover Shot step (2.2), both in vg_support
+    support.qd_on_action(act, player, act.category == 4 and res.spells[act.param] or nil, landed_msgs)
+    support.hover_on_action(act, player, act.category == 3 and res.weapon_skills[act.param] or nil)
 
     -- Our own action results: release the busy lock, record songs / debuffs.
     if act.actor_id == player.id and act.category == 3 and first then           -- a weapon skill (Magian trials)
@@ -2060,6 +2514,8 @@ windower.register_event('action', function(act)
             -- casting begins (24931): remember which spell; interrupted (28787): say so - a song sung again right after
             -- looked like a bug in his log (Honor March three times in 16 s while his bard was fighting), 2026-10-19
             if act.param == 24931 and first_action then
+                state.last_ma = nil                                  -- (the cast began: not refused)
+                note_next_action(res.spells[first_action.param])
                 state.casting_spell = first_action.param
                 local sp = res.spells[first_action.param]
                 state.casting_until = now() + ((sp and sp.cast_time) or 3) + 0.5     -- stand still while it's cast
@@ -2067,6 +2523,7 @@ windower.register_event('action', function(act)
             if act.param == 28787 then
                 state.casting_until = 0
                 state.busy_until = now() + 1
+                wake(state.busy_until)
                 local sp = res.spells[(first_action and first_action.param ~= 0 and first_action.param) or state.casting_spell or 0]
                 if sp and not recently('interrupted:' .. sp.en, 3) then
                     mark('interrupted:' .. sp.en)
@@ -2076,8 +2533,13 @@ windower.register_event('action', function(act)
             end
         elseif act.category == 4 then
             state.casting_until = 0                                 -- cast finished: free to move
-            state.busy_until = now() + 2.5
+            -- the after-finish wait: 2.5 s as before, or cast.tail when that is shorter (audit 1.4 - the setting
+            -- used to be undone here for every cast that finished)
+            local tail = tonumber(settings.cast.tail) or 3
+            state.busy_until = now() + math.max(0, math.min(2.5, tail))
+            wake(state.busy_until)                                  -- (the pass right when the wait ends, 1.3)
             local spell = res.spells[act.param]
+            state.cast_done = { at = now(), en = spell and spell.en or '?' }   -- (after-cast gap, 1.4)
             -- one of my cures landed: learn how much it heals on this job (vg_cure)
             if spell and cure.DEFAULT[spell.en] then
                 local cc = state.cure_cast
@@ -2126,6 +2588,10 @@ windower.register_event('action', function(act)
             end
         elseif act.category == 3 or act.category == 6 or act.category == 5 then
             state.busy_until = now() + 1.5
+            local what = act.category == 6 and res.job_abilities[act.param] or act.category == 3 and res.weapon_skills[act.param]
+            note_next_action(what or { en = act.category == 5 and 'item' or '?' })
+            -- our job ability landed: only the settle wait (1.2) when it's the one Vanguard sent, else the 1.5 s
+            if not (act.category == 6 and ja_answered(act.param)) then wake(state.busy_until) end
             if act.category == 6 and first_action then
                 local ja = res.job_abilities[act.param]
                 if ja and (jobs.lucky[ja.en] or ja.en == 'Double-Up') then
@@ -2149,6 +2615,21 @@ windower.register_event('action', function(act)
         end
     end
 
+    scfollow.on_action(act, player)                  -- reactive skillchains + the learned window (vg_scfollow)
+
+    -- Burst window closes when a LATER weapon skill lands on that mob (1.2.0, Silmaril audit 2.3): the skillchain is
+    -- over, a burst now would be a plain nuke. The weapon skill that made the skillchain carries the skillchain
+    -- add-effect and re-opens the window just below, so it never closes its own window (a 3rd step that chains again
+    -- opens a new one). A missed weapon skill (message 188) doesn't count.
+    if act.category == 3 and first and state.burst and state.burst.target == first.id and res.weapon_skills[act.param]
+        and not (first_action and first_action.message == 188) then
+        local makes_sc = first_action and first_action.has_add_effect and util.skillchain_by_msg[first_action.add_effect_message]
+        if not makes_sc then
+            state.burst = nil
+            bridge.log('Burst window closed: another weapon skill landed')
+        end
+    end
+
     -- Skillchain detection on any target -> open a burst window.
     if first and first_action and first_action.has_add_effect then
         local chain = util.skillchain_by_msg[first_action.add_effect_message]
@@ -2166,9 +2647,22 @@ windower.register_event('action', function(act)
     local actor = windower.ffxi.get_mob_by_id(act.actor_id)
     if actor and actor.is_npc and actor.spawn_type == 16 then
         local bt = windower.ffxi.get_mob_by_target('bt')
-        if (act.category == 4 or act.category == 11) and first_action and buffed_msgs:contains(first_action.message)
-            and bt and bt.id == act.actor_id then
-            state.dispel_until = now() + 10
+        -- (1.2.0, audit 2.4) which buff it gained: named by the "gains the effect of" message, or by the TP move
+        -- (util.MOB_BUFF_MOVES). Buffs Dispel can't take off (Invincible, Perfect Dodge) don't open the dispel window.
+        if (act.category == 4 or act.category == 11) and first_action and bt and bt.id == act.actor_id then
+            local mv = act.category == 11 and util.mob_move_buff(act.param)
+            local gained = buffed_msgs:contains(first_action.message) or (act.category == 11 and mob_buff_msgs[first_action.message])
+            if (gained or mv) and not no_effect_msgs[first_action.message] then
+                local b = gained and res.buffs[first_action.param]
+                local bname = (b and b.en) or (mv and mv.buff) or 'a buff'
+                local ok = util.dispellable(bname) and not (mv and not gained and mv.dispel == false)
+                state.mob_buff = { id = act.actor_id, name = bname, move = mv and mv.move, at = now() }
+                if ok then state.dispel_until = now() + 10 end
+                if settings.modules.dispel and not recently('mobbuff:' .. bname, 5) then
+                    mark('mobbuff:' .. bname)
+                    log(('%s gained %s%s'):format(actor.name, bname, ok and ' - dispelling' or " - it can't be dispelled, skipping"))
+                end
+            end
         end
         if act.category == 7 and first_action then
             local ab = res.monster_abilities[first_action.param] or res.weapon_skills[first_action.param]
@@ -2180,10 +2674,13 @@ windower.register_event('action', function(act)
     end
 end)
 
-windower.register_event('incoming text', function(original)
+windower.register_event('incoming text', function(original, modified, mode)
+    -- the app's read-only Game chat tab (1.3.0, CurePlease audit 3.3): kept only while Vanguard Control is there
+    pcall(bridge.on_text, original, mode)        -- (never stops the readers below; nothing in it yields)
     if settings.modules.triggers then triggers.note_chat(original) end
     if settings.modules.farm then farm.on_text(original) end
     trials.on_text(original)
+    sortie.on_text(original)
     local inviter = original:match('(%a+) invites you to')
     if inviter then
         local player = windower.ffxi.get_player()
@@ -2196,9 +2693,12 @@ windower.register_event('zone change', function(new_id, old_id)
     stop_running()
     warp.on_zone()
     farm.on_zone(new_id, old_id)
+    sortie.on_zone(new_id)
     state.party_buffs, state.debuffs, state.burst = {}, {}, nil
     bard.on_zone()
     state.sc = { target = 0, step = 0, time = 0 }
+    scfollow.on_zone()
+    state.qd_no_card = nil                            -- (Quick Draw: "no card" said again once per zone)
     state.busy_until = now() + 5
     state.farm_pulled, state.farm_pull_try, state.route, state.wp, state.resting = {}, {}, nil, 1, false
     state.action_once = {}
@@ -2224,6 +2724,8 @@ windower.register_event('ipc message', function(msg)
     if dmob then share.on_debuff(tonumber(dmob), dspell, dwhat) return end
     local cfrom, ctarget, csecs = msg:match('^vg_cure (%S+) (%S+) (%d+)$')
     if cfrom then share.on_cure(player, cfrom, ctarget, csecs) return end
+    local ufrom, utarget, usecs = msg:match('^vg_unseen (%S+) (%S+) (%d+)$')
+    if ufrom then share.on_unseen(player, ufrom, utarget, usecs) return end
     local gfrom, gwhat, garg = msg:match('^vg_gear (%S+) (%a+) (.+)$')
     if gfrom then safety.on_gear(player, gfrom, gwhat, garg) return end
     local xfrom, xwho, xcmd = msg:match('^vg_send (%S+) (%S+) (.+)$')
@@ -2242,6 +2744,8 @@ windower.register_event('ipc message', function(msg)
     if rfrom then support.on_rolls(player, rfrom, rarg, apply_rolls) return end
     local bfrom, bel, bst = msg:match('^vg_bar (%S+) (%a+) (%S+)$')
     if bfrom then mages.on_bar(player, bfrom, bel, bst) return end
+    local scmob, scfrom, scsecs = msg:match('^vg_scf (%d+) (%S+) ([%d.]+)$')
+    if scmob then scfollow.on_ipc(player, scmob, scfrom, scsecs) return end
     local slmob, slsecs = msg:match('^vg_sleep (%d+) (%d+)$')
     if slmob then mages.on_sleep(slmob, slsecs) return end
     local hname, hleader, hjob = msg:match('^vg_hello (%S+) (%S+) ?(%a*)$')
@@ -2350,10 +2854,14 @@ local help = [[Vanguard commands (//vg ...):
   trigger add <rule> | trigger list | trigger clear
   bar <element> [status] | off      keep Bar-element + Bar-status up (leader: on every alt)
   sleep on|off                      sleep extra mobs that attack the party
+  enfeebler on|off|count N|mobs <a,b>|pull on|off|stay on|off   keep up to N mobs enfeebled (off by default)
   warp                              warp home (Warp spell, Instant Warp or Warp Ring)
   rolls melee|magic|accuracy|...    Corsair roll set (leader: sent to the Corsair)
   pianissimo <song> > <name>|clear  Bard single-target songs
   chain <skillchain>|off            Scholar Immanence skillchains (liquefaction, fusion, ...)
+  scf add <who>|<trigger>|<ws>|<s>  reactive skillchain: when <who|anyone> makes <WS|spell|Light...>, my <ws>
+  scf list | clear [n] | on | off   (up to 4 rules per job; off by default)
+  scf set <n> <who>|<trigger>|<ws>|<s>  put rule n (1-4) in place (the app's Skillchains tab)
   update [install|on|off]           check for / install a newer Vanguard from its GitHub page
   reload                            reload Vanguard (the panel does this after updating it)
   all <command>                     run a vg command on every character
@@ -2534,6 +3042,11 @@ windower.register_event('addon command', function(cmd, ...)
         if (args[1] or ''):lower() == 'reset' then stats.reset() log('Session stats reset') end
         local t = stats.get()
         log(('Session %d min: %d XP, %d CP, %d LP, %d kills, %d deaths'):format(math.floor(t.secs / 60), t.exp, t.cp, t.lp, t.kills, t.deaths))
+        local g = stats.cast_gap()
+        if g then
+            log(('After a cast, the next action went %.2f s later on average (%d times, %.2f-%.2f s; wait setting %s s)')
+                :format(g.avg, g.n, g.min, g.max, tostring(settings.cast.tail)))
+        end
     elseif cmd == 'reload' then
         log('Reloading Vanguard...')
         windower.send_command('lua reload vanguard')
@@ -2620,6 +3133,34 @@ windower.register_event('addon command', function(cmd, ...)
         farm.forget_respawn()
         log('Respawn times forgotten: learned again from the next kills')
         send_profile()
+    elseif cmd == 'scf' then
+        -- reactive skillchains (vg_scfollow): //vg scf add <who>|<trigger>|<ws>|<delay> | list | clear [n] | on | off
+        local sub = (args[1] or 'list'):lower()
+        if sub == 'on' or sub == 'off' then
+            settings.scf.on = (sub == 'on')
+            log('Skillchain follow: ' .. (settings.scf.on and 'on' or 'off'))
+        elseif sub == 'add' then
+            local ok, r = scfollow.add(table.concat(args, ' ', 2))
+            log(ok and ('Skillchain follow rule added: ' .. scfollow.describe(r)) or ('Skillchain follow: ' .. r))
+        elseif sub == 'set' then
+            -- the app's rule rows (Control 2.0.0): //vg scf set <n> <who>|<trigger>|<ws>|<delay>
+            local ok, r = scfollow.set(args[2], table.concat(args, ' ', 3))
+            log(ok and ('Skillchain follow rule ' .. args[2] .. ': ' .. scfollow.describe(r)) or ('Skillchain follow: ' .. r))
+        elseif sub == 'clear' then
+            scfollow.clear(args[2])
+            log(args[2] and ('Skillchain follow: rule ' .. args[2] .. ' removed') or 'Skillchain follow: all rules removed')
+        end
+        if not ({ on = 1, off = 1, add = 1, set = 1, clear = 1 })[sub] then   -- list (or anything else)
+            local rules = scfollow.rules()
+            log(('Skillchain follow is %s, %d rule(s)%s'):format(settings.scf.on and 'on' or 'off', #rules,
+                #rules > 0 and ':' or ' (//vg scf add <who>|<trigger>|<ws>|<delay>)'))
+            for i, r in ipairs(rules) do log(('  %d. %s'):format(i, scfollow.describe(r))) end
+            local l = scfollow.learned()
+            log(('  learned: %d skillchain(s) seen, %.1f s after the opener on average; window %.1f s, /ws lag %.1f s, latest delay %.1f s')
+                :format(l.n, l.avg, l.window, l.lag, l.max_delay))
+        end
+        store.save(settings)
+        send_profile()
     elseif cmd == 'wschain' then
         -- the app's weapon skill chain: //vg wschain slot <1-6> <ws|none> | load <chain name> | clear | save <name> | forget <name>
         local sub = (args[1] or ''):lower()
@@ -2688,8 +3229,12 @@ windower.register_event('addon command', function(cmd, ...)
         if v == 'toggle' then settings.mages.sleep = not settings.mages.sleep else settings.mages.sleep = (v == 'on' or v == 'true') end
         store.save(settings)
         log('Sleep extra mobs: ' .. (settings.mages.sleep and 'on' or 'off'))
+    elseif cmd == 'enfeebler' or cmd == 'enf' then
+        if mages.enfeebler_cmd(args) then store.save(settings) send_profile() end
     elseif cmd == 'chain' then
-        if mages.set_chain(args[1]) then store.save(settings) end
+        if mages.set_chain(args[1], args[2]) then store.save(settings) send_profile() end
+    elseif cmd == 'sortie' then
+        if mages.sortie(args[1]) then store.save(settings) send_profile() end
     elseif cmd == 'send' or cmd == 'sendall' then
         share.send(windower.ffxi.get_player(), cmd == 'send' and '*' or '**', rest)
     elseif cmd == 'sendto' then
@@ -3078,3 +3623,4 @@ end)
 
 -- Expose for the bridge (state snapshots).
 _G.vanguard_settings = function() return settings end
+_G.vanguard_state = function() return state end      -- (tests)

@@ -9,7 +9,7 @@ Vanguard: party forming, formation follow, hold and camp (round 2, 2026-10-14).
   //vg hold  / //vg come   on the leader: the alts stop where they are / start following again
   //vg camp  / //vg camp off   on the leader: the alts go back to this spot after every fight and wait there
 
-Trail follow (round 3, after FastFollow): the leader sends its position over IPC twice a second; when an alt
+Trail follow (round 3, after FastFollow): the leader sends its position over IPC (10 times a second while moving); when an alt
 is more than a few yalms behind it follows the leader's actual path (around corners, not straight into a
 wall), and when the leader zones it runs the rest of the path to the zone line and through it.
 //vg set follow.trail false turns it off.
@@ -38,6 +38,7 @@ end
 
 function party.on_hello(name, leader)
     party.known[name] = { leader = (leader ~= '-' and leader or ''), t = clock() }
+    party.followers_changed()
 end
 
 local function in_party(name)
@@ -109,35 +110,57 @@ end
 -- Trail: the leader's recent positions (sent by the leader over IPC)
 ------------------------------------------------------------------------
 local last_pos, last_pos_xy = -100, nil
+local followed_at, followed_cached = -100, false
+function party.followers_changed() followed_at = -100 end     -- (a hello: look again at once)
 
--- On every character: if someone follows me, send my position twice a second (only when it changed,
--- or every 3 s while standing still).
+-- On every character: if someone follows me, send my position - every follow.move_tick (0.1 s) while I move (more
+-- than 0.3 yalm since the last one sent; Silmaril audit 1.1, was twice a second), every 3 s while standing still.
+-- Called from both Vanguard passes (decisions 0.25 s, movement 0.1 s); "is anyone following me" is looked up once a
+-- second, so the fast calls stay light.
 function party.send_pos(player)
-    if clock() - last_pos < 0.5 then return end
-    local followed = false
-    for _, k in pairs(party.known) do
-        if clock() - k.t < 300 and k.leader ~= '' and k.leader:lower() == player.name:lower() then followed = true break end
+    local mt = tonumber(S.follow and S.follow.move_tick) or 0
+    if mt <= 0 then mt = 0.5 elseif mt < 0.05 then mt = 0.05 end
+    if clock() - last_pos < mt - 0.005 then return end
+    if clock() - followed_at >= 1 then
+        followed_at, followed_cached = clock(), false
+        for _, k in pairs(party.known) do
+            if clock() - k.t < 300 and k.leader ~= '' and k.leader:lower() == player.name:lower() then followed_cached = true break end
+        end
     end
-    if not followed then return end
+    if not followed_cached then return end
     local me = windower.ffxi.get_mob_by_target('me')
-    local zone = (windower.ffxi.get_info() or {}).zone
     if not me then return end
+    local zone = (windower.ffxi.get_info() or {}).zone
     local moved = not last_pos_xy or math.abs(me.x - last_pos_xy[1]) + math.abs(me.y - last_pos_xy[2]) > 0.3 or last_pos_xy[3] ~= zone
     if not moved and clock() - last_pos < 3 then return end
     last_pos, last_pos_xy = clock(), { me.x, me.y, zone }
     windower.send_ipc_message(('vg_pos %s %.2f %.2f %.2f %d'):format(player.name, me.x, me.y, me.z or 0, zone or 0))
 end
 
+-- Crumbs are kept about 2 yalms apart whatever the send rate (follow.move_tick 0.1 sends ~1 yalm apart at run
+-- speed; spacing them by distance keeps the remembered path as long as before: ~200 yalms in 100 crumbs). When the
+-- list is full the oldest crumb goes, but the last few of the previous zone stay (the zone-line follow needs them).
+local CRUMB_GAP, CRUMB_MAX, KEEP_OLD_ZONE = 2, 100, 5
 function party.on_pos(player, from, x, y, z, zone)
     if S.leader == '' or from:lower() ~= S.leader:lower() then return end
     state.crumbs = state.crumbs or {}
     local c = state.crumbs
     local last = c[#c]
     state.leader_zone = zone
-    if last and last.zone == zone and math.abs(last.x - x) + math.abs(last.y - y) < 1 then return end
+    if last and last.zone == zone and math.abs(last.x - x) + math.abs(last.y - y) < CRUMB_GAP then return end
     c[#c + 1] = { x = x, y = y, z = z, zone = zone, t = clock() }
-    if #c > 80 then table.remove(c, 1) end
+    if #c > CRUMB_MAX then
+        -- the first crumb of the newest zone; old-zone crumbs just before it are kept (up to KEEP_OLD_ZONE)
+        local first_new = #c
+        while first_new > 1 and c[first_new - 1].zone == zone do first_new = first_new - 1 end
+        local drop = 1
+        if first_new > 1 and first_new - 1 <= KEEP_OLD_ZONE then drop = first_new end   -- (keep them: drop a new one)
+        if drop >= #c then drop = 1 end
+        table.remove(c, drop)
+    end
 end
+
+function party.trail() return state.crumbs or {} end   -- (the remembered path; for the status box and the tests)
 
 local function dist2(me, x, y) local dx, dy = x - me.x, y - me.y return math.sqrt(dx * dx + dy * dy) end
 

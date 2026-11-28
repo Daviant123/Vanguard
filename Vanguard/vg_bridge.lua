@@ -3,7 +3,8 @@ Vanguard bridge: talks to the Vanguard Control desktop app over local UDP.
 
   addon -> app : JSON status snapshots every settings.bridge.interval seconds,
                  plus {"type":"log"} lines.
-  app -> addon : plain text "cmd <vg command>", e.g. "cmd follow on".
+  app -> addon : plain text "cmd <vg command>", e.g. "cmd follow on";
+                 "plan <seq> ..." team planner assignments (vg_plan.lua; only from the app's own port).
 
 Only 127.0.0.1 is used by default; nothing leaves your PC.
 ]]
@@ -79,7 +80,10 @@ function bridge.foe(settings, state)
     for _, name in ipairs(settings.modules.debuff and util.split(settings.debuff.list, ',') or {}) do add(name, rec[name]) end
     for name, r in pairs(rec) do if type(r) == 'table' then add(name, r) end end
     return { id = bt.id, name = bt.name, hpp = bt.hpp, d = math.floor(util.dist(bt) + 0.5), effects = effects,
-             move = require('vg_triggers').last_move(6) }
+             move = require('vg_triggers').last_move(6),
+             -- the last buff it gained (1.2.0, util.MOB_BUFF_MOVES): shown for a minute; nil = none seen
+             buff = state and state.mob_buff and state.mob_buff.id == bt.id and os.clock() - state.mob_buff.at < 60
+                    and state.mob_buff.name or nil }
 end
 
 -- Cooldowns (series 3 round 7): every job ability this character has, with the seconds until it's ready (0 = ready)
@@ -125,6 +129,61 @@ function bridge.farm(settings, state)
     return next(out) and out or nil
 end
 
+-- Members the game just said it can't see (1.3.0, CurePlease audit 3.1; Vanguard.lua cant_see): names, for the
+-- app's "can't see X". nil when there are none.
+function bridge.unseen(state)
+    local out = {}
+    for _, u in pairs(state and state.unseen or {}) do
+        if os.clock() < u.untl then out[#out + 1] = u.name end
+    end
+    table.sort(out)
+    return #out > 0 and out or nil
+end
+
+-- Game chat for Vanguard Control's Game chat tab (1.3.0, CurePlease audit 3.3 / F80). Read only: the lines the game
+-- shows are copied, nothing is ever typed into the game. Only while the app is there: it says "vgapp" every 2 s from
+-- its own port (bridge.app_seen); without it no line is even kept. A small rolling buffer (CHAT_KEEP lines) is sent in
+-- "chat" messages with the lines the app hasn't had yet; sid tells the app this load from the last one (ids restart).
+bridge.CHAT_KEEP, bridge.APP_TIMEOUT, bridge.CHAT_EVERY = 40, 6, 0.3
+bridge.chat = { lines = {}, seq = 0, sent = 0, at = 0, sid = tostring(os.time()) .. '-' .. math.random(1000, 9999) }
+
+function bridge.app_connected()
+    return bridge.app_seen ~= nil and now() - bridge.app_seen < bridge.APP_TIMEOUT
+end
+
+-- The game's text without its colour / auto-translate codes and with plain ASCII only (the rest is Shift-JIS).
+function bridge.clean(text)
+    text = tostring(text or '')
+    text = text:gsub('\239\039', '{'):gsub('\239%(', '}')        -- auto-translate brackets (0xEF 0x27 / 0x28; '(' escaped in the pattern)
+    text = text:gsub('[\030\031\127].', '')                        -- colour codes: 0x1E / 0x1F / 0x7F + one byte
+    text = text:gsub('[%c\128-\255]', ' '):gsub('%s+', ' ')
+    text = text:match('^%s*(.-)%s*$') or ''
+    if #text > 300 then text = text:sub(1, 300) end
+    return text
+end
+
+function bridge.on_text(text, mode)
+    if not bridge.app_connected() then return end
+    local t = bridge.clean(text)
+    if t == '' then return end
+    local c = bridge.chat
+    c.seq = c.seq + 1
+    c.lines[#c.lines + 1] = { i = c.seq, m = tonumber(mode) or 0, t = t }
+    while #c.lines > bridge.CHAT_KEEP do table.remove(c.lines, 1) end
+end
+
+-- The lines the app hasn't had (sent from poll, at most every CHAT_EVERY s).
+function bridge.flush_chat(force)
+    local c = bridge.chat
+    if c.seq <= c.sent or not bridge.app_connected() then return end
+    if not force and now() - c.at < bridge.CHAT_EVERY then return end
+    local out = {}
+    for _, l in ipairs(c.lines) do if l.i > c.sent then out[#out + 1] = l end end
+    c.sent, c.at = c.seq, now()
+    local p = windower.ffxi.get_player()
+    if #out > 0 then send({ type = 'chat', name = p and p.name or '?', sid = c.sid, lines = out }) end
+end
+
 local function snapshot(settings, state)
     local p = windower.ffxi.get_player()
     if not p then return nil end
@@ -156,6 +215,10 @@ local function snapshot(settings, state)
         defense = state and state.defense or 'off',
         strat = state and state.strat_now or nil,
         farm = bridge.farm(settings, state),
+        sortie = require('vg_sortie').snap(),
+        -- team planner (Control 2.0.0): only while the app's planner sends plans (vg_plan.snap)
+        plan = require('vg_plan').snap(p),
+        unseen = bridge.unseen(state),
     }
 end
 
@@ -163,8 +226,30 @@ function bridge.poll(settings, state)
     if not bridge.udp then return end
     -- Incoming commands
     for _ = 1, 10 do
-        local data = bridge.udp:receive()
+        -- (receivefrom also says who sent it; a socket without it: no sender known, so no plan lines are taken)
+        local data, ip, port
+        if bridge.udp.receivefrom then data, ip, port = bridge.udp:receivefrom() else data = bridge.udp:receive() end
         if not data then break end
+        bridge.on_message(data, ip, port)
+    end
+    -- Outgoing status
+    if now() - bridge.last_send >= settings.bridge.interval then
+        bridge.last_send = now()
+        local snap = snapshot(settings, state)
+        if snap then send(snap) end
+    end
+    bridge.flush_chat()
+end
+
+-- One message from the app. ip / port: who sent it (the team planner's lines are only taken from the app's own port).
+function bridge.on_message(data, ip, port)
+    do
+        if require('vg_plan').on_message(data, ip, port) then return end
+        -- the app is there (its keep-alive, every 2 s; only from the app's own port): the chat buffer runs
+        if data == 'vgapp' then
+            if ip == nil or (ip == '127.0.0.1' and tonumber(port) == tonumber(bridge.port)) then bridge.app_seen = now() end
+            return
+        end
         local cmd = data:match('^cmd (.+)$')
         if cmd then windower.send_command('vg ' .. cmd) end
         local n, total, part = data:match('^cfg (%d+)/(%d+) (.*)$')
@@ -179,12 +264,6 @@ function bridge.poll(settings, state)
                 bridge.on_cfg(json)
             end
         end
-    end
-    -- Outgoing status
-    if now() - bridge.last_send >= settings.bridge.interval then
-        bridge.last_send = now()
-        local snap = snapshot(settings, state)
-        if snap then send(snap) end
     end
 end
 

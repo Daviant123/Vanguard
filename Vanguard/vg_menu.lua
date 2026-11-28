@@ -185,6 +185,16 @@ end
 ------------------------------------------------------------------------
 -- What's currently chosen (sent to the panel)
 ------------------------------------------------------------------------
+-- A copy of a settings section with these text entries as text: an empty entry reads back from settings.xml as an
+-- empty table (vg_store), which the app would show as "[object Object]".
+local function text_entries(t, names)
+    if type(t) ~= 'table' then return t end
+    local out = {}
+    for k, v in pairs(t) do out[k] = v end
+    for _, n in ipairs(names) do if type(out[n]) ~= 'string' then out[n] = '' end end
+    return out
+end
+
 function menu.config(settings)
     return {
         buffs = util.split(settings.buffs.list, ','),
@@ -198,8 +208,18 @@ function menu.config(settings)
             priority = util.split(settings.heal.priority, ','), ignore = util.split(settings.heal.ignore, ','),
             wake_sleep = settings.heal.wake_sleep, curaga = settings.heal.curaga, tiers = settings.heal.tiers, curagas = settings.heal.curagas,
             auto = settings.heal.auto ~= false, trust_at = settings.heal.trust_at, alliance = settings.heal.alliance == true, alliance_at = settings.heal.alliance_at, alliance_raise = settings.heal.alliance_raise == true, watch = util.split(settings.heal.watch or '', ','), learned = require('vg_cure').info(),
+            -- 1.3.0 (CurePlease audit 2.4 / 2.5 / 3.2; Control 2.1.0's Healing tab)
+            priority_cover = tonumber(settings.heal.priority_cover) or 0.85,
+            curaga_on = type(settings.heal.curaga_on) == 'string' and settings.heal.curaga_on or '',
+            predict = settings.heal.predict == true, predict_lead = tonumber(settings.heal.predict_lead) or 2,
+            predict_cap = tonumber(settings.heal.predict_cap) or 20, predict_window = tonumber(settings.heal.predict_window) or 3,
         },
-        rest = settings.rest, mana = settings.mana, cleanse = settings.cleanse,
+        -- 1.3.0 (audit 2.9; Control 2.1.0's Recovery box): temporary MP items under this MP% (0 = off)
+        items = { temp_mp = tonumber((settings.items or {}).temp_mp) or 0 },
+        -- 1.3.0 reaction timing (audit 1.2-1.4; Control 2.1.0's Advanced tab)
+        react = { ja_settle = tonumber((settings.ja or {}).settle) or 0.3, wake_on = (settings.wake or {}).on ~= false,
+                  cast_tail = tonumber((settings.cast or {}).tail) or 3, cast_log_gap = (settings.cast or {}).log_gap == true },
+        rest = settings.rest, mana = text_entries(settings.mana, { 'devotion_to' }), cleanse = settings.cleanse,
         cleanse_skip = util.split(settings.cleanse.skip, ','),
         songs_when = settings.songs.when,
         debuff_retries = settings.debuff.retries,
@@ -222,6 +242,15 @@ function menu.extra(settings)
         food = settings.upkeep and settings.upkeep.food, reraise = settings.upkeep and settings.upkeep.reraise,
         mount = settings.mount and settings.mount.name,
         bar = m.bar, bar_status = m.bar_status, sleep = m.sleep, chain = m.chain, immanence = m.immanence,
+        chain_steps = m.chain_steps, chain_healer = m.chain_healer, helix_close = m.helix_close, helix_tier = m.helix_tier,
+        finish_hp = m.finish_hp, elements = m.elements, storm_auto = m.storm_auto, klimaform = m.klimaform,
+        sortie_auto = m.sortie_auto, sortie_procs = m.sortie_procs,
+        chain_plan = (function()
+            local ok, mg = pcall(require, 'vg_mages')
+            if not ok or not mg.plan or (m.chain or '') == '' then return nil end
+            local list, res = mg.plan(m.chain_steps or 2, m.chain)
+            return list and { list = list, result = res } or nil
+        end)(),
         aoe_na = m.aoe_na, saboteur = m.saboteur, stymie = m.stymie,
         cor_risk = c.risk, cor_range = c.range, cor_crooked = c.crooked,
         nitro = settings.songs.nitro, nitro_when = settings.songs.nitro_when, marcato = settings.songs.marcato, pianissimo = settings.songs.pianissimo,
@@ -232,7 +261,35 @@ function menu.extra(settings)
         disengage = settings.assist.disengage, defend = settings.assist.defend, autotarget = settings.assist.autotarget,
         assist = { range = settings.assist.engage_range, switch = settings.assist.switch ~= false, delay = settings.assist.delay or 0,
                    below_hp = settings.assist.below_hp or 100, on_claim = settings.assist.on_claim == true,
-                   approach_mode = settings.assist.approach_mode or 'role', approach = settings.assist.approach },
+                   approach_mode = settings.assist.approach_mode or 'role', approach = settings.assist.approach,
+                   -- 1.2.0 (the app's Job tab, Control 2.0.0): out-of-step /attack, seek, on-engage command
+                   resync = settings.assist.resync == true, seek = settings.assist.seek == true,
+                   seek_range = tonumber(settings.assist.seek_range) or 15, max_mobs = tonumber(settings.assist.max_mobs) or 2,
+                   seek_unclaimed = settings.assist.seek_unclaimed == true,
+                   on_engage = type(settings.assist.on_engage) == 'string' and settings.assist.on_engage or '',
+                   -- 1.3.0 (audit 2.8; Control 2.1.0's Job tab): the hate spell and who it goes on ('' = the mob)
+                   hate_spell = type(settings.assist.hate_spell) == 'string' and settings.assist.hate_spell or '',
+                   hate_on = type(settings.assist.hate_on) == 'string' and settings.assist.hate_on or '' },
+        -- 1.2.0 settings the app shows (Control 2.0.0): faster following, Enfeebler mode, reactive skillchains,
+        -- Corsair Quick Draw, Ranger Hover Shot steps, the party TP box
+        move_tick = tonumber(settings.follow.move_tick) or 0,
+        enfeebler = (function()
+            local E = settings.enfeebler or {}
+            local str = function(v) return type(v) == 'string' and v or '' end
+            return { on = E.on == true, count = tonumber(E.count) or 1, mobs = str(E.mobs), pull = E.pull == true,
+                     range = tonumber(E.range) or 20, spells = str(E.spells), stay = E.stay == true,
+                     wait_hp = tonumber(E.wait_hp) or 50 }
+        end)(),
+        scf = (function()
+            local ok, info = pcall(function() return require('vg_scfollow').info() end)
+            return ok and info or nil
+        end)(),
+        cor_quickdraw = type(c.quickdraw) == 'string' and c.quickdraw or '',
+        rng_hover_step = settings.rng and settings.rng.hover_step == true or false,
+        hud_tp = settings.hud and settings.hud.tp == true or false,
+        -- 1.3.0 (CurePlease audit 2.2 / 2.6; Control 2.1.0's Job tab): the White Mage's Afflatus stance, Indi only in fights
+        whm_afflatus = (settings.whm and tostring(settings.whm.afflatus or ''):lower() == 'misery') and 'misery' or 'solace',
+        geo_indi_engaged = settings.geo.indi_engaged == true,
         setups = setups,
         strat = settings.strat,
         farm_targets = settings.farm.targets, farm_ignore = settings.farm.ignore,

@@ -106,7 +106,9 @@ end
 
 -- Called at the start of movement; returns true while stepping around.
 function safety.unstick()
-    if S.farm and S.farm.stay then state.unstick_until = nil return false end      -- DO NOT MOVE: no stepping around
+    if S.farm and S.farm.stay or (S.enfeebler and S.enfeebler.on and S.enfeebler.stay) then   -- DO NOT MOVE / enfeebler.stay
+        state.unstick_until = nil return false                                      -- (no stepping around)
+    end
     if (state.casting_until or 0) > clock() then return false end                 -- casting / singing: stand still
     if state.unstick_until and clock() < state.unstick_until then
         windower.ffxi.run(state.unstick[1], state.unstick[2])

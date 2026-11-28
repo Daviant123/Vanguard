@@ -140,8 +140,11 @@ function ef.mob_filter(mob, ids)
     if me and math.abs((m.z or 0) - (me.z or 0)) > C.height then return false end
     if match_any(m.name, C.ignored) then return false end
     if has_aggroed(m) and C.aggro then return true end
-    if not match_any(m.name, C.targets) and #C.targets > 0 then return false end
+    -- party (alliance) claimed comes before the Mobs to Kill names, as in EasyFarm: whatever the party is fighting
+    -- gets help even when its name isn't on the list (his report 2026-11-24: CharC stood by while the party
+    -- fought mobs not on her list, "Party Claimed" ticked)
     if party_claim(m, ids) and C.party then return true end
+    if not match_any(m.name, C.targets) and #C.targets > 0 then return false end
     if not claimed(m) and C.unclaimed then return true end
     if claimed(m) and C.claimed then return true end
     return my_claim(m)

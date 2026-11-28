@@ -54,6 +54,61 @@ talk to each other and to the app only on your own PC (Windower's IPC and a loca
 
 ---
 
+## New in 1.3.0 (ideas from the CurePlease audit)
+
+Things that change what your characters do start **off** (or work as before), except the faster reaction timing,
+which is the point of this version (the lines marked "on"); each can be set back.
+
+| Feature | What it does | How to turn it on / set it | Default |
+|---|---|---|---|
+| Can't act, nothing sent | No spells / abilities / items while asleep, petrified, stunned, charmed or terrorized | always | on |
+| Abilities chain faster | After an ability the game confirms (or refuses), the next action waits only this long | `//vg set ja.settle 0.3` (1.5 = the old way) | 0.3 s |
+| Quicker reaction | An extra decision right when a member falls under the cure line or your own wait ends | `//vg set wake.on false` turns it off | on |
+| After-cast wait | Seconds after a spell before the next action; `//vg stats` shows the real gaps | `//vg set cast.tail 2`, `//vg set cast.log_gap true` | 3 (as before), log off |
+| Refused spell retried | A spell the game refuses before it starts ("You must wait longer"...) is tried again after 1 s | always | on |
+| Can't see a member | "Unable to see X": that member is skipped for 3 s, the others healed first, the other healers told | always | on |
+| Divine Caress | Only right before a -na spell | tick it on the Job tab (ability list) | off |
+| Afflatus stance | Solace or Misery, only that one kept up | `//vg set whm.afflatus misery` | solace |
+| Devotion choices | Only to one member; only while the party fights | `//vg set mana.devotion_to CharB`, `//vg set mana.devotion_engaged true` | anyone, always |
+| Indi while fighting | Geomancer's Indi only while the party fights | `//vg set geo.indi_engaged true` | off |
+| Sublimation and Refresh | Don't charge Sublimation while your Refresh is up (unless MP is low) | `//vg set mana.sub_skip_refresh true` | off |
+| Bigger priority cures | Priority members get a Cure for all the HP they miss | `//vg set heal.priority_cover 1.0` | 0.85 (as before) |
+| Fixed Curaga centre | Curaga on this member when it reaches enough hurt members | `//vg set heal.curaga_on CharA` | empty (off) |
+| Predictive healing | Members whose HP keeps falling are cured first, one Cure tier bigger at most | `//vg set heal.predict true` (`predict_lead`, `predict_cap`, `predict_window`) | off |
+| Hate spell | Once per new mob the leader fights, this spell on the mob (or on a member) | `//vg set assist.hate_spell Dia II`, `assist.hate_on <name>` | empty (off) |
+| Temporary items | Echo Drops, Holy Water... found in the Temporary Items bag too; temporary MP items under this MP % | `//vg set items.temp_mp 30` | 0 (off) |
+| Utsusemi tools | Utsusemi only with Shihei (Shikanofuda on a NIN main); told once when there are none | always | on |
+| "MP OK" alert | The leader is told when an alt's MP is clearly back after a low-MP alert | with the alerts (`//vg alerts on`) | with alerts |
+| Vanguard Control 2.1.0 | Four-colour HP bars, "MP lasts ~N min", a read-only Game chat tab, menus for all of the above | in the app | on |
+
+More detail is in CHANGELOG.md.
+
+## New in 1.2.0 (ideas from the Silmaril audit)
+
+Everything below that changes what your characters do starts **off**; turn on only what you want.
+
+| Feature | What it does | How to turn it on / set it | Default |
+|---|---|---|---|
+| Faster following | Walking and steering checked 10 times a second (spells and weapon skills still 4 times) | `//vg set follow.move_tick 0.1` | off (`0`, the old speed) |
+| Reactive skillchains | "When someone makes X on our mob, use my weapon skill after N s" (up to 4 rules per job) | `//vg scf add CharA\|Savage Blade\|Requiescat\|3`, `//vg scf on` | off |
+| Learned skillchain timing | Learns how long real skillchains take; keeps follow-up delays inside the window | learns while `scf on` (or `scf.tune_sc`) is on; `//vg set scf.tune_sc true` also uses it for the fixed steps | off |
+| Enfeebler mode | Keeps up to N mobs enfeebled, by mob id; leaves sleeping mobs alone | `//vg enfeebler on`, `//vg enfeebler count 2` | off, count 1 |
+| Seek | An idle melee alt takes the nearest mob the party fights | `//vg set assist.seek true` | off |
+| On engage | One ability / spell / command once on each new mob | `//vg set assist.on_engage Provoke` | empty |
+| Corsair Quick Draw | Light Shot after Dia, Dark Shot after Bio / Blind (needs the card or a Trump Card) | `//vg action quick_draw on` (or tick it on the Job tab); elements: `//vg set cor.quickdraw all` | off (elements light,dark) |
+| Ranger Hover Shot steps | A half-second side step after each ranged shot while Hover Shot is up | `//vg set rng.hover_step true` | off |
+| Party TP box | Every party member's TP and the mob's HP % | `//vg set hud.tp true` | off |
+| Burst window | Closes when another weapon skill lands without a skillchain | always | on |
+| Monster buffs for Dispel | Knows which buff a monster's TP move gives; no MP on Invincible / Perfect Dodge | always | on |
+| Server out of step | Sends /attack again if the server says you're not fighting | `//vg set assist.resync true` | off |
+| Team planner (Vanguard Control 2.0.0) | The app shares out who cures whom, who enfeebles which mob (Enfeebler mode) and who closes a reactive skillchain; each character decides by itself again within 3 s of the app closing | Team tab: "Team planner" box | off |
+
+More detail for each is in its own section below and in CHANGELOG.md. Vanguard Control 2.0.0 has a menu for each
+(the chat commands work too): Job tab - Movement speed, More fighting options (Seek, On each new mob, the
+out-of-step /attack), the Corsair's Quick Draw Shots and the Ranger's Hover Shot steps; the Skillchains tab - the
+reactive rules, tune_sc and the learned timing; Enfeebles tab - Enfeebler mode; Team tab - the party TP box and the
+buff the enemy gained.
+
 ## Setup (once)
 
 Run **Vanguard Control**; it installs the addon (see Install above).
@@ -139,8 +194,15 @@ These are on by default and survive presets:
 - **Trail & zone follow.** When an alt falls behind, it follows the path you actually walked (around corners instead
   of into the wall), and when you zone it runs the rest of your path and through the zone line after you.
   `//vg set follow.trail false` for straight-line following.
+- **Faster following (1.2.0).** Walking and steering (following, formation, trail, camp, closing in on the mob) is
+  checked 10 times a second; spells, abilities and weapon skills are still decided 4 times a second. Your main sends
+  its position 10 times a second while it walks. Off by default: `//vg set follow.move_tick 0.1` to try it
+  (seconds; `0` = the old single speed).
 - **Alt overview box** on your main's screen: every alt's job, HP, MP, TP, distance and what it's doing, red when
   something's wrong, grey "(no word)" if an alt goes quiet. Drag it where you like. `//vg hud off` to hide it.
+- **Party TP box (1.2.0, off by default).** `//vg set hud.tp true`: a small box with every party member's TP (green
+  at 1000+, ready for a weapon skill) and the mob you fight with its HP %. Works on any character; drag it where you
+  like (start position `hud.tp_x` / `hud.tp_y`).
 - **Pull to camp.** Farming with a camp: set `//vg camp` where you want to fight and a pull command
   (`//vg set farm.pull_cmd input /ra <t>` or `input /ma "Dia" <t>`). The farmer pulls first (before buffing),
   runs back to camp and fights the mob there; the alts wait at camp.
@@ -177,6 +239,13 @@ These are on by default and survive presets:
   (`//vg cp` / `//vg ep` do the same).
 - **Next target.** After a kill, if another monster is still attacking someone in the party and you aren't fighting,
   melee alts take it on. `//vg set assist.autotarget false` to turn it off.
+- **Seek (1.2.0, off by default).** A melee alt standing idle while you aren't fighting takes the nearest mob within
+  15 yalms that the party has claimed or that is attacking the party, as long as the party then fights no more than 2
+  mobs. Never unclaimed mobs unless you allow it; never while farming, on hold or retreating.
+  `//vg set assist.seek true`, `assist.seek_range 15`, `assist.max_mobs 2`, `assist.seek_unclaimed false`.
+- **On engage (1.2.0).** One thing to use once on each new mob, right after this character engages, for any job:
+  `//vg set assist.on_engage Provoke` (an ability or spell name) or `//vg set assist.on_engage input /ra <t>`.
+  Empty (the default) = nothing. When farming with a "Pull with", the pull goes first and this stays quiet.
 
 ## Characters working together, sending commands (new in 0.8.0)
 
@@ -215,6 +284,14 @@ Settings are now saved safely with several characters running (one character's s
 - **Sleep extra mobs.** `//vg sleep on`: a second mob attacking the party (not the one you're fighting) gets
   Sleep II / Sleep / Foe Lullaby / Sleepga. It's slept again when it wakes up; undead and mobs it doesn't work on
   are left alone, and two characters never sleep the same mob.
+- **Enfeebler mode (off by default).** `//vg enfeebler on`: keeps up to N mobs enfeebled (`//vg enfeebler count 2`) -
+  the mob you fight first, then the other mobs attacking the party, nearest first, each by its own id. Spells: the
+  Enfeebles list, or `//vg enfeebler spells Dia II,Slow,Paralyze`. Only some mobs: `//vg enfeebler mobs Bat,Crawler`
+  (`mobs any` = all). `//vg enfeebler pull on`: also enfeebles unclaimed mobs within 20' to fill the count (never with a
+  sleep, and only when the party is ready). `//vg enfeebler stay on`: it never walks (like DO NOT MOVE). It waits
+  while someone is under 50% HP (`//vg set enfeebler.wait_hp 50`), while following you on the move, when silenced or
+  under the MP kept for cures; two characters never cast the same spell on the same mob. While it's on, it does the
+  enfeebling instead of the normal Enfeebles (no double casts).
 - **Scholar stratagems.** As healer: Accession + Regen when 3+ members nearby have no Regen, Perpetuance + Regen V
   on you, and Aurorastorm II on itself. As nuker: makes its own skillchain with Immanence (Stone then Fire II =
   Liquefaction) and the burst module bursts on it. `//vg chain fusion` (liquefaction, scission, reverberation,
@@ -230,6 +307,16 @@ Settings are now saved safely with several characters running (one character's s
   (Fixed: the old Double-Up mistook each roll's unlucky number for a lucky one.)
 - **Roll range.** Rolls only reach people within 8 yalms, so the Corsair walks over to you before rolling.
   With Luzaf's Ring: `//vg set cor.range 16`.
+- **Quick Draw (1.2.0).** When someone in the party lands Dia or Bio / Blind on the mob you fight, the Corsair follows
+  with Light Shot or Dark Shot, which makes that enfeeble stronger and last longer (if Quick Draw is ready and the mob is
+  within 18 yalms). Other elements too: `//vg set cor.quickdraw all` (Paralyze -> Ice Shot, Slow -> Earth Shot ...),
+  or pick them: `//vg set cor.quickdraw light,dark,ice`. Off by default: tick "Quick Draw" on the Job tab or
+  `//vg action quick_draw on`. It needs the card (the element's card or a Trump Card) in the inventory; without one
+  it skips the Shot and says so once per zone.
+- **Hover Shot stepping (1.2.0, Ranger).** Hover Shot only gets stronger when the Ranger moves between shots, so with
+  Hover Shot up it takes a half-second side step after each ranged attack or ranged weapon skill (left, then right, so
+  it stays in place) and faces the mob again. Never while casting, following on the move, holding or with DO NOT MOVE.
+  Off by default: `//vg set rng.hover_step true` to turn it on.
 - **Roll sets.** `//vg rolls melee` (Samurai + Chaos), `magic` (Wizard's + Warlock's), `accuracy`, `tank`, `crit`,
   `refresh`, `exp`, `fastcast`, or name two: `//vg rolls chaos,rogue's`. Typed on CharA it goes to the Corsair alt.
 - **Geomancer.** Casts Dia II first so Geo-Frailty / Malaise work (the guide: the GEO must be on the mob's hate list).
@@ -347,6 +434,26 @@ enfeeble: green landed, yellow being cast, red resisted, grey not tried yet.
 
 Team tab > Skillchain: pick each step's character and weapon skill from menus. The app shows the properties, what each
 step makes (or "no skillchain") and which magic bursts the result opens. **Use this skillchain** sets it on everyone.
+
+## Reactive skillchains (new in 1.2.0; the app's Skillchains tab)
+
+Up to 4 rules per job: "when <someone> makes <something> on the mob we fight, use my weapon skill after N seconds".
+The something can be a weapon skill (Savage Blade), a spell (a Scholar's Immanence Fire) or a skillchain (Light,
+Darkness, Fusion...). Off until you turn it on.
+
+    //vg scf add CharA|Savage Blade|Requiescat|3     when CharA uses Savage Blade, Requiescat 3 s later
+    //vg scf add anyone|Light|Requiescat|2            whenever anyone makes Light on our mob
+    //vg scf list | clear | clear 2 | on | off
+    //vg scf set 2 anyone|Darkness|Requiescat|3       put rule 2 in place (what the app's rule rows send)
+
+Only on the mob we fight, with 1000+ TP, a weapon skill the weapon in hand can use, in reach; one trigger = one weapon
+skill. While a follow-up waits, every other weapon skill (the normal one, the finisher, AutoSkillchain, battle lists,
+EasyFarm's Weaponskill list, reactions) holds the TP. Aftermath upkeep (ws.am) wins over a follow-up: while
+Aftermath needs the TP, no follow-up is used. The same 'anyone' rule on several characters gives one weapon skill:
+the characters agree among themselves (the first name alphabetically takes it).
+A character listed in the fixed skillchain steps (sc.steps) ignores these rules. Vanguard also learns how long real
+skillchains take on your mobs and keeps the delays between 2 s and the game's window (about 8 s; `//vg scf list` shows
+what it learned). `//vg set scf.tune_sc true` lets the fixed steps use the learned window too.
 
 ## Crash reports (new in 0.29.0 / Vanguard Control 1.18.0)
 

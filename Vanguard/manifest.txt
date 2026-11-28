@@ -19,9 +19,12 @@ vg_link.lua
 vg_mages.lua
 vg_menu.lua
 vg_party.lua
+vg_plan.lua
 vg_quick.lua
 vg_safety.lua
+vg_scfollow.lua
 vg_share.lua
+vg_sortie.lua
 vg_stats.lua
 vg_store.lua
 vg_strat.lua

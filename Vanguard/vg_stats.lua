@@ -28,9 +28,29 @@ local watch = {}           -- mob id -> { hpp, name } for mobs our party is figh
 local msgs_seen = {}       -- message ids that named a watched mob (newest last), for diagnosing
 local was_dead = false
 
+-- After-cast gaps (CurePlease audit 1.4, measuring only): seconds from our cast finishing to the game accepting our
+-- next action (the next cast beginning, ability, weapon skill or item), when that came within 10 s. Kept for the
+-- session so the after-cast wait (cast.tail) can later be set from real numbers: //vg stats shows them.
+local gap = { n = 0, sum = 0, min = nil, max = nil, last = nil }
+
+function stats.note_gap(secs)
+    secs = tonumber(secs)
+    if not secs or secs < 0 then return end
+    gap.n, gap.sum, gap.last = gap.n + 1, gap.sum + secs, secs
+    if not gap.min or secs < gap.min then gap.min = secs end
+    if not gap.max or secs > gap.max then gap.max = secs end
+end
+
+-- nil before the first gap; else { n, avg, min, max, last } in seconds
+function stats.cast_gap()
+    if gap.n == 0 then return nil end
+    return { n = gap.n, avg = gap.sum / gap.n, min = gap.min, max = gap.max, last = gap.last }
+end
+
 function stats.reset()
     s = { since = now(), exp = 0, lp = 0, cp = 0, kills = 0, deaths = 0 }
     seen_kill = {}
+    gap = { n = 0, sum = 0, min = nil, max = nil, last = nil }
 end
 
 -- one kill per mob, whichever way it was seen

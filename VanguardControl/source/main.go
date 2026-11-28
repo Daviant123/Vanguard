@@ -46,7 +46,9 @@ type character struct {
 	Nearby   map[string]any `json:"nearby,omitempty"` // the last "Look around" answer (mobs near it)
 	LastSeen time.Time      `json:"-"`
 	Online   bool           `json:"online"`
+	MPMins   float64        `json:"mp_mins,omitempty"` // MP forecast in minutes (mpforecast.go); absent = none
 	addr     *net.UDPAddr
+	mp       mpTrack
 }
 
 type logLine struct {
@@ -138,6 +140,11 @@ func (h *hub) listen() {
 				h.chars[name] = c
 			}
 			c.Snapshot, c.LastSeen, c.addr = msg, time.Now(), addr
+			if mp, ok := msg["mp"].(float64); ok {
+				job, _ := msg["job"].(string)
+				status, _ := msg["status"].(string)
+				c.MPMins = c.mp.add(job, mp, status, c.LastSeen)
+			}
 			h.mu.Unlock()
 			if !ok {
 				h.addLog("%s connected", name)
@@ -166,8 +173,12 @@ func (h *hub) listen() {
 				c.addr = addr
 			}
 			h.mu.Unlock()
+		case "chat": // the read-only Game chat tab (chat.go)
+			chats.add(name, msg, time.Now())
 		case "farmrun":
 			h.addFarmRun(msg)
+		case "scfq": // a reactive skillchain follow-up was queued / used (team planner, planner.go)
+			h.plannerScf(name, msg)
 		case "crash":
 			// vg_crash.lua caught an error in the addon
 			str := func(k string) string { v, _ := msg[k].(string); return v }
@@ -235,7 +246,8 @@ func (h *hub) handleState(w http.ResponseWriter, r *http.Request) {
 			logs = append(logs, l)
 		}
 	}
-	body, _ := json.Marshal(map[string]any{"chars": chars, "logs": logs, "version": panelVersion})
+	body, _ := json.Marshal(map[string]any{"chars": chars, "logs": logs, "version": panelVersion,
+		"planner": plannerStatus(time.Now())})
 	h.mu.Unlock()
 	w.Header().Set("Content-Type", "application/json")
 	w.Write(body)
@@ -351,6 +363,9 @@ func main() {
 	h.safeGo("stop timer", h.timerLoop)
 	loadAlarms()
 	h.safeGo("alarms", h.alarmLoop)
+	loadPlanner()
+	h.safeGo("team planner", h.plannerLoop)
+	h.safeGo("telling the characters the app is here", h.helloLoop) // (their Game chat buffer, chat.go)
 	// The addon: find Windower, install / update the one built into this exe, reload old copies.
 	h.safeGo("addon install / reload", func() {
 		if msg := h.ensureAddon(false); msg != "" && msg != "ok" {
@@ -374,6 +389,8 @@ func main() {
 	mux.HandleFunc("/api/crashes", h.handleCrashes)
 	mux.HandleFunc("/api/alarms", h.handleAlarms)
 	mux.HandleFunc("/api/farmruns", h.handleFarmRuns)
+	mux.HandleFunc("/api/planner", h.handlePlanner)
+	mux.HandleFunc("/api/chat", h.handleChat)
 	mux.HandleFunc("/api/quit", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNoContent)
 		go func() { time.Sleep(200 * time.Millisecond); os.Exit(0) }()

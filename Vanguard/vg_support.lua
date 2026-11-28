@@ -172,6 +172,160 @@ function support.on_rolls(player, from, arg, apply)
 end
 
 ------------------------------------------------------------------------
+-- COR: Quick Draw after an enfeeble lands (1.2.0, Silmaril audit 2.1)
+------------------------------------------------------------------------
+-- A Shot strengthens / lengthens the enfeeble of its own element that is already on the mob (bg-wiki "Quick Draw"):
+-- Light Shot -> Dia, Dark Shot -> Bio and Blind, Fire -> Burn, Water -> Poison / Drown, Thunder -> Shock,
+-- Earth -> Slow / Rasp, Wind -> Choke, Ice -> Paralyze / Frost. The Dia / Bio ones are the useful ones, so only
+-- cor.quickdraw = 'light,dark' by default ('' or 'off' = none, 'all' = every element).
+-- Who owns the Shots: this feature alone. The action engine never uses the quick_draw action from its list
+-- (reactive = true, vg_actions.run); it only switches this on / off. All Shots share one recast, so a Shot fired by a
+-- trigger or by hand just means the next one waits.
+local SHOT_FOR = {
+    Dia = 'light', Diaga = 'light',
+    Bio = 'dark', Blind = 'dark', Blindga = 'dark', Kurayami = 'dark',
+    Burn = 'fire',
+    Poison = 'water', Poisonga = 'water', Drown = 'water',
+    Shock = 'thunder',
+    Slow = 'earth', Hojo = 'earth', Rasp = 'earth',
+    Choke = 'wind',
+    Paralyze = 'ice', Paralyga = 'ice', Frost = 'ice',
+}
+support.SHOT_FOR = SHOT_FOR
+local QD_RANGE = 18                     -- yalms; farther and the game refuses the Shot
+local QD_WAIT = 8                       -- a landed enfeeble is answered within this many seconds, or forgotten
+
+-- The element a spell's Shot belongs to: "Dia II" -> light, "Kurayami: Ni" -> dark, "Slow II" -> earth
+function support.shot_element(spell_name)
+    if not spell_name then return nil end
+    local base = spell_name:gsub(':.*$', ''):gsub(' [IV]+$', '')
+    return SHOT_FOR[base]
+end
+
+local function qd_elements()
+    local v = util.trim(tostring(S.cor.quickdraw or '')):lower()
+    local out = {}
+    if v == '' or v == 'off' or v == 'none' or v == 'false' then return out end
+    for _, w in ipairs(util.split(v, ',')) do
+        w = util.trim(w):gsub(' shot$', '')
+        if w == 'all' then
+            for _, el in pairs(SHOT_FOR) do out[el] = true end
+        elseif w == 'lightning' then out.thunder = true
+        elseif w == 'wind' or w == 'aero' then out.wind = true
+        elseif w ~= '' then out[w] = true end
+    end
+    return out
+end
+
+-- The action event: one of the party's (or alliance's, or my own) enfeebles landed on our battle target.
+function support.qd_on_action(act, player, spell, landed_msgs)
+    if act.category ~= 4 or not spell or player.main_job ~= 'COR' then return end
+    local el = support.shot_element(spell.en)
+    if not el or not qd_elements()[el] then return end
+    if act.actor_id ~= player.id and not util.alliance_ids()[act.actor_id] then return end
+    local first = act.targets and act.targets[1]
+    local a1 = first and first.actions and first.actions[1]
+    if not a1 or not landed_msgs[a1.message] then return end          -- resisted / no effect: nothing to extend
+    local bt = h.battle_target()
+    if not bt or bt.id ~= first.id then return end
+    local shot = el:sub(1, 1):upper() .. el:sub(2) .. ' Shot'
+    state.qd_pending = { mob = first.id, shot = shot, spell = spell.en, at = clock() }
+end
+
+-- A Light Card (or any Trump Card) in the inventory
+function support.have_card(card)
+    local items = require('vg_items')
+    local want = {}
+    for _, n in ipairs({ card, 'Trump Card' }) do local id = items.id(n) if id then want[id] = true end end
+    for _, it in ipairs(windower.ffxi.get_items('inventory') or {}) do
+        if type(it) == 'table' and want[it.id] and (it.count or 1) > 0 then return true end
+    end
+    return false
+end
+
+-- The decision pass (the "abilities" group, before the action list): fire the Shot that is waiting.
+function support.quick_draw(player, profile)
+    local p = state.qd_pending
+    if not p then return false end
+    if clock() - p.at > QD_WAIT then state.qd_pending = nil return false end
+    if player.main_job ~= 'COR' or not S.modules.actions or not profile then return false end
+    local action
+    for _, a in ipairs(jobs.COR.actions) do if a.id == 'quick_draw' then action = a end end
+    if not action or not require('vg_actions').enabled(action, profile) then state.qd_pending = nil return false end
+    local bt = h.battle_target()
+    if not bt or bt.id ~= p.mob then state.qd_pending = nil return false end
+    if util.dist(bt) > QD_RANGE or h.amnesia(player) or h.recently('quickdraw', 3) then return false end
+    local ja = has_ja(p.shot)
+    if not ja or not util.ability_ready(ja) then return false end       -- on recast: it waits (up to QD_WAIT)
+    -- the Shot uses a card: its element's card or a Trump Card in the inventory (no card: no Shot, said once per zone)
+    local card = p.shot:gsub(' Shot$', ' Card')
+    if not support.have_card(card) then
+        state.qd_pending = nil
+        state.qd_no_card = state.qd_no_card or {}
+        if not state.qd_no_card[card] then
+            state.qd_no_card[card] = true
+            h.log(('%s: no %s or Trump Card in the inventory - skipped'):format(ja.en, card))
+        end
+        return false
+    end
+    state.qd_pending = nil
+    h.mark('quickdraw')
+    h.log(('%s: %s landed on %s'):format(ja.en, p.spell, bt.name))
+    return h.use_ja(ja, '<bt>')
+end
+
+------------------------------------------------------------------------
+-- RNG: Hover Shot stepping (1.2.0, Silmaril audit 2.2)
+------------------------------------------------------------------------
+-- Hover Shot's bonus only grows when the Ranger moves between shots (bg-wiki: about a yalm). With Hover Shot up and
+-- rng.hover_step on, after each of my ranged attacks / ranged weapon skills a short side step (half a second,
+-- left then right then left ..., so the Ranger stays where it was) with windower.ffxi.run, then it stops and faces
+-- the mob again. No key presses.
+-- Who owns the walking: during the step this does (state.run_by = 'hover'; the movement step and its fast passes
+-- keep out, see do_movement / move_step); anything that wants to stand still wins - a spell (cast() stops running),
+-- DO NOT MOVE, holding, following on the move (no step while already running).
+local HOVER_SECS = 0.5
+support.HOVER_SECS = HOVER_SECS
+
+function support.hover_on_action(act, player, ws)
+    if not S.rng.hover_step or act.actor_id ~= player.id then return end
+    local ranged = act.category == 2 or (act.category == 3 and ws and (ws.skill == 25 or ws.skill == 26))
+    if not ranged or not S.enabled then return end
+    if not util.has_buff(player.buffs, util.buff_id('Hover Shot')) then return end
+    if S.farm.stay or (S.enfeebler and S.enfeebler.on and S.enfeebler.stay) or state.hold or state.retreat then return end
+    if h.casting() or (state.running and state.run_by ~= 'hover') then return end
+    local first = act.targets and act.targets[1]
+    local me, mob = windower.ffxi.get_mob_by_target('me'), first and windower.ffxi.get_mob_by_id(first.id)
+    if not me or not mob then return end
+    local dx, dy = mob.x - me.x, mob.y - me.y
+    local len = math.sqrt(dx * dx + dy * dy)
+    if len < 0.01 then return end
+    local side = state.hover_side or 1
+    state.hover_side = -side
+    local rx, ry = -dy / len * side, dx / len * side                   -- square to the mob: left / right
+    windower.ffxi.run(rx, ry)
+    state.running, state.run_by, state.run_dir, state.run_sent = true, 'hover', { rx, ry }, clock()
+    state.hover = { till = clock() + HOVER_SECS, mob = mob.id }
+    state.busy_until = math.max(state.busy_until or 0, clock() + HOVER_SECS + 0.2)   -- (no /ra while stepping)
+end
+
+-- Every frame while a step is on, and at the top of the movement step: true while stepping (nothing else steers).
+function support.hover_tick()
+    local hv = state.hover
+    if not hv then return false end
+    if clock() < hv.till then
+        if state.running and state.run_by == 'hover' then return true end
+        state.hover = nil                                              -- something else stopped it (a spell)
+        return false
+    end
+    state.hover = nil
+    if state.running and state.run_by == 'hover' then h.stop_running() end
+    local me, mob = windower.ffxi.get_mob_by_target('me'), windower.ffxi.get_mob_by_id(hv.mob)
+    if me and mob and (mob.hpp or 0) > 0 then h.face(me, mob) end     -- face it again for the next shot
+    return false
+end
+
+------------------------------------------------------------------------
 -- GEO
 ------------------------------------------------------------------------
 -- Before a Geo debuff on the battle target: get on its hate list (Dia II / Dia).
@@ -188,6 +342,70 @@ function support.geo_hate(player, spell, mob)
         end
     end
     state.geo_hate[mob.id] = true                                -- nothing to cast: don't hold the bubble back
+    return false
+end
+
+-- Hate spell per new mob (1.3.0, CurePlease audit 2.8, its "auto target" F66), any job: a healer standing back is on
+-- no mob's hate list, so the mob's first move can be on whoever it likes and a GEO's bubble or a -na doesn't count.
+-- assist.hate_spell ('' = off): once per new battle target, when the leader engages it (or I do, when I lead), that
+-- spell on <bt>; assist.hate_on = a member name: on that member instead (a buff - CurePlease's "party" mode).
+-- Retried until it is sent (recast, MP, out of reach), given up HATE_GIVE_UP s after the leader engaged the mob.
+-- One owner: this is the first hate action on the mob. It marks state.geo_hate, so the GEO's own Dia before a Geo
+-- debuff (geo_hate, above) isn't cast a second time; a hit or spell of ours already on the mob (note_hate) means
+-- this one isn't needed. A one-off "on engage" (assist.on_engage, vg_combat) is for the character that engages and
+-- may be set too: both go off once.
+local HATE_GIVE_UP = 10
+function support.hate_spell(player)
+    local name = type(S.assist.hate_spell) == 'string' and util.trim(S.assist.hate_spell) or ''
+    if name == '' or state.hold or state.retreat then return false end
+    if player.status ~= 0 and player.status ~= 1 then return false end
+    local lead = h.leader_mob(player)                             -- nil: I lead (or nobody is set)
+    local engaged = lead and lead.status == 1 or (not lead and player.status == 1)
+    local bt = h.battle_target()
+    if not engaged or not bt then return false end
+    local seen = state.hate_spell
+    if seen and seen.id == bt.id and seen.done then return false end
+    if not seen or seen.id ~= bt.id then seen = { id = bt.id, t = clock() } state.hate_spell = seen end
+    state.geo_hate = state.geo_hate or {}
+    local on = type(S.assist.hate_on) == 'string' and util.trim(S.assist.hate_on) or ''
+    if on == '' and state.geo_hate[bt.id] then seen.done = true return false end   -- already on its hate list
+    if clock() - seen.t > HATE_GIVE_UP then
+        seen.done = true
+        h.log(('Hate spell: %s not sent within %d s - skipped for %s'):format(name, HATE_GIVE_UP, bt.name or 'this mob'))
+        return false
+    end
+    local spell = util.spell(name)
+    if not spell or not util.can_cast(spell, player) then
+        seen.done = true
+        if not h.recently('hate_bad', 60) then
+            h.mark('hate_bad')
+            h.log(("Hate spell: '%s' isn't a spell this job can cast"):format(name))
+        end
+        return false
+    end
+    if h.silenced(player) then return false end
+    local target
+    if on ~= '' then
+        for _, m in ipairs(h.party_members(20)) do
+            if m.name:lower() == on:lower() then target = (m.name == player.name) and '<me>' or m.name end
+        end
+        if not target then return false end                       -- not near: try again (until the time limit)
+    else
+        if not util.targets(spell, 'Enemy') then
+            seen.done = true
+            if not h.recently('hate_bad', 60) then
+                h.mark('hate_bad')
+                h.log(("Hate spell: '%s' can't be cast on a monster (set assist.hate_on to cast it on a member)"):format(name))
+            end
+            return false
+        end
+        target = '<bt>'
+    end
+    if h.try_cast(spell.en, target, 'hate list: ' .. (bt.name or 'new mob'), player) then
+        seen.done = true
+        if on == '' then state.geo_hate[bt.id] = true end
+        return true
+    end
     return false
 end
 

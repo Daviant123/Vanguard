@@ -112,7 +112,58 @@ function hud.draw()
     hud.text = table.concat(t, '\n')
 end
 
-function hud.destroy() if box then box:destroy() box = nil end end
+-- Party TP / battle target HP (1.2.0, Silmaril audit 2.8, after Insight; off by default: //vg set hud.tp true).
+-- A small box of its own, on any character: one line per party member with its TP (green at 1000+, ready for a
+-- weapon skill), then the mob being fought and its HP %. Read from the game's own party list - nothing is sent.
+-- Redrawn at most 4 times a second.
+local tpbox
+local last_tp = -100
+local PARTY_KEYS = { 'p0', 'p1', 'p2', 'p3', 'p4', 'p5' }
+
+function hud.tp_lines()
+    local party = windower.ffxi.get_party() or {}
+    local out = {}
+    for _, k in ipairs(PARTY_KEYS) do
+        local m = party[k]
+        if m and m.name then
+            local tp = tonumber(m.tp) or 0
+            out[#out + 1] = { text = ('%-13s TP %4d'):format(m.name:sub(1, 13), tp), color = tp >= 1000 and GREEN or nil }
+        end
+    end
+    local bt = windower.ffxi.get_mob_by_target('bt')
+    if bt and (bt.hpp or 0) > 0 then
+        out[#out + 1] = { text = ('%-13s HP %3d%%'):format((bt.name or '?'):sub(1, 13), bt.hpp or 0),
+                          color = (bt.hpp or 0) <= 25 and RED or nil }
+    end
+    return out
+end
+
+function hud.draw_tp()
+    if not (S.hud and S.hud.tp) then
+        if tpbox then tpbox:hide() end
+        hud.tp_text = nil
+        return
+    end
+    if clock() - last_tp < 0.25 then return end
+    last_tp = clock()
+    local lines = hud.tp_lines()
+    if #lines == 0 then if tpbox then tpbox:hide() end return end
+    if not tpbox then
+        tpbox = texts.new('', { pos = { x = S.hud.tp_x or 20, y = S.hud.tp_y or 220 },
+            bg = { alpha = 190, red = 18, green = 20, blue = 26 }, text = { font = 'Consolas', size = 10 },
+            flags = { draggable = true }, padding = 4 })
+    end
+    local t = {}
+    for _, l in ipairs(lines) do t[#t + 1] = l.color and (l.color .. l.text .. '\\cr') or l.text end
+    hud.tp_text = table.concat(t, '\n')
+    tpbox:text(hud.tp_text)
+    tpbox:show()
+end
+
+function hud.destroy()
+    if box then box:destroy() box = nil end
+    if tpbox then tpbox:destroy() tpbox = nil end
+end
 
 function hud.init(settings, runtime_state, helpers)
     S, state, h = settings, runtime_state, helpers

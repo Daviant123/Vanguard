@@ -35,6 +35,7 @@ local function clock() return os.clock() end
 ------------------------------------------------------------------------
 local since = {}          -- condition key -> time it started (for "for N seconds")
 local last_sent = {}      -- alert key -> time last sent
+local mp_was_low = false  -- a low-MP alert went out: say "MP OK" once it is back over the limit
 
 local function alert(player, key, text)
     if last_sent[key] and clock() - last_sent[key] < (tonumber(S.alerts['repeat']) or 60) then return end
@@ -66,8 +67,18 @@ function alts.alerts(player)
     if (v.hpp or 100) > 0 and (v.hpp or 100) < (tonumber(S.alerts.hp) or 30) then
         alert(player, 'hp', ('HP %d%%'):format(v.hpp))
     end
-    if (v.max_mp or 0) > 0 and (v.mpp or 100) < (tonumber(S.alerts.mp) or 10) then
+    local mp_line = tonumber(S.alerts.mp) or 10
+    if (v.max_mp or 0) > 0 and (v.mpp or 100) < mp_line then
         alert(player, 'mp', ('MP %d%%'):format(v.mpp))
+        mp_was_low = true
+        since.mp_ok = nil
+    elseif mp_was_low and (v.max_mp or 0) > 0
+        and held('mp_ok', (v.mpp or 100) >= math.min(100, mp_line + 10), 3) then
+        -- "MP OK" once MP is clearly back over the limit after a low-MP alert (1.3.0, CurePlease F52's "MP OK!"
+        -- tell): 10 points over the line for 3 s, so a healer hovering around the line (Refresh ticks up, cures down)
+        -- doesn't send a "MP 9%" / "MP OK" pair on every crossing. Both alerts keep the alerts.repeat limit.
+        mp_was_low = false
+        alert(player, 'mp_ok', ('MP OK (%d%%)'):format(v.mpp or 100))
     end
     local leader = windower.ffxi.get_mob_by_name(S.leader)
     if held('gone', not leader, 20) then

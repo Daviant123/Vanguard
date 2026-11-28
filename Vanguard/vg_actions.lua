@@ -35,6 +35,39 @@ local function best_nuke(element, player, ready_only)
     return nil
 end
 
+-- Ninja tools (1.3.0, CurePlease audit F23): Utsusemi needs Shihei (or Shikanofuda, the universal tool for
+-- enhancing ninjutsu, only with NIN as the main job; Chonofuda is the enfeebling one and does nothing for Utsusemi).
+-- Without them the game refuses the cast and it was tried again and again. A Toolbag in the bag isn't a tool: the
+-- log says to open it. Logged once until the tools are back. Other spells: always true.
+-- Names are looked up through vg_items (ids only), never require('resources').items: that table is the 5 MB item
+-- list that ran the game out of memory (GitHub issues #2-#5).
+local TOOLS = { ['Utsusemi: Ichi'] = true, ['Utsusemi: Ni'] = true, ['Utsusemi: San'] = true }
+local tools_warned = false
+local function in_inventory(name)
+    local id = require('vg_items').id(name)
+    if not id then return false end
+    local list = windower.ffxi.get_items('inventory')
+    for _, it in ipairs(type(list) == 'table' and list or {}) do
+        if type(it) == 'table' and it.id == id and (it.count or 1) > 0 then return true end
+    end
+    return false
+end
+function engine.tools_ok(spell_name, player, log)
+    if not TOOLS[spell_name] then return true end
+    local nin = player.main_job == 'NIN'
+    if in_inventory('Shihei') or (nin and in_inventory('Shikanofuda')) then
+        tools_warned = false
+        return true
+    end
+    if not tools_warned and log then
+        tools_warned = true
+        log((in_inventory('Toolbag (Shihe)') and 'Utsusemi: no Shihei left - open a Toolbag (Shihei)')
+            or (nin and in_inventory('Toolbag (Shika)') and 'Utsusemi: no Shikanofuda left - open a Toolbag (Shikanofuda)')
+            or 'Utsusemi: no Shihei (ninja tools) - not casting it')
+    end
+    return false
+end
+
 -- Is a shield in the off hand? true / false, or nil when it can't be told (then it isn't held against anything).
 function engine.has_shield()
     local eq = windower.ffxi.get_items('equipment')
@@ -449,6 +482,7 @@ local function try(a, ctx, ja_set)
         if ctx.silenced(p) then return false end
         local spell = util.spell(a.name)
         if not util.spell_ready(spell, p, UNBRIDLED_OK) then return false end
+        if not engine.tools_ok(spell.en, p, ctx.log) then return false end   -- (Utsusemi: only with ninja tools)
         local pre = prep(a, ctx, ja_set) if pre then return pre == 'sent' end
         done = ctx.cast(spell, target, a.label)
     elseif a.kind == 'nuke' then
@@ -490,7 +524,9 @@ function engine.run(ctx, profile, filter)
         -- lists while it farms is left to that feature (his log 2026-11-10..14: Haste II on the leader, Reraise, Aquaveil,
         -- Auspice from both the Job tab and the Buffs tab; White Wind from the Job tab and EasyFarm's Healing list)
         local owned = engine.owner and engine.owner(a)
-        if not songs_own and not owned and (not filter or filter(a)) and engine.enabled(a, profile) and not engine.refused(a.id)
+        -- reactive actions (COR Quick Draw, 1.2.0) are used by their own feature when the thing they answer happens
+        -- (vg_support.quick_draw), never from this list: the toggle only says whether that feature may use it
+        if not a.reactive and not songs_own and not owned and (not filter or filter(a)) and engine.enabled(a, profile) and not engine.refused(a.id)
             and engine.available(a, ctx.player, ja_set) then
             if try(engine.effective(a, profile), ctx, ja_set) then return true end
         end

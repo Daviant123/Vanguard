@@ -333,6 +333,181 @@ function mages.on_action(act, player, res)
 end
 
 ------------------------------------------------------------------------
+-- Enfeebler mode (1.2.0, Silmaril audit 1.3): keep up to enfeebler.count mobs enfeebled - the battle target first,
+-- then the other mobs fighting the party (nearest first), then (enfeebler.pull) unclaimed mobs within enfeebler.range,
+-- only to fill the count. enfeebler.mobs = names (part of the name, comma list) it may take; '' = any.
+-- Spells: enfeebler.spells, else debuff.list, in order; each mob's records (state.debuffs) are the same ones the
+-- action handler fills (landed / resisted) and the other characters share (vg_share.debuff): no double Slow.
+-- Who owns what: with enfeebler.on it owns enfeebling (do_debuff in Vanguard.lua stands aside); sleeping extra mobs
+-- stays with mages.crowd while mages.sleep is on (the enfeebler then skips sleep spells). Sleep spells never go on an
+-- unclaimed mob (no sleeping as a pull) nor on the battle target. Healing first: it waits while a party member is
+-- under enfeebler.wait_hp (and pulling waits for farm.party_wait too), and while following a leader on the move.
+------------------------------------------------------------------------
+local function enf_named(mob, names)
+    if #names == 0 then return true end
+    local n = (mob.name or ''):lower()
+    for _, w in ipairs(names) do if n:find(w, 1, true) then return true end end
+    return false
+end
+
+-- Following a leader who is walking (or walking after him right now): no casting, it would stop the follow.
+function mages.enf_following(player)
+    if not S.modules.follow then return false end
+    local l = h.leader_mob(player)
+    if not l or not l.x then return false end
+    local t, lp = clock(), state.enf_leader
+    if lp and (math.abs(l.x - lp.x) > 0.1 or math.abs(l.y - lp.y) > 0.1) then state.enf_leader_moved = t end
+    state.enf_leader = { x = l.x, y = l.y }
+    if not lp then return true end                     -- (first look: one pass to see whether he walks)
+    if state.enf_leader_moved and t - state.enf_leader_moved < 1.5 then return true end
+    return state.running and state.run_by == 'move' or false
+end
+
+-- A party member (a player, not a trust) under enfeebler.wait_hp: the cures come first.
+function mages.enf_party_low(player)
+    local need = tonumber(S.enfeebler.wait_hp) or 50
+    for _, m in ipairs(h.party_members()) do
+        if m.mob and not m.mob.is_npc and (m.hpp or 100) > 0 and (m.hpp or 100) < need then return m end
+    end
+    return nil
+end
+
+-- Every mob this character could keep enfeebled, in its own order (not cut to enfeebler.count): the battle target,
+-- the mobs fighting the party (nearest first), then (enfeebler.pull, party ready) unclaimed ones.
+-- Each: { mob = , bt = true for the battle target, pull = true for an unclaimed one }. The team planner gets this list.
+function mages.enfeebler_candidates(player)
+    local E = S.enfeebler
+    local range = math.min(tonumber(E.range) or 20, 21)
+    local names = {}
+    for _, n in ipairs(util.split(E.mobs or '', ',')) do names[#names + 1] = n:lower() end
+    local party_idx, party_ids = {}, {}
+    for _, m in ipairs(h.party_members()) do
+        if m.mob then party_idx[m.mob.index] = true; party_ids[m.mob.id] = true end
+    end
+    util.alliance_ids(party_ids)
+    local bt = h.battle_target()
+    local fighting, free = {}, {}
+    -- a mob asleep (mages.crowd here or on another character, shared as vg_sleep) is left alone: Dia / Bio would wake
+    -- it (sleeping extra mobs wins over enfeebling them)
+    local slept = state.slept or {}
+    for _, mob in pairs(windower.ffxi.get_mob_array()) do
+        if mob.is_npc and mob.spawn_type == 16 and (mob.hpp or 0) > 0 and mob.valid_target ~= false
+            and util.dist(mob) <= range and enf_named(mob, names) and not (bt and mob.id == bt.id)
+            and not ((slept[mob.id] or 0) > clock()) then
+            local claim = mob.claim_id or 0
+            if party_idx[mob.target_index] or party_ids[claim] then
+                if mob.status == 1 or party_ids[claim] then fighting[#fighting + 1] = mob end
+            elseif claim == 0 and E.pull then
+                free[#free + 1] = mob
+            end
+        end
+    end
+    local near = function(a, b) return util.dist(a) < util.dist(b) end
+    table.sort(fighting, near)
+    table.sort(free, near)
+    local out = {}
+    if bt and util.dist(bt) <= range and enf_named(bt, names) then out[1] = { mob = bt, bt = true } end
+    for _, mob in ipairs(fighting) do out[#out + 1] = { mob = mob } end
+    -- pulling only fills the count (enfeebler_mobs), and only when the party is ready (farm.party_wait, when that's on)
+    if #free > 0 and not require('vg_farm').party_wait(player) then
+        for _, mob in ipairs(free) do out[#out + 1] = { mob = mob, pull = true } end
+    end
+    return out
+end
+
+-- The mobs to keep enfeebled, in order (at most enfeebler.count). Each: { mob = , pull = true for an unclaimed one }.
+-- Team planner (Vanguard Control 2.0.0, vg_plan): while a fresh plan names this character's mobs, only those (no two
+-- characters on one mob; an empty list = none now); no fresh plan = this character's own pick, as before.
+function mages.enfeebler_mobs(player)
+    local count = math.max(1, math.floor(tonumber(S.enfeebler.count) or 1))
+    local all = mages.enfeebler_candidates(player)
+    local mine = require('vg_plan').enf_for(player)
+    -- pulling only fills the count: never while the party already fights `count` mobs (also with a plan, which may
+    -- give the mobs we fight to someone else - that is no reason to pull a new one)
+    local fighting = 0
+    for _, c in ipairs(all) do if not c.pull then fighting = fighting + 1 end end
+    local out = {}
+    for _, c in ipairs(all) do
+        -- (the list is in order: fighting mobs come before unclaimed ones, so a pull only fills the count)
+        if (not mine or mine.set[c.mob.id]) and not (c.pull and fighting >= count) then out[#out + 1] = c end
+        if #out >= count then break end
+    end
+    return out
+end
+
+function mages.enfeebler(player)
+    local E = S.enfeebler
+    if not E or not E.on or h.silenced(player) then return false end
+    if mages.enf_party_low(player) then return false end
+    if mages.enf_following(player) then return false end
+    local list = util.split((E.spells or '') ~= '' and E.spells or (S.debuff.list or ''), ',')
+    if #list == 0 then return false end
+    local retries = tonumber(S.debuff.retries) or 1
+    local share = require('vg_share')
+    for _, c in ipairs(mages.enfeebler_mobs(player)) do
+        local mob = c.mob
+        state.debuffs[mob.id] = state.debuffs[mob.id] or {}
+        local rec = state.debuffs[mob.id]
+        for _, name in ipairs(list) do
+            local spell = util.spell(name)
+            local sleep = spell and SLEEP_SET[spell.en]
+            -- (no sleeping as a pull, nor the mob we fight; mages.crowd owns the sleeping of extra mobs when it's on)
+            local skip = not spell or (sleep and (c.pull or c.bt or S.mages.sleep))
+            if not skip then
+                local r = rec[spell.en] or { tries = 0, landed = false }
+                rec[spell.en] = r
+                local tgt = c.bt and '<bt>' or tostring(mob.id)
+                if not share.debuff_blocked(r) and r.tries <= retries and util.spell_ready(spell, player)
+                    and not h.recently('ma:' .. spell.en .. ':' .. tgt, 4) then
+                    if c.bt and mages.before_enfeeble(player, mob, spell.en, r) then return true end
+                    local why = ('enfeebler: %s%s'):format(mob.name or 'mob', c.pull and ' (pull)' or '')
+                    if h.cast(spell, tgt, why) then
+                        r.tries = r.tries + 1
+                        share.debuff(mob.id, spell.en, 'cast')
+                        return true
+                    end
+                    if state.stand_wait and clock() - state.stand_wait < 0.3 then return true end   -- (stopping to cast it)
+                    return false                       -- (refused: MP kept for cures and the like - try again later)
+                end
+            end
+        end
+    end
+    return false
+end
+
+-- //vg enfeebler on|off|count N|mobs <list>|pull on|off|stay on|off|spells <list>|status
+function mages.enfeebler_cmd(args)
+    local E = S.enfeebler
+    local sub = (args[1] or 'status'):lower()
+    local rest = table.concat(args, ' ', 2)
+    local v = (args[2] or ''):lower()
+    if sub == 'on' or sub == 'off' then E.on = (sub == 'on')
+    elseif sub == 'count' then
+        local n = tonumber(args[2])
+        if not n or n < 1 or n > 8 then h.log('Enfeebler: count 1 to 8') return false end
+        E.count = math.floor(n)
+    elseif sub == 'mobs' then E.mobs = (rest == 'any' or rest == 'none' or rest == 'clear') and '' or rest
+    elseif sub == 'spells' then E.spells = (rest == 'default' or rest == 'clear') and '' or rest
+    elseif sub == 'pull' or sub == 'stay' then
+        if v ~= 'on' and v ~= 'off' then h.log('Usage: //vg enfeebler ' .. sub .. ' on|off') return false end
+        E[sub] = (v == 'on')
+    elseif sub == 'range' then
+        local n = tonumber(args[2])
+        if not n or n < 1 or n > 21 then h.log('Enfeebler: range 1 to 21 yalms') return false end
+        E.range = n
+    elseif sub ~= 'status' then
+        h.log('Usage: //vg enfeebler on|off | count N | mobs <name,name>|any | pull on|off | stay on|off | spells <list>|default | range N')
+        return false
+    end
+    h.log(('Enfeebler %s: up to %d mob(s), %s, spells %s%s%s'):format(E.on and 'on' or 'off', tonumber(E.count) or 1,
+        (E.mobs or '') ~= '' and ('only ' .. E.mobs) or 'any mob fighting the party',
+        (E.spells or '') ~= '' and E.spells or ('the debuff list (' .. (S.debuff.list or '') .. ')'),
+        E.pull and (', pulls unclaimed mobs within %d\''):format(tonumber(E.range) or 20) or '',
+        E.stay and ', does not move' or ''))
+    return sub ~= 'status'
+end
+
+------------------------------------------------------------------------
 -- SCH stratagems
 ------------------------------------------------------------------------
 local REGENS = { 'Regen V', 'Regen IV', 'Regen III', 'Regen II', 'Regen' }
@@ -344,6 +519,115 @@ local CHAINS = {
     fusion        = { 'Fire', 'Thunder' },
 }
 mages.CHAINS = CHAINS
+
+------------------------------------------------------------------------
+-- Sortie round (his request 2026-11-25: "research sortie and the role sch can play with completing objectives";
+-- RESEARCH.md "Sortie and Scholar"). Under Immanence an elemental spell carries its element's skillchain property
+-- (bg-wiki Immanence / Skillchain): Fire Liquefaction, Stone Scission, Water Reverberation, Aero Detonation,
+-- Blizzard Induration, Thunder Impaction, Luminohelix Transfixion, Noctohelix Compression. Spells only have level-1
+-- properties, so a chain goes on while each result is level 1 and ends on a level-2 result (Fusion, Fragmentation,
+-- Gravitation, Distortion). The planner finds N spells in a row (Sortie D: a 4-step skillchain) ending on the chain
+-- picked, or on one that bursts the target's weak element.
+------------------------------------------------------------------------
+local PROP = { fire = 'Liquefaction', earth = 'Scission', water = 'Reverberation', wind = 'Detonation',
+               ice = 'Induration', thunder = 'Impaction', light = 'Transfixion', dark = 'Compression' }
+local SC = {     -- opener > closer (a level-1 property) = result (bg-wiki Skillchain table)
+    ['Compression>Transfixion'] = 'Transfixion',
+    ['Induration>Compression'] = 'Compression', ['Transfixion>Compression'] = 'Compression',
+    ['Impaction>Liquefaction'] = 'Liquefaction', ['Scission>Liquefaction'] = 'Liquefaction',
+    ['Liquefaction>Scission'] = 'Scission', ['Detonation>Scission'] = 'Scission',
+    ['Transfixion>Reverberation'] = 'Reverberation', ['Scission>Reverberation'] = 'Reverberation',
+    ['Impaction>Detonation'] = 'Detonation', ['Compression>Detonation'] = 'Detonation', ['Scission>Detonation'] = 'Detonation',
+    ['Reverberation>Induration'] = 'Induration',
+    ['Induration>Impaction'] = 'Impaction', ['Reverberation>Impaction'] = 'Impaction',
+    ['Liquefaction>Impaction'] = 'Fusion', ['Induration>Reverberation'] = 'Fragmentation',
+    ['Detonation>Compression'] = 'Gravitation', ['Transfixion>Scission'] = 'Distortion',
+}
+local LEVEL2 = { Fusion = true, Fragmentation = true, Gravitation = true, Distortion = true }
+local BURSTS = { Liquefaction = { 'fire' }, Scission = { 'earth' }, Reverberation = { 'water' }, Detonation = { 'wind' },
+                 Induration = { 'ice' }, Impaction = { 'thunder' }, Transfixion = { 'light' }, Compression = { 'dark' },
+                 Fusion = { 'fire', 'light' }, Fragmentation = { 'wind', 'thunder' }, Gravitation = { 'earth', 'dark' },
+                 Distortion = { 'ice', 'water' } }
+local NUKE = { fire = 'Fire', earth = 'Stone', water = 'Water', wind = 'Aero', ice = 'Blizzard', thunder = 'Thunder' }
+local HELIX = { fire = 'Pyrohelix', earth = 'Geohelix', water = 'Hydrohelix', wind = 'Anemohelix', ice = 'Cryohelix',
+                thunder = 'Ionohelix', light = 'Luminohelix', dark = 'Noctohelix' }
+local STORM = { fire = 'Firestorm', ice = 'Hailstorm', wind = 'Windstorm', earth = 'Sandstorm', thunder = 'Thunderstorm',
+                water = 'Rainstorm', light = 'Aurorastorm', dark = 'Voidstorm' }
+local STORM_ORDER = { 'fire', 'ice', 'wind', 'earth', 'thunder', 'water', 'light', 'dark' }   -- buff 178+i, II 589+i
+local ELEMENT_ALIAS = { stone = 'earth', aero = 'wind', blizzard = 'ice', lightning = 'thunder', ice = 'ice', fire = 'fire',
+                        earth = 'earth', wind = 'wind', thunder = 'thunder', water = 'water', light = 'light', dark = 'dark' }
+-- (non-helix elements first: plain nukes are faster and have no long recast; light / dark only as Helix)
+local TRY = { 'earth', 'fire', 'water', 'wind', 'ice', 'thunder', 'light', 'dark' }
+mages.PROP, mages.SC, mages.BURSTS = PROP, SC, BURSTS
+
+local function burst_has(result, element)
+    for _, e in ipairs(BURSTS[result] or {}) do if e == element then return true end end
+    return false
+end
+
+-- N elements in a row that keep a skillchain going: ending on the chain named (goal), or else on one that bursts the
+-- element given (a level-2 one preferred). nil when none fits.
+function mages.plan(steps, goal, element)
+    steps = math.max(2, math.min(5, tonumber(steps) or 2))
+    goal = goal and goal ~= '' and (goal:sub(1, 1):upper() .. goal:sub(2):lower()) or nil
+    local found
+    local function ok_end(result)
+        if goal then return result == goal end
+        if element then return burst_has(result, element) and (LEVEL2[result] or not found) end
+        return true
+    end
+    local seq = {}
+    local function walk(cur)
+        if found and (goal or LEVEL2[found.result]) then return end
+        if #seq == steps then
+            if ok_end(cur) then
+                local copy = {}
+                for i, e in ipairs(seq) do copy[i] = e end
+                found = { list = copy, result = cur }
+            end
+            return
+        end
+        for _, e in ipairs(TRY) do
+            local res = #seq == 0 and PROP[e] or SC[cur .. '>' .. PROP[e]]
+            -- a level-2 result ends the chain: only on the last spell
+            if res and (#seq == 0 or not LEVEL2[res] or #seq == steps - 1) then
+                seq[#seq + 1] = e
+                walk(#seq == 1 and PROP[e] or res)
+                seq[#seq] = nil
+                if found and (goal or LEVEL2[found.result]) then return end
+            end
+        end
+    end
+    walk(nil)
+    return found and found.list, found and found.result
+end
+
+-- Element by target (Sortie bosses and Naakuals): mages.elements = "Name:element,Name:element" (part of the name).
+function mages.target_element(mob)
+    if not mob or not mob.name then return nil end
+    -- Degei / Aita in Sortie: the element their last TP move made them weak to (vg_sortie)
+    local proc = require('vg_sortie').element_for(mob)
+    if proc then return proc end
+    local name = mob.name:lower()
+    for _, pair in ipairs(util.split(S.mages.elements or '', ',')) do
+        local n, e = pair:match('^%s*(.-)%s*:%s*(%a+)%s*$')
+        if n and n ~= '' and name:find(n:lower(), 1, true) then return ELEMENT_ALIAS[e:lower()] end
+    end
+    return nil
+end
+
+-- The spell for one step: light / dark only as Helix; the last step a Helix when "close with a Helix" is on.
+local function step_spell(element, last, player)
+    local function ready(n) local s = util.spell(n) return s and util.can_cast(s, player) and util.spell_ready(s, player) and s or nil end
+    if HELIX[element] and (last and S.mages.helix_close or not NUKE[element]) then
+        local tier = last and tostring(S.mages.helix_tier or '1') == '2'
+        local s = tier and ready(HELIX[element] .. ' II') or ready(HELIX[element]) or (not tier and ready(HELIX[element] .. ' II'))
+        if s or not NUKE[element] then return s end
+    end
+    if last then return ready(NUKE[element] .. ' II') or ready(NUKE[element]) end
+    return ready(NUKE[element]) or ready(NUKE[element] .. ' II')
+end
+mages.step_spell = step_spell
 
 local function best(list, player)
     for _, n in ipairs(list) do
@@ -395,23 +679,48 @@ local function closer(base, player)
     return s and util.spell_ready(s, player) and s or nil
 end
 
+-- The chain to make on this mob: the element set for it (mages.elements) picks a chain that bursts it, else the chain
+-- picked. Returns the elements in order and the result.
+function mages.chain_for(mob)
+    local steps = tonumber(S.mages.chain_steps) or 2
+    local el = mages.target_element(mob)
+    if el then
+        local list, res = mages.plan(steps, nil, el)
+        if list then return list, res, el end
+    end
+    if (S.mages.chain or '') == '' then return nil end
+    local list, res = mages.plan(steps, S.mages.chain)
+    return list, res, nil
+end
+
 local function sch_nuker(player)
-    local chain = CHAINS[S.mages.chain or '']
-    if not chain then return false end
+    if (S.mages.chain or '') == '' and (S.mages.elements or '') == '' then return false end
     if not (has(player.buffs, 'Dark Arts') or has(player.buffs, 'Addendum: Black')) then return false end
     local bt = h.battle_target()
     if not bt or util.dist(bt) > 21 or not h.party_engaged(player) then state.imm = nil return false end
+    if require('vg_sortie').no_chain(bt) then state.imm = nil return false end    -- (Degei / Aita: a skillchain heals them)
     local imm = state.imm
+    -- (each step must land inside the last one's window: 15 s without the next step and it starts over)
     if imm and (clock() - imm.t > 15 or imm.mob ~= bt.id) then imm = nil state.imm = nil end
     if not imm then
         if h.recently('imm_chain', tonumber(S.mages.chain_every) or 40) or player.vitals.mpp < 30 then return false end
-        if mages.charges() < 2 or not util.spell_ready(util.spell(chain[1]), player) then return false end
-        imm = { step = 1, t = clock(), mob = bt.id }
+        local list, res, el = mages.chain_for(bt)
+        if not list then
+            if not h.recently('imm_none', 120) then
+                h.mark('imm_none')
+                h.log(('Immanence chain: no %d-step chain ends on %s'):format(tonumber(S.mages.chain_steps) or 2, el or S.mages.chain))
+            end
+            return false
+        end
+        -- every step costs a charge (Immanence): only start what can be finished
+        if mages.charges() < #list or not step_spell(list[1], false, player) then return false end
+        imm = { step = 1, t = clock(), mob = bt.id, list = list, result = res }
         state.imm = imm
         h.mark('imm_chain')
     end
-    local spell = imm.step == 1 and util.spell(chain[1]) or closer(chain[2], player)
-    if not spell or not util.spell_ready(spell, player) then return false end
+    local last = imm.step >= #imm.list
+    local spell = step_spell(imm.list[imm.step], last, player)
+    if not spell then return false end
     if not has(player.buffs, 'Immanence') then
         if h.recently('ja:Immanence:<me>', 3) then return false end
         local ja = strat('Immanence', player)
@@ -420,28 +729,171 @@ local function sch_nuker(player)
     end
     local step = imm.step
     imm.step, imm.t = imm.step + 1, clock()
-    if step >= 2 then state.imm = nil end
-    return h.cast(spell, '<bt>', step == 1 and ('Immanence chain: open (%s)'):format(S.mages.chain)
-        or ('Immanence chain: close -> %s'):format(S.mages.chain))
+    if last then state.imm = nil end
+    return h.cast(spell, '<bt>', step == 1 and ('Immanence chain: open, %d steps -> %s'):format(#imm.list, imm.result)
+        or last and ('Immanence chain: step %d, close -> %s'):format(step, imm.result)
+        or ('Immanence chain: step %d'):format(step))
+end
+
+------------------------------------------------------------------------
+-- Magic killing blow (Sortie A: "vanquish 3 Abject foes with magic for the killing blow" - AoE counts only on the
+-- primary target, DoT doesn't count): a nearly dead mob gets a single-target nuke. mages.finish_hp = 0 off.
+------------------------------------------------------------------------
+local FINISH_TIERS = { ' V', ' IV', ' III', ' II', '' }
+
+-- The smallest ready single-target nuke of an element on <bt> (Sortie procs: 0 damage is enough, speed matters).
+function mages.quick_nuke(player, element, why)
+    local base = NUKE[element]
+    if not base then return false end
+    for i = #FINISH_TIERS, 1, -1 do
+        local s = util.spell(base .. FINISH_TIERS[i])
+        if s and util.can_cast(s, player) and util.spell_ready(s, player) and (player.vitals.mp or 0) >= (s.mp_cost or 0) then
+            return h.cast(s, '<bt>', why)
+        end
+    end
+    -- (a Helix works too)
+    local hx = util.spell(HELIX[element])
+    if hx and util.can_cast(hx, player) and util.spell_ready(hx, player) then return h.cast(hx, '<bt>', why) end
+    return false
+end
+
+-- With the Sortie setup on, the Scholar changes with the sector (vg_sortie): A Abject foes must die to magic (killing
+-- blow at 15 %), D a 4-step skillchain on 3 Demisang, elsewhere 2-step chains for the shortest burst cycle.
+function mages.sector_mode(sec)
+    if not S.mages.sortie_auto then return end
+    local steps, fin = 2, 0
+    if sec == 'A' then fin = 15 elseif sec == 'D' then steps = 4 end
+    if S.mages.chain_steps == steps and S.mages.finish_hp == fin then return end
+    S.mages.chain_steps, S.mages.finish_hp = steps, fin
+    state.imm = nil
+    h.log(('Sortie sector %s: %d-step chains%s'):format(sec, steps, fin > 0 and ', magic killing blow at 15%' or ''))
+end
+function mages.finisher(player)
+    local at = tonumber(S.mages.finish_hp) or 0
+    if at <= 0 or h.silenced(player) or state.imm then return false end
+    local bt = h.battle_target()
+    if not bt or (bt.hpp or 100) > at or (bt.hpp or 0) <= 0 or util.dist(bt) > 21 then return false end
+    if h.recently('finish_nuke:' .. bt.id, 4) then return false end
+    local order = {}
+    local el = mages.target_element(bt)
+    if el and NUKE[el] then order[1] = el end
+    for _, e in ipairs({ 'thunder', 'fire', 'ice', 'wind', 'earth', 'water' }) do if e ~= el then order[#order + 1] = e end end
+    -- (smallest tier that's ready first: it only has to finish the mob, and the fastest cast lands before a melee hit)
+    for _, e in ipairs(order) do
+        for i = #FINISH_TIERS, 1, -1 do
+            local s = util.spell(NUKE[e] .. FINISH_TIERS[i])
+            if s and util.can_cast(s, player) and util.spell_ready(s, player) and (player.vitals.mp or 0) >= (s.mp_cost or 0) then
+                h.mark('finish_nuke:' .. bt.id)
+                return h.cast(s, '<bt>', ('magic killing blow (%s at %d%%)'):format(bt.name or 'mob', bt.hpp or 0))
+            end
+        end
+    end
+    return false
+end
+
+------------------------------------------------------------------------
+-- Storm and Klimaform for the target's element (mages.storm_auto): the Storm of the weak element replaces any other.
+------------------------------------------------------------------------
+local function storm_on(buffs)
+    for i, e in ipairs(STORM_ORDER) do
+        if util.has_buff(buffs, 177 + i) or util.has_buff(buffs, 588 + i) then return e end
+    end
+    return nil
+end
+mages.storm_on = storm_on
+
+function mages.storm(player)
+    if not S.mages.storm_auto or player.main_job ~= 'SCH' or h.silenced(player) then return false end
+    local bt = h.battle_target()
+    if not bt or not h.party_engaged(player) then return false end
+    local el = mages.target_element(bt)
+    if not el then return false end
+    local function ready(n) local s = util.spell(n) return s and util.can_cast(s, player) and util.spell_ready(s, player) and s or nil end
+    if storm_on(player.buffs) ~= el and not h.recently('storm_el', 8) then
+        local s = ready(STORM[el] .. ' II') or ready(STORM[el])
+        if s then h.mark('storm_el') return h.cast(s, '<me>', ('%s is weak to %s'):format(bt.name or 'the mob', el)) end
+    end
+    if (S.mages.klimaform ~= false) and not util.has_buff(player.buffs, 407) and not h.recently('ma:Klimaform:<me>', 10) then
+        local s = ready('Klimaform')
+        if s then return h.cast(s, '<me>', 'Klimaform') end
+    end
+    return false
+end
+
+-- Bursting: the target's weak element first when the skillchain bursts it.
+function mages.burst_order(elements, mob)
+    -- Degei / Aita: only the proc element (anything else heals them back); none while it isn't known
+    local only = require('vg_sortie').only_element(mob)
+    if only then
+        local out = {}
+        for _, e in ipairs(elements) do if e:lower() == only then out[#out + 1] = e end end
+        return out
+    end
+    local el = mages.target_element(mob)
+    if not el then return elements end
+    local out = {}
+    for _, e in ipairs(elements) do if e:lower() == el then table.insert(out, 1, e) else out[#out + 1] = e end end
+    return out
 end
 
 function mages.sch(player)
     if player.main_job ~= 'SCH' or h.silenced(player) then return false end
-    if role() == 'healer' then return sch_healer(player) end
-    if role() == 'nuker' and S.mages.immanence then return sch_nuker(player) end
+    if role() == 'healer' then
+        if sch_healer(player) then return true end
+        -- a healer Scholar makes its chains too when "also as healer" is ticked (Sortie: a single Scholar does both)
+        return S.mages.immanence and S.mages.chain_healer and sch_nuker(player) or false
+    end
+    if S.mages.immanence and (role() == 'nuker' or S.mages.chain_healer) then return sch_nuker(player) end
     return false
 end
 
-function mages.set_chain(name)
+-- Sortie bosses and Naakuals and the element to use on them (FFXIAH Sortie mage guide, Kylos 2025; RESEARCH.md):
+-- Naakual weaknesses Bztavian Ice/Fire, Rockfin Thunder/Stone, Gabbrath Thunder/Water, Yggdreant Fire/Wind,
+-- Waktza Earth/Ice, Cehuetzi Fire; Stone on Ghatjot and Dhartok, Fire on Skomora and Triboulex, Fire on the Acuex in A.
+mages.SORTIE_ELEMENTS = 'Bztavian:ice,Rockfin:thunder,Gabbrath:thunder,Yggdreant:fire,Waktza:earth,Cehuetzi:fire,'
+    .. 'Ghatjot:earth,Dhartok:earth,Skomora:fire,Triboulex:fire,Acuex:fire'
+
+-- //vg sortie: the Scholar set up for Sortie in one go (his request 2026-11-25); //vg sortie d: 4-step chains for
+-- Sector D's objective. Saved as a profile from the app.
+function mages.sortie(which)
+    which = (which or ''):lower()
+    S.mages.elements = mages.SORTIE_ELEMENTS
+    S.mages.helix_close, S.mages.helix_tier = true, 1
+    S.mages.chain_healer = true
+    S.mages.storm_auto, S.mages.klimaform = true, true
+    S.mages.finish_hp = 15
+    S.mages.chain_every = 20
+    S.mages.chain, S.mages.immanence = 'fusion', true
+    S.mages.chain_steps = which == 'd' and 4 or 2
+    S.mages.sortie_auto = true                           -- (then the sector decides: vg_sortie / mages.sector_mode)
+    S.modules.burst = true
+    h.log(('Sortie setup: %d-step Immanence chains closed with a Helix (Fusion, or the boss / Naakual\'s weak element), '
+        .. 'its Storm + Klimaform, bursts on, magic killing blow at 15%%%s')
+        :format(S.mages.chain_steps, which == 'd' and ' - Sector D: 4-step chains (//vg sortie for 2-step)' or ''))
+    return true
+end
+
+function mages.set_chain(name, steps)
     name = (name or ''):lower()
-    if name ~= 'off' and not CHAINS[name] then
-        h.log('Usage: //vg chain liquefaction|scission|reverberation|detonation|fusion|off')
+    local n = tonumber(steps)
+    if name ~= 'off' and not BURSTS[name:sub(1, 1):upper() .. name:sub(2)] then
+        h.log('Usage: //vg chain <skillchain> [2-5 steps] | off   (liquefaction, scission, reverberation, detonation, '
+            .. 'induration, impaction, transfixion, compression, fusion, fragmentation, gravitation, distortion)')
         return false
     end
+    if n and (n < 2 or n > 5) then h.log('Steps: 2 to 5') return false end
+    if n then S.mages.chain_steps = n end
     S.mages.chain = name == 'off' and '' or name
     S.mages.immanence = name ~= 'off'
-    h.log(name == 'off' and 'Immanence skillchains off'
-        or ('Immanence skillchain: %s (%s -> %s)'):format(name, CHAINS[name][1], CHAINS[name][2]))
+    if name == 'off' then h.log('Immanence skillchains off') return true end
+    local list, res = mages.plan(S.mages.chain_steps or 2, name)
+    if not list then
+        h.log(('Immanence skillchain: no %d-step chain ends on %s - try another number of steps'):format(S.mages.chain_steps or 2, name))
+        return true
+    end
+    local names = {}
+    for i, e in ipairs(list) do names[i] = (NUKE[e] or HELIX[e]) end
+    h.log(('Immanence skillchain: %s in %d steps (%s)'):format(res, #list, table.concat(names, ' > ')))
     return true
 end
 

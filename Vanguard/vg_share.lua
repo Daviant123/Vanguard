@@ -43,13 +43,49 @@ function share.debuff_blocked(r) return r.landed or (r.other_until and clock() <
 ------------------------------------------------------------------------
 -- Cures
 ------------------------------------------------------------------------
+local my_claim            -- { target = lower name or '*', at } my last "I'm curing X" (for share.release)
+
 function share.cure(player, target, seconds)
-    windower.send_ipc_message(('vg_cure %s %s %d'):format(player.name, target, math.ceil(seconds)))
+    my_claim = { target = target:lower(), at = clock() }
+    windower.send_ipc_message(('vg_cure %s %s %d'):format(player.name, target, math.max(1, math.ceil(seconds))))
+end
+
+-- The game refused my cure because I can't see this member (1.3.0, CurePlease audit 3.1): take back my claim on him
+-- (or my Curaga's claim on everyone), so the other healers don't keep leaving him to me. "vg_cure <me> <who> 0" =
+-- released (real claims are always 1 s or more). Returns true when a claim was taken back.
+function share.release(player, name)
+    if not my_claim or clock() - my_claim.at > 15 or type(name) ~= 'string' then return false end
+    local n = name:lower()
+    if my_claim.target ~= n and my_claim.target ~= '*' then return false end
+    windower.send_ipc_message(('vg_cure %s %s 0'):format(player.name, my_claim.target == '*' and '*' or name))
+    my_claim = nil
+    return true
+end
+
+-- I can't see this member (cant_see): told to the others so the team planner's split doesn't keep him mine
+-- ("vg_unseen <me> <who> <seconds>", see plan.cure_elsewhere).
+function share.unseen(player, name, seconds)
+    windower.send_ipc_message(('vg_unseen %s %s %d'):format(player.name, name, math.ceil(seconds)))
+end
+
+function share.on_unseen(player, from, target, seconds)
+    if from:lower() == player.name:lower() then return end
+    state.unseen_by = state.unseen_by or {}
+    state.unseen_by[target:lower() .. '#' .. from:lower()] = clock() + (tonumber(seconds) or 3) + 1
+end
+
+-- does this healer report he can't see this member right now?
+function share.unseen_by(healer, member_name)
+    local t = (state.unseen_by or {})[tostring(member_name):lower() .. '#' .. tostring(healer):lower()]
+    return t ~= nil and clock() < t
 end
 
 function share.on_cure(player, from, target, seconds)
     if from:lower() == player.name:lower() then return end
     state.cured = state.cured or {}
+    -- 0 = the healer took his claim back (share.release). (A second healer's claim on the same member is only one
+    -- line of state here; it goes too - the worst case is that member being looked at again, not left alone.)
+    if tonumber(seconds) == 0 then state.cured[target:lower()] = nil return end
     state.cured[target:lower()] = clock() + (tonumber(seconds) or 3) + 1
 end
 
